@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   StyleSheet,
   Text,
@@ -40,14 +40,15 @@ export default function CollectionScreen() {
 
   const [valueData, setValueData] = useState<ValueResponse | null>(null);
   const [valueLoading, setValueLoading] = useState(false);
+  const valueFetchRef = useRef(0);
 
   const allCards = useMemo(() => {
     const cards: { game: string; cardId: string }[] = [];
     for (const game of Object.keys(collection)) {
-      const sets = collection[game];
-      if (!sets) continue;
-      for (const setId of Object.keys(sets)) {
-        const cardIds = sets[setId];
+      const gameSets = collection[game];
+      if (!gameSets) continue;
+      for (const setId of Object.keys(gameSets)) {
+        const cardIds = gameSets[setId];
         if (!cardIds) continue;
         for (const cardId of cardIds) {
           cards.push({ game, cardId });
@@ -57,30 +58,36 @@ export default function CollectionScreen() {
     return cards;
   }, [collection]);
 
+  const allCardsRef = useRef(allCards);
+  allCardsRef.current = allCards;
+
+  const allCardsKey = useMemo(() => {
+    return allCards.map(c => `${c.game}:${c.cardId}`).sort().join(",");
+  }, [allCards]);
+
   useEffect(() => {
-    if (allCards.length === 0) {
+    const currentCards = allCardsRef.current;
+    if (currentCards.length === 0) {
       setValueData(null);
+      setValueLoading(false);
       return;
     }
-    let cancelled = false;
+    const fetchId = ++valueFetchRef.current;
     setValueLoading(true);
-    apiRequest("POST", "/api/collection/value", { cards: allCards })
+    apiRequest("POST", "/api/collection/value", { cards: currentCards })
       .then(async (res) => {
-        if (!cancelled) {
+        if (fetchId === valueFetchRef.current) {
           const data = await res.json();
           setValueData(data);
         }
       })
       .catch(() => {
-        if (!cancelled) setValueData(null);
+        if (fetchId === valueFetchRef.current) setValueData(null);
       })
       .finally(() => {
-        if (!cancelled) setValueLoading(false);
+        if (fetchId === valueFetchRef.current) setValueLoading(false);
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [allCards]);
+  }, [allCardsKey]);
 
   const { data: sets, isLoading } = useQuery<TCGSet[]>({
     queryKey: [`/api/tcg/${selectedGame}/sets`],
@@ -213,7 +220,7 @@ export default function CollectionScreen() {
         <StatCard
           icon="albums"
           label="Sets Started"
-          value={String(collectedSets.length)}
+          value={String(uniqueSetsStarted)}
           color={gameColor}
         />
         <StatCard

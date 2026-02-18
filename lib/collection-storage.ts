@@ -29,7 +29,7 @@ export async function addCardToCollection(
     collection[game][setId].push(cardId);
   }
   await saveCollection(collection);
-  return collection;
+  return JSON.parse(JSON.stringify(collection));
 }
 
 export async function removeCardFromCollection(
@@ -44,7 +44,7 @@ export async function removeCardFromCollection(
     if (Object.keys(collection[game]).length === 0) delete collection[game];
   }
   await saveCollection(collection);
-  return collection;
+  return JSON.parse(JSON.stringify(collection));
 }
 
 export function getCollectedCount(collection: CollectionData, game?: GameId): number {
