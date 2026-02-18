@@ -33,7 +33,7 @@ function formatCurrency(value: number): string {
 
 export default function CollectionScreen() {
   const insets = useSafeAreaInsets();
-  const { colors, toggle, isDark } = useTheme();
+  const { colors } = useTheme();
   const [selectedGame, setSelectedGame] = useState<GameId>("pokemon");
   const { totalCards, setCards, collection } = useCollection();
 
@@ -228,15 +228,6 @@ export default function CollectionScreen() {
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               {totalCards()} cards collected
             </Text>
-          </View>
-          <View style={styles.topBarActions}>
-            <Pressable onPress={toggle} hitSlop={8}>
-              <Ionicons
-                name={isDark ? "sunny-outline" : "moon-outline"}
-                size={22}
-                color={colors.text}
-              />
-            </Pressable>
           </View>
         </View>
       </View>
