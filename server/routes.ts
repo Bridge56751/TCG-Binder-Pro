@@ -109,18 +109,22 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
     const lang = result.language === "ja" ? "ja" : "en";
 
     if (game === "pokemon") {
+      const extractPokemonSetId = (cId: string) => {
+        const lastDash = cId.lastIndexOf("-");
+        return lastDash > 0 ? cId.substring(0, lastDash) : setId;
+      };
       const cardId = `${setId}-${cardNumber}`;
       const res = await fetch(`https://api.tcgdex.net/v2/${lang}/cards/${encodeURIComponent(cardId)}`);
       if (res.ok) {
         const card = await res.json();
-        return { name: card.name, cardId: card.id };
+        return { name: card.name, cardId: card.id, setId: extractPokemonSetId(card.id) };
       }
       if (lang === "ja" && cardNumber.length < 3) {
         const paddedId = `${setId}-${cardNumber.padStart(3, "0")}`;
         const paddedRes = await fetch(`https://api.tcgdex.net/v2/ja/cards/${encodeURIComponent(paddedId)}`);
         if (paddedRes.ok) {
           const card = await paddedRes.json();
-          return { name: card.name, cardId: card.id };
+          return { name: card.name, cardId: card.id, setId: extractPokemonSetId(card.id) };
         }
       }
       const setRes = await fetch(`https://api.tcgdex.net/v2/${lang}/sets/${encodeURIComponent(setId)}`);
@@ -128,15 +132,15 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
         const setData = await setRes.json();
         if (setData.cards) {
           const match = setData.cards.find((c: any) => c.localId === cardNumber);
-          if (match) return { name: match.name, cardId: match.id };
+          if (match) return { name: match.name, cardId: match.id, setId: extractPokemonSetId(match.id) };
           const numPadded = cardNumber.replace(/^0+/, "");
           const matchPadded = setData.cards.find((c: any) => c.localId.replace(/^0+/, "") === numPadded);
-          if (matchPadded) return { name: matchPadded.name, cardId: matchPadded.id };
+          if (matchPadded) return { name: matchPadded.name, cardId: matchPadded.id, setId: extractPokemonSetId(matchPadded.id) };
           const nameMatches = setData.cards.filter((c: any) =>
             c.name.toLowerCase() === name.toLowerCase()
           );
           if (nameMatches.length === 1) {
-            return { name: nameMatches[0].name, cardId: nameMatches[0].id };
+            return { name: nameMatches[0].name, cardId: nameMatches[0].id, setId: extractPokemonSetId(nameMatches[0].id) };
           }
           if (nameMatches.length > 1) {
             const cardNum = parseInt(cardNumber, 10);
@@ -150,10 +154,19 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
                   closestDist = dist;
                 }
               }
-              return { name: closest.name, cardId: closest.id };
+              return { name: closest.name, cardId: closest.id, setId: extractPokemonSetId(closest.id) };
             }
-            return { name: nameMatches[0].name, cardId: nameMatches[0].id };
+            return { name: nameMatches[0].name, cardId: nameMatches[0].id, setId: extractPokemonSetId(nameMatches[0].id) };
           }
+        }
+      }
+      const searchByName = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(name)}`);
+      if (searchByName.ok) {
+        const searchData = await searchByName.json();
+        if (Array.isArray(searchData) && searchData.length > 0) {
+          const byNum = searchData.find((c: any) => c.localId === cardNumber);
+          const match = byNum || searchData[0];
+          return { name: match.name, cardId: match.id, setId: extractPokemonSetId(match.id) };
         }
       }
     } else if (game === "yugioh") {
