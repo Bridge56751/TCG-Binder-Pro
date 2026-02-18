@@ -7,6 +7,7 @@ import {
   Platform,
   Pressable,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
@@ -27,7 +28,7 @@ export default function SetDetailScreen() {
   const insets = useSafeAreaInsets();
   const { game, id } = useLocalSearchParams<{ game: string; id: string }>();
   const gameId = game as GameId;
-  const { hasCard, setCards } = useCollection();
+  const { hasCard, setCards, removeCard } = useCollection();
   const { colors } = useTheme();
 
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
@@ -309,22 +310,39 @@ export default function SetDetailScreen() {
         keyExtractor={(item) => item.id}
         numColumns={NUM_COLUMNS}
         ListHeaderComponent={renderHeader}
-        renderItem={({ item }) => (
-          <View style={styles.cellWrapper}>
-            <CardCell
-              cardId={item.id}
-              localId={item.localId}
-              name={item.name}
-              imageUrl={item.image}
-              isCollected={hasCard(gameId, id || "", item.id)}
-              onPress={() => {
-                if (hasCard(gameId, id || "", item.id)) {
-                  router.push(`/card/${game}/${item.id}`);
-                }
-              }}
-            />
-          </View>
-        )}
+        renderItem={({ item }) => {
+          const collected = hasCard(gameId, id || "", item.id);
+          return (
+            <View style={styles.cellWrapper}>
+              <CardCell
+                cardId={item.id}
+                localId={item.localId}
+                name={item.name}
+                imageUrl={item.image}
+                isCollected={collected}
+                onPress={() => {
+                  if (collected) {
+                    router.push(`/card/${game}/${item.id}`);
+                  }
+                }}
+                onLongPress={collected ? () => {
+                  Alert.alert(
+                    "Remove Card",
+                    `Remove ${item.name} from your collection?`,
+                    [
+                      { text: "Cancel", style: "cancel" },
+                      {
+                        text: "Remove",
+                        style: "destructive",
+                        onPress: () => removeCard(gameId, id || "", item.id),
+                      },
+                    ]
+                  );
+                } : undefined}
+              />
+            </View>
+          );
+        }}
         columnWrapperStyle={styles.row}
         contentContainerStyle={[
           styles.gridContent,

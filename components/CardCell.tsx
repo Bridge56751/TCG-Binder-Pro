@@ -11,12 +11,15 @@ interface CardCellProps {
   imageUrl: string | null;
   isCollected: boolean;
   onPress: () => void;
+  onLongPress?: () => void;
 }
 
-export function CardCell({ cardId, localId, name, imageUrl, isCollected, onPress }: CardCellProps) {
+export function CardCell({ cardId, localId, name, imageUrl, isCollected, onPress, onLongPress }: CardCellProps) {
   const { colors } = useTheme();
   const Wrapper = isCollected ? Pressable : View;
-  const wrapperProps = isCollected ? { onPress, style: styles.container } : { style: styles.container };
+  const wrapperProps = isCollected
+    ? { onPress, onLongPress, delayLongPress: 400, style: styles.container }
+    : { style: styles.container };
   return (
     <Wrapper {...wrapperProps}>
 
