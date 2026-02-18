@@ -93,8 +93,26 @@ export default function CollectionScreen() {
     queryKey: [`/api/tcg/${selectedGame}/sets`],
   });
 
+  const { data: japaneseSets } = useQuery<TCGSet[]>({
+    queryKey: [`/api/tcg/pokemon/sets?lang=ja`],
+    enabled: selectedGame === "pokemon",
+  });
+
+  const japaneseSetIds = useMemo(() => {
+    if (!japaneseSets) return new Set<string>();
+    return new Set(japaneseSets.map((s) => s.id));
+  }, [japaneseSets]);
+
+  const combinedSets = useMemo(() => {
+    if (selectedGame !== "pokemon" || !japaneseSets) return sets || [];
+    const enSets = sets || [];
+    const enIds = new Set(enSets.map((s) => s.id));
+    const jaOnly = japaneseSets.filter((s) => !enIds.has(s.id));
+    return [...enSets, ...jaOnly];
+  }, [sets, japaneseSets, selectedGame]);
+
   const collectedSets =
-    sets?.filter(
+    combinedSets.filter(
       (s) => (collection[selectedGame]?.[s.id]?.length || 0) > 0
     ) || [];
 
@@ -154,9 +172,10 @@ export default function CollectionScreen() {
     GAMES.find((g) => g.id === selectedGame)?.color || colors.tint;
 
   const navigateToSet = (setId: string) => {
+    const isJa = selectedGame === "pokemon" && japaneseSetIds.has(setId) && !(sets || []).find((s) => s.id === setId);
     router.push({
       pathname: "/set/[game]/[id]",
-      params: { game: selectedGame, id: setId },
+      params: { game: selectedGame, id: setId, lang: isJa ? "ja" : "en" },
     });
   };
 
