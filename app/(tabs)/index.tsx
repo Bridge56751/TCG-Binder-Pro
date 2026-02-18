@@ -389,6 +389,15 @@ export default function CollectionScreen() {
               </View>
             );
           })}
+          <View style={[styles.perGameTotal, { borderTopColor: colors.cardBorder }]}>
+            <Ionicons name="cube" size={14} color={colors.tint} />
+            <Text style={[styles.perGameTotalLabel, { color: colors.text }]}>
+              Total Collection
+            </Text>
+            <Text style={[styles.perGameTotalCount, { color: colors.tint }]}>
+              {totalCards()}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -666,6 +675,23 @@ const styles = StyleSheet.create({
   perGameCount: {
     fontFamily: "DMSans_700Bold",
     fontSize: 16,
+  },
+  perGameTotal: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingTop: 10,
+    marginTop: 6,
+    borderTopWidth: 1,
+    gap: 8,
+  },
+  perGameTotalLabel: {
+    flex: 1,
+    fontFamily: "DMSans_600SemiBold",
+    fontSize: 14,
+  },
+  perGameTotalCount: {
+    fontFamily: "DMSans_700Bold",
+    fontSize: 18,
   },
   selectorRow: {
     marginBottom: 8,
