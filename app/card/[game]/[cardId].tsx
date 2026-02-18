@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -8,6 +8,7 @@ import {
   Pressable,
   ActivityIndicator,
   Dimensions,
+  Share,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
@@ -15,7 +16,20 @@ import { useQuery } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LineChart } from "react-native-chart-kit";
-import Colors from "@/constants/colors";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  interpolate,
+} from "react-native-reanimated";
+import { useTheme } from "@/lib/ThemeContext";
+import {
+  getTradeList,
+  addToTradeList,
+  removeFromTradeList,
+  isOnTradeList,
+} from "@/lib/trade-list-storage";
+import type { TradeItem } from "@/lib/trade-list-storage";
 import type { CardDetail, GameId } from "@/lib/types";
 import { GAMES } from "@/lib/types";
 
@@ -23,6 +37,7 @@ const screenWidth = Dimensions.get("window").width;
 
 export default function CardDetailScreen() {
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
   const { game, cardId } = useLocalSearchParams<{ game: string; cardId: string }>();
   const gameId = game as GameId;
   const topInset = Platform.OS === "web" ? 67 : insets.top;
@@ -30,24 +45,66 @@ export default function CardDetailScreen() {
 
   const gameInfo = GAMES.find((g) => g.id === gameId);
 
+  const [tradeList, setTradeList] = useState<TradeItem[]>([]);
+  const flipAnim = useSharedValue(90);
+
+  useEffect(() => {
+    getTradeList().then(setTradeList);
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      flipAnim.value = withTiming(0, { duration: 600 });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const flipStyle = useAnimatedStyle(() => {
+    const rotateY = interpolate(flipAnim.value, [0, 90], [0, 90]);
+    return {
+      transform: [{ perspective: 1000 }, { rotateY: `${rotateY}deg` }],
+    };
+  });
+
   const { data: card, isLoading } = useQuery<CardDetail>({
     queryKey: [`/api/tcg/${game}/card/${cardId}`],
   });
 
+  const onTrade = card ? isOnTradeList(tradeList, gameId, card.id) : false;
+
+  const handleTradeToggle = async () => {
+    if (!card) return;
+    if (onTrade) {
+      const updated = await removeFromTradeList(gameId, card.id);
+      setTradeList(updated);
+    } else {
+      const updated = await addToTradeList(gameId, card.setId, card.id);
+      setTradeList(updated);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!card) return;
+    const message = `${card.name} - ${card.setName} #${card.localId}\nRarity: ${card.rarity || "N/A"}\nMarket Price: $${card.currentPrice?.toFixed(2) || "N/A"}\n\nTracked with CardVault`;
+    try {
+      await Share.share({ message });
+    } catch {}
+  };
+
   if (isLoading) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={Colors.light.tint} />
-        <Text style={styles.loadingText}>Loading card details...</Text>
+      <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.tint} />
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading card details...</Text>
       </View>
     );
   }
 
   if (!card) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <Ionicons name="alert-circle-outline" size={48} color={Colors.light.textTertiary} />
-        <Text style={styles.loadingText}>Card not found</Text>
+      <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
+        <Ionicons name="alert-circle-outline" size={48} color={colors.textTertiary} />
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Card not found</Text>
       </View>
     );
   }
@@ -76,60 +133,83 @@ export default function CardDetailScreen() {
 
   const priceUp = priceChange >= 0;
 
+  const chartBg = isDark ? colors.surface : "#FFFFFF";
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: bottomInset + 20 }}
       >
         <View style={[styles.topBar, { paddingTop: topInset + 8 }]}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={24} color={Colors.light.text} />
+            <Ionicons name="chevron-back" size={24} color={colors.text} />
           </Pressable>
           <View style={styles.headerInfo}>
-            <Text style={styles.headerTitle} numberOfLines={1}>{card.name}</Text>
-            <Text style={styles.headerSub}>
+            <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>{card.name}</Text>
+            <Text style={[styles.headerSub, { color: colors.textSecondary }]}>
               {card.setName} - #{card.localId}
             </Text>
           </View>
+          <Pressable style={styles.actionButton} onPress={handleTradeToggle}>
+            <Ionicons
+              name="swap-horizontal"
+              size={22}
+              color={onTrade ? colors.tint : colors.textTertiary}
+            />
+            {onTrade && (
+              <View style={[styles.actionDot, { backgroundColor: colors.tint }]} />
+            )}
+          </Pressable>
+          <Pressable style={styles.actionButton} onPress={handleShare}>
+            <Ionicons name="share-outline" size={22} color={colors.textTertiary} />
+          </Pressable>
         </View>
 
         <View style={styles.imageSection}>
-          {card.image ? (
-            <Image
-              source={{ uri: card.image }}
-              style={styles.cardImage}
-              contentFit="contain"
-              transition={300}
-            />
-          ) : (
-            <View style={[styles.cardImage, styles.noImage]}>
-              <Ionicons name="image-outline" size={48} color={Colors.light.textTertiary} />
-            </View>
-          )}
+          <Animated.View style={flipStyle}>
+            {card.image ? (
+              <Image
+                source={{ uri: card.image }}
+                style={styles.cardImage}
+                contentFit="contain"
+                transition={300}
+              />
+            ) : (
+              <View style={[styles.cardImage, styles.noImage, { backgroundColor: colors.surfaceAlt }]}>
+                <Ionicons name="image-outline" size={48} color={colors.textTertiary} />
+              </View>
+            )}
+            {onTrade && (
+              <View style={[styles.tradeBadge, { backgroundColor: colors.tint }]}>
+                <Ionicons name="swap-horizontal" size={10} color="#FFFFFF" />
+                <Text style={styles.tradeBadgeText}>For Trade</Text>
+              </View>
+            )}
+          </Animated.View>
         </View>
 
         <View style={styles.infoSection}>
           <View style={styles.badgeRow}>
             {card.rarity && (
-              <View style={[styles.badge, { backgroundColor: (gameInfo?.color || Colors.light.tint) + "18" }]}>
-                <Ionicons name="diamond" size={12} color={gameInfo?.color || Colors.light.tint} />
-                <Text style={[styles.badgeText, { color: gameInfo?.color || Colors.light.tint }]}>
+              <View style={[styles.badge, { backgroundColor: (gameInfo?.color || colors.tint) + "18" }]}>
+                <Ionicons name="diamond" size={12} color={gameInfo?.color || colors.tint} />
+                <Text style={[styles.badgeText, { color: gameInfo?.color || colors.tint }]}>
                   {card.rarity}
                 </Text>
               </View>
             )}
             {card.cardType && (
-              <View style={[styles.badge, { backgroundColor: Colors.light.surfaceAlt }]}>
-                <Text style={[styles.badgeText, { color: Colors.light.textSecondary }]}>
+              <View style={[styles.badge, { backgroundColor: colors.surfaceAlt }]}>
+                <Text style={[styles.badgeText, { color: colors.textSecondary }]}>
                   {card.cardType}
                 </Text>
               </View>
             )}
             {card.hp != null && (
-              <View style={[styles.badge, { backgroundColor: Colors.light.error + "18" }]}>
-                <Ionicons name="heart" size={12} color={Colors.light.error} />
-                <Text style={[styles.badgeText, { color: Colors.light.error }]}>
+              <View style={[styles.badge, { backgroundColor: colors.error + "18" }]}>
+                <Ionicons name="heart" size={12} color={colors.error} />
+                <Text style={[styles.badgeText, { color: colors.error }]}>
                   {gameId === "yugioh" ? `ATK ${card.hp}` : `HP ${card.hp}`}
                 </Text>
               </View>
@@ -138,26 +218,26 @@ export default function CardDetailScreen() {
 
           {card.artist && (
             <View style={styles.artistRow}>
-              <Ionicons name="brush" size={14} color={Colors.light.textTertiary} />
-              <Text style={styles.artistText}>Illustrated by {card.artist}</Text>
+              <Ionicons name="brush" size={14} color={colors.textTertiary} />
+              <Text style={[styles.artistText, { color: colors.textTertiary }]}>Illustrated by {card.artist}</Text>
             </View>
           )}
 
           {card.description && (
-            <View style={styles.descCard}>
-              <Text style={styles.descLabel}>Card Details</Text>
-              <Text style={styles.descText}>{card.description}</Text>
+            <View style={[styles.descCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              <Text style={[styles.descLabel, { color: colors.textSecondary }]}>Card Details</Text>
+              <Text style={[styles.descText, { color: colors.text }]}>{card.description}</Text>
             </View>
           )}
         </View>
 
         {hasPrice && (
           <View style={styles.priceSection}>
-            <Text style={styles.sectionTitle}>Market Price</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Market Price</Text>
 
-            <View style={styles.priceCard}>
+            <View style={[styles.priceCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
               <View style={styles.priceMain}>
-                <Text style={styles.priceValue}>
+                <Text style={[styles.priceValue, { color: colors.text }]}>
                   {card.priceUnit === "EUR" ? "\u20AC" : "$"}
                   {card.currentPrice!.toFixed(2)}
                 </Text>
@@ -173,25 +253,25 @@ export default function CardDetailScreen() {
                 </View>
               </View>
 
-              <View style={styles.priceRange}>
+              <View style={[styles.priceRange, { borderTopColor: colors.surfaceAlt }]}>
                 {card.priceLow != null && (
                   <View style={styles.priceRangeItem}>
-                    <Text style={styles.priceRangeLabel}>Low</Text>
-                    <Text style={styles.priceRangeValue}>
+                    <Text style={[styles.priceRangeLabel, { color: colors.textTertiary }]}>Low</Text>
+                    <Text style={[styles.priceRangeValue, { color: colors.text }]}>
                       ${card.priceLow.toFixed(2)}
                     </Text>
                   </View>
                 )}
                 <View style={styles.priceRangeItem}>
-                  <Text style={styles.priceRangeLabel}>Market</Text>
-                  <Text style={[styles.priceRangeValue, { color: Colors.light.tint }]}>
+                  <Text style={[styles.priceRangeLabel, { color: colors.textTertiary }]}>Market</Text>
+                  <Text style={[styles.priceRangeValue, { color: colors.tint }]}>
                     ${card.currentPrice!.toFixed(2)}
                   </Text>
                 </View>
                 {card.priceHigh != null && (
                   <View style={styles.priceRangeItem}>
-                    <Text style={styles.priceRangeLabel}>High</Text>
-                    <Text style={styles.priceRangeValue}>
+                    <Text style={[styles.priceRangeLabel, { color: colors.textTertiary }]}>High</Text>
+                    <Text style={[styles.priceRangeValue, { color: colors.text }]}>
                       ${card.priceHigh.toFixed(2)}
                     </Text>
                   </View>
@@ -204,7 +284,7 @@ export default function CardDetailScreen() {
         {hasPriceHistory && chartData.length > 2 && (
           <View style={styles.chartSection}>
             <View style={styles.chartHeader}>
-              <Text style={styles.sectionTitle}>90-Day Price History</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>90-Day Price History</Text>
               <View style={[styles.trendIcon, priceUp ? styles.trendUp : styles.trendDown]}>
                 <MaterialCommunityIcons
                   name={priceUp ? "arrow-top-right" : "arrow-bottom-right"}
@@ -214,7 +294,7 @@ export default function CardDetailScreen() {
               </View>
             </View>
 
-            <View style={styles.chartCard}>
+            <View style={[styles.chartCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
               <LineChart
                 data={{
                   labels: chartLabels,
@@ -229,15 +309,15 @@ export default function CardDetailScreen() {
                 withDots={false}
                 withShadow={false}
                 chartConfig={{
-                  backgroundColor: "#FFFFFF",
-                  backgroundGradientFrom: "#FFFFFF",
-                  backgroundGradientTo: "#FFFFFF",
+                  backgroundColor: chartBg,
+                  backgroundGradientFrom: chartBg,
+                  backgroundGradientTo: chartBg,
                   decimalPlaces: 2,
-                  color: () => gameInfo?.color || Colors.light.tint,
-                  labelColor: () => Colors.light.textTertiary,
+                  color: () => gameInfo?.color || colors.tint,
+                  labelColor: () => colors.textTertiary,
                   propsForBackgroundLines: {
                     strokeDasharray: "",
-                    stroke: Colors.light.surfaceAlt,
+                    stroke: colors.surfaceAlt,
                     strokeWidth: 1,
                   },
                   propsForLabels: {
@@ -254,8 +334,8 @@ export default function CardDetailScreen() {
 
         {!hasPrice && (
           <View style={styles.noPriceSection}>
-            <Ionicons name="pricetag-outline" size={32} color={Colors.light.textTertiary} />
-            <Text style={styles.noPriceText}>Price data not available for this card</Text>
+            <Ionicons name="pricetag-outline" size={32} color={colors.textTertiary} />
+            <Text style={[styles.noPriceText, { color: colors.textTertiary }]}>Price data not available for this card</Text>
           </View>
         )}
       </ScrollView>
@@ -266,7 +346,6 @@ export default function CardDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
   },
   centered: {
     alignItems: "center",
@@ -276,7 +355,6 @@ const styles = StyleSheet.create({
   loadingText: {
     fontFamily: "DMSans_400Regular",
     fontSize: 14,
-    color: Colors.light.textSecondary,
   },
   topBar: {
     flexDirection: "row",
@@ -291,6 +369,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  actionButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionDot: {
+    position: "absolute",
+    bottom: 6,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
   headerInfo: {
     flex: 1,
     gap: 2,
@@ -298,12 +389,10 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: "DMSans_700Bold",
     fontSize: 20,
-    color: Colors.light.text,
   },
   headerSub: {
     fontFamily: "DMSans_400Regular",
     fontSize: 13,
-    color: Colors.light.textSecondary,
   },
   imageSection: {
     alignItems: "center",
@@ -316,9 +405,24 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   noImage: {
-    backgroundColor: Colors.light.surfaceAlt,
     alignItems: "center",
     justifyContent: "center",
+  },
+  tradeBadge: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  tradeBadgeText: {
+    fontFamily: "DMSans_600SemiBold",
+    fontSize: 10,
+    color: "#FFFFFF",
   },
   infoSection: {
     paddingHorizontal: 20,
@@ -350,25 +454,20 @@ const styles = StyleSheet.create({
   artistText: {
     fontFamily: "DMSans_400Regular",
     fontSize: 13,
-    color: Colors.light.textTertiary,
   },
   descCard: {
-    backgroundColor: Colors.light.surface,
     borderRadius: 12,
     padding: 16,
     gap: 8,
     borderWidth: 1,
-    borderColor: Colors.light.cardBorder,
   },
   descLabel: {
     fontFamily: "DMSans_600SemiBold",
     fontSize: 13,
-    color: Colors.light.textSecondary,
   },
   descText: {
     fontFamily: "DMSans_400Regular",
     fontSize: 13,
-    color: Colors.light.text,
     lineHeight: 20,
   },
   priceSection: {
@@ -379,15 +478,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontFamily: "DMSans_600SemiBold",
     fontSize: 16,
-    color: Colors.light.text,
   },
   priceCard: {
-    backgroundColor: Colors.light.surface,
     borderRadius: 14,
     padding: 16,
     gap: 16,
     borderWidth: 1,
-    borderColor: Colors.light.cardBorder,
   },
   priceMain: {
     flexDirection: "row",
@@ -397,7 +493,6 @@ const styles = StyleSheet.create({
   priceValue: {
     fontFamily: "DMSans_700Bold",
     fontSize: 32,
-    color: Colors.light.text,
   },
   changeBadge: {
     flexDirection: "row",
@@ -428,7 +523,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: Colors.light.surfaceAlt,
   },
   priceRangeItem: {
     alignItems: "center",
@@ -437,12 +531,10 @@ const styles = StyleSheet.create({
   priceRangeLabel: {
     fontFamily: "DMSans_400Regular",
     fontSize: 12,
-    color: Colors.light.textTertiary,
   },
   priceRangeValue: {
     fontFamily: "DMSans_600SemiBold",
     fontSize: 15,
-    color: Colors.light.text,
   },
   chartSection: {
     paddingHorizontal: 20,
@@ -468,11 +560,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#FDE8E5",
   },
   chartCard: {
-    backgroundColor: Colors.light.surface,
     borderRadius: 14,
     padding: 12,
     borderWidth: 1,
-    borderColor: Colors.light.cardBorder,
     alignItems: "center",
   },
   chart: {
@@ -486,6 +576,5 @@ const styles = StyleSheet.create({
   noPriceText: {
     fontFamily: "DMSans_400Regular",
     fontSize: 14,
-    color: Colors.light.textTertiary,
   },
 });

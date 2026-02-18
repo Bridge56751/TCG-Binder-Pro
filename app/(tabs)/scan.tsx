@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   StyleSheet,
   Text,
@@ -7,6 +7,7 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  ScrollView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
@@ -14,21 +15,70 @@ import * as ImagePicker from "expo-image-picker";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import Colors from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
 import { useCollection } from "@/lib/CollectionContext";
+import { useTheme } from "@/lib/ThemeContext";
 import type { CardIdentification, GameId } from "@/lib/types";
-import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
+import {
+  getScanHistory,
+  addToScanHistory,
+  clearScanHistory,
+  type ScanHistoryItem,
+} from "@/lib/scan-history-storage";
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeOut,
+  SlideInUp,
+  SlideOutUp,
+} from "react-native-reanimated";
+
+function timeAgo(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function gameLabel(game: GameId): string {
+  if (game === "pokemon") return "Pokemon";
+  if (game === "yugioh") return "Yu-Gi-Oh!";
+  return "One Piece";
+}
 
 export default function ScanScreen() {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<CardIdentification | null>(null);
   const { addCard } = useCollection();
 
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchCount, setBatchCount] = useState(0);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>([]);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
+
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 84 + 34 : 100;
+
+  useEffect(() => {
+    getScanHistory().then(setScanHistory);
+  }, []);
+
+  const showToast = useCallback((msg: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToastMessage(msg);
+    toastTimer.current = setTimeout(() => {
+      setToastMessage(null);
+    }, 2000);
+  }, []);
 
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -87,22 +137,31 @@ export default function ScanScreen() {
       scanResult.setId,
       `${scanResult.setId}-${scanResult.cardNumber}`
     );
+    const updatedHistory = await addToScanHistory(scanResult, true);
+    setScanHistory(updatedHistory);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert(
-      "Added!",
-      `${scanResult.name} has been added to your collection.`,
-      [
-        { text: "Scan Another", onPress: resetScan },
-        {
-          text: "View Set",
-          onPress: () =>
-            router.push({
-              pathname: "/set/[game]/[id]",
-              params: { game: scanResult.game, id: scanResult.setId },
-            }),
-        },
-      ]
-    );
+
+    if (batchMode) {
+      setBatchCount((c) => c + 1);
+      showToast(`${scanResult.name} added!`);
+      resetScan();
+    } else {
+      Alert.alert(
+        "Added!",
+        `${scanResult.name} has been added to your collection.`,
+        [
+          { text: "Scan Another", onPress: resetScan },
+          {
+            text: "View Set",
+            onPress: () =>
+              router.push({
+                pathname: "/set/[game]/[id]",
+                params: { game: scanResult.game, id: scanResult.setId },
+              }),
+          },
+        ]
+      );
+    }
   };
 
   const resetScan = () => {
@@ -111,324 +170,582 @@ export default function ScanScreen() {
     setIsScanning(false);
   };
 
-  return (
-    <View style={[styles.container, { paddingTop: topInset }]}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Scan Card</Text>
-        <Text style={styles.subtitle}>Take a photo or pick from your library</Text>
-      </View>
+  const handleClearHistory = async () => {
+    await clearScanHistory();
+    setScanHistory([]);
+  };
 
-      <View style={styles.scanArea}>
-        {imageUri ? (
-          <Animated.View entering={FadeIn.duration(300)} style={styles.previewWrapper}>
-            <Image source={{ uri: imageUri }} style={styles.preview} contentFit="contain" />
-            {isScanning && (
-              <View style={styles.scanningOverlay}>
-                <ActivityIndicator size="large" color={Colors.light.tint} />
-                <Text style={styles.scanningText}>Identifying card...</Text>
+  const historyItems = scanHistory.slice(0, 10);
+
+  const dynamicStyles = getDynamicStyles(colors);
+
+  return (
+    <ScrollView
+      style={[dynamicStyles.container, { paddingTop: topInset }]}
+      contentContainerStyle={{ paddingBottom: bottomInset }}
+      showsVerticalScrollIndicator={false}
+    >
+      {toastMessage && (
+        <Animated.View
+          entering={SlideInUp.duration(300)}
+          exiting={SlideOutUp.duration(300)}
+          style={[dynamicStyles.toast, { top: topInset + 4 }]}
+        >
+          <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
+          <Text style={dynamicStyles.toastText}>{toastMessage}</Text>
+        </Animated.View>
+      )}
+
+      <View style={dynamicStyles.header}>
+        <View style={dynamicStyles.headerRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={dynamicStyles.title}>Scan Card</Text>
+            <Text style={dynamicStyles.subtitle}>Take a photo or pick from your library</Text>
+          </View>
+          <View style={dynamicStyles.batchToggleArea}>
+            {batchMode && batchCount > 0 && (
+              <View style={[dynamicStyles.batchCounter, { backgroundColor: colors.success + "20" }]}>
+                <Text style={[dynamicStyles.batchCounterText, { color: colors.success }]}>
+                  {batchCount}
+                </Text>
               </View>
             )}
-            <Pressable style={styles.clearButton} onPress={resetScan}>
+            <Pressable
+              style={[
+                dynamicStyles.batchToggle,
+                {
+                  backgroundColor: batchMode ? colors.tint : colors.surfaceAlt,
+                },
+              ]}
+              onPress={() => {
+                setBatchMode((b) => !b);
+                if (!batchMode) setBatchCount(0);
+              }}
+            >
+              <Ionicons
+                name="layers"
+                size={16}
+                color={batchMode ? "#FFFFFF" : colors.textSecondary}
+              />
+              <Text
+                style={[
+                  dynamicStyles.batchToggleText,
+                  { color: batchMode ? "#FFFFFF" : colors.textSecondary },
+                ]}
+              >
+                Batch
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+
+      <View style={dynamicStyles.scanArea}>
+        {imageUri ? (
+          <Animated.View entering={FadeIn.duration(300)} style={[dynamicStyles.previewWrapper, { backgroundColor: colors.surfaceAlt }]}>
+            <Image source={{ uri: imageUri }} style={dynamicStyles.preview} contentFit="contain" />
+            {isScanning && (
+              <View style={dynamicStyles.scanningOverlay}>
+                <ActivityIndicator size="large" color={colors.tint} />
+                <Text style={[dynamicStyles.scanningText, { color: colors.text }]}>Identifying card...</Text>
+              </View>
+            )}
+            <Pressable style={dynamicStyles.clearButton} onPress={resetScan}>
               <Ionicons name="close" size={20} color="#FFFFFF" />
             </Pressable>
           </Animated.View>
         ) : (
-          <View style={styles.placeholder}>
-            <View style={styles.crosshairContainer}>
-              <View style={[styles.corner, styles.topLeft]} />
-              <View style={[styles.corner, styles.topRight]} />
-              <View style={[styles.corner, styles.bottomLeft]} />
-              <View style={[styles.corner, styles.bottomRight]} />
+          <View style={[dynamicStyles.placeholder, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardBorder }]}>
+            <View style={dynamicStyles.crosshairContainer}>
+              <View style={[dynamicStyles.corner, dynamicStyles.topLeft, { borderColor: colors.tint }]} />
+              <View style={[dynamicStyles.corner, dynamicStyles.topRight, { borderColor: colors.tint }]} />
+              <View style={[dynamicStyles.corner, dynamicStyles.bottomLeft, { borderColor: colors.tint }]} />
+              <View style={[dynamicStyles.corner, dynamicStyles.bottomRight, { borderColor: colors.tint }]} />
               <MaterialCommunityIcons
                 name="cards-outline"
                 size={48}
-                color={Colors.light.textTertiary}
+                color={colors.textTertiary}
               />
-              <Text style={styles.placeholderText}>Position card within frame</Text>
+              <Text style={[dynamicStyles.placeholderText, { color: colors.textTertiary }]}>Position card within frame</Text>
             </View>
           </View>
         )}
       </View>
 
       {scanResult && (
-        <Animated.View entering={FadeInDown.duration(400).springify()} style={styles.resultCard}>
-          <View style={styles.resultHeader}>
-            <View style={styles.resultInfo}>
-              <Text style={styles.resultName}>{scanResult.name}</Text>
-              <Text style={styles.resultSet}>
+        <Animated.View entering={FadeInDown.duration(400).springify()} style={[dynamicStyles.resultCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+          <View style={dynamicStyles.resultHeader}>
+            <View style={dynamicStyles.resultInfo}>
+              <Text style={[dynamicStyles.resultName, { color: colors.text }]}>{scanResult.name}</Text>
+              <Text style={[dynamicStyles.resultSet, { color: colors.textSecondary }]}>
                 {scanResult.setName} - #{scanResult.cardNumber}
               </Text>
-              <View style={styles.resultMeta}>
-                <View style={[styles.badge, { backgroundColor: Colors.light[scanResult.game] + "20" }]}>
-                  <Text style={[styles.badgeText, { color: Colors.light[scanResult.game] }]}>
-                    {scanResult.game === "pokemon"
-                      ? "Pokemon"
-                      : scanResult.game === "yugioh"
-                        ? "Yu-Gi-Oh!"
-                        : "One Piece"}
+              <View style={dynamicStyles.resultMeta}>
+                <View style={[dynamicStyles.badge, { backgroundColor: colors[scanResult.game] + "20" }]}>
+                  <Text style={[dynamicStyles.badgeText, { color: colors[scanResult.game] }]}>
+                    {gameLabel(scanResult.game)}
                   </Text>
                 </View>
-                <View style={[styles.badge, { backgroundColor: Colors.light.surfaceAlt }]}>
-                  <Text style={[styles.badgeText, { color: Colors.light.textSecondary }]}>
+                <View style={[dynamicStyles.badge, { backgroundColor: colors.surfaceAlt }]}>
+                  <Text style={[dynamicStyles.badgeText, { color: colors.textSecondary }]}>
                     {scanResult.rarity}
                   </Text>
                 </View>
               </View>
             </View>
-            <View style={styles.priceTag}>
-              <Text style={styles.priceLabel}>Value</Text>
-              <Text style={styles.priceValue}>
+            <View style={dynamicStyles.priceTag}>
+              <Text style={[dynamicStyles.priceLabel, { color: colors.textTertiary }]}>Value</Text>
+              <Text style={[dynamicStyles.priceValue, { color: colors.success }]}>
                 ${scanResult.estimatedValue?.toFixed(2) || "0.00"}
               </Text>
             </View>
           </View>
           <Pressable
-            style={({ pressed }) => [styles.addButton, pressed && { opacity: 0.9 }]}
+            style={({ pressed }) => [dynamicStyles.addButton, { backgroundColor: colors.tint }, pressed && { opacity: 0.9 }]}
             onPress={handleAddToCollection}
           >
             <Ionicons name="add-circle" size={20} color="#FFFFFF" />
-            <Text style={styles.addButtonText}>Add to Collection</Text>
+            <Text style={dynamicStyles.addButtonText}>Add to Collection</Text>
           </Pressable>
         </Animated.View>
       )}
 
-      <View style={[styles.actions, { paddingBottom: bottomInset }]}>
+      <View style={dynamicStyles.actions}>
         <Pressable
-          style={({ pressed }) => [styles.actionButton, styles.primaryAction, pressed && { opacity: 0.9 }]}
+          style={({ pressed }) => [dynamicStyles.actionButton, dynamicStyles.primaryAction, { backgroundColor: colors.tint }, pressed && { opacity: 0.9 }]}
           onPress={takePhoto}
         >
           <Ionicons name="camera" size={24} color="#FFFFFF" />
-          <Text style={styles.primaryActionText}>Take Photo</Text>
+          <Text style={dynamicStyles.primaryActionText}>Take Photo</Text>
         </Pressable>
         <Pressable
-          style={({ pressed }) => [styles.actionButton, styles.secondaryAction, pressed && { opacity: 0.9 }]}
+          style={({ pressed }) => [dynamicStyles.actionButton, dynamicStyles.secondaryAction, { backgroundColor: colors.surface, borderColor: colors.cardBorder }, pressed && { opacity: 0.9 }]}
           onPress={pickImage}
         >
-          <Ionicons name="images" size={22} color={Colors.light.tint} />
-          <Text style={styles.secondaryActionText}>Library</Text>
+          <Ionicons name="images" size={22} color={colors.tint} />
+          <Text style={[dynamicStyles.secondaryActionText, { color: colors.tint }]}>Library</Text>
         </Pressable>
       </View>
-    </View>
+
+      {scanHistory.length > 0 && (
+        <View style={dynamicStyles.historySection}>
+          <Pressable
+            style={dynamicStyles.historyHeader}
+            onPress={() => setHistoryExpanded((e) => !e)}
+          >
+            <View style={dynamicStyles.historyHeaderLeft}>
+              <Ionicons name="time-outline" size={18} color={colors.textSecondary} />
+              <Text style={[dynamicStyles.historyTitle, { color: colors.text }]}>Recent Scans</Text>
+              <View style={[dynamicStyles.historyCountBadge, { backgroundColor: colors.surfaceAlt }]}>
+                <Text style={[dynamicStyles.historyCountText, { color: colors.textSecondary }]}>
+                  {historyItems.length}
+                </Text>
+              </View>
+            </View>
+            <View style={dynamicStyles.historyHeaderRight}>
+              {historyExpanded && (
+                <Pressable onPress={handleClearHistory} hitSlop={8}>
+                  <Text style={[dynamicStyles.clearText, { color: colors.error }]}>Clear</Text>
+                </Pressable>
+              )}
+              <Ionicons
+                name={historyExpanded ? "chevron-up" : "chevron-down"}
+                size={18}
+                color={colors.textTertiary}
+              />
+            </View>
+          </Pressable>
+
+          {historyExpanded && (
+            <Animated.View entering={FadeIn.duration(200)}>
+              {historyItems.map((item) => (
+                <Pressable
+                  key={item.id}
+                  style={[dynamicStyles.historyItem, { borderTopColor: colors.cardBorder }]}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/card/[game]/[cardId]",
+                      params: { game: item.game, cardId: `${item.setId}-${item.cardNumber}` },
+                    })
+                  }
+                >
+                  <View style={dynamicStyles.historyItemLeft}>
+                    <Text style={[dynamicStyles.historyItemName, { color: colors.text }]} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    <View style={dynamicStyles.historyItemMeta}>
+                      <View style={[dynamicStyles.historyGameBadge, { backgroundColor: colors[item.game] + "15" }]}>
+                        <Text style={[dynamicStyles.historyGameText, { color: colors[item.game] }]}>
+                          {gameLabel(item.game)}
+                        </Text>
+                      </View>
+                      <Text style={[dynamicStyles.historySetText, { color: colors.textTertiary }]} numberOfLines={1}>
+                        {item.setName}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={dynamicStyles.historyItemRight}>
+                    <Text style={[dynamicStyles.historyValue, { color: colors.success }]}>
+                      ${item.estimatedValue?.toFixed(2) || "0.00"}
+                    </Text>
+                    <Text style={[dynamicStyles.historyTime, { color: colors.textTertiary }]}>
+                      {timeAgo(item.scannedAt)}
+                    </Text>
+                  </View>
+                </Pressable>
+              ))}
+            </Animated.View>
+          )}
+        </View>
+      )}
+    </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.light.background,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  title: {
-    fontFamily: "DMSans_700Bold",
-    fontSize: 28,
-    color: Colors.light.text,
-  },
-  subtitle: {
-    fontFamily: "DMSans_400Regular",
-    fontSize: 14,
-    color: Colors.light.textSecondary,
-    marginTop: 2,
-  },
-  scanArea: {
-    flex: 1,
-    marginHorizontal: 20,
-    marginVertical: 12,
-    borderRadius: 20,
-    overflow: "hidden",
-  },
-  placeholder: {
-    flex: 1,
-    backgroundColor: Colors.light.surfaceAlt,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: Colors.light.cardBorder,
-    borderStyle: "dashed",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  crosshairContainer: {
-    width: 200,
-    height: 280,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-  },
-  corner: {
-    position: "absolute",
-    width: 30,
-    height: 30,
-    borderColor: Colors.light.tint,
-  },
-  topLeft: {
-    top: 0,
-    left: 0,
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
-    borderTopLeftRadius: 8,
-  },
-  topRight: {
-    top: 0,
-    right: 0,
-    borderTopWidth: 3,
-    borderRightWidth: 3,
-    borderTopRightRadius: 8,
-  },
-  bottomLeft: {
-    bottom: 0,
-    left: 0,
-    borderBottomWidth: 3,
-    borderLeftWidth: 3,
-    borderBottomLeftRadius: 8,
-  },
-  bottomRight: {
-    bottom: 0,
-    right: 0,
-    borderBottomWidth: 3,
-    borderRightWidth: 3,
-    borderBottomRightRadius: 8,
-  },
-  placeholderText: {
-    fontFamily: "DMSans_400Regular",
-    fontSize: 13,
-    color: Colors.light.textTertiary,
-  },
-  previewWrapper: {
-    flex: 1,
-    borderRadius: 20,
-    overflow: "hidden",
-    backgroundColor: Colors.light.surfaceAlt,
-  },
-  preview: {
-    flex: 1,
-  },
-  scanningOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(250, 247, 242, 0.85)",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-  },
-  scanningText: {
-    fontFamily: "DMSans_500Medium",
-    fontSize: 15,
-    color: Colors.light.text,
-  },
-  clearButton: {
-    position: "absolute",
-    top: 12,
-    right: 12,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  resultCard: {
-    marginHorizontal: 20,
-    backgroundColor: Colors.light.surface,
-    borderRadius: 16,
-    padding: 16,
-    gap: 14,
-    borderWidth: 1,
-    borderColor: Colors.light.cardBorder,
-  },
-  resultHeader: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  resultInfo: {
-    flex: 1,
-    gap: 4,
-  },
-  resultName: {
-    fontFamily: "DMSans_700Bold",
-    fontSize: 17,
-    color: Colors.light.text,
-  },
-  resultSet: {
-    fontFamily: "DMSans_400Regular",
-    fontSize: 13,
-    color: Colors.light.textSecondary,
-  },
-  resultMeta: {
-    flexDirection: "row",
-    gap: 6,
-    marginTop: 4,
-  },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  badgeText: {
-    fontFamily: "DMSans_500Medium",
-    fontSize: 11,
-  },
-  priceTag: {
-    alignItems: "flex-end",
-    justifyContent: "center",
-    gap: 2,
-  },
-  priceLabel: {
-    fontFamily: "DMSans_400Regular",
-    fontSize: 11,
-    color: Colors.light.textTertiary,
-  },
-  priceValue: {
-    fontFamily: "DMSans_700Bold",
-    fontSize: 22,
-    color: Colors.light.success,
-  },
-  addButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: Colors.light.tint,
-    paddingVertical: 14,
-    borderRadius: 12,
-  },
-  addButtonText: {
-    fontFamily: "DMSans_600SemiBold",
-    fontSize: 15,
-    color: "#FFFFFF",
-  },
-  actions: {
-    flexDirection: "row",
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-  },
-  actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 14,
-  },
-  primaryAction: {
-    flex: 2,
-    backgroundColor: Colors.light.tint,
-  },
-  primaryActionText: {
-    fontFamily: "DMSans_600SemiBold",
-    fontSize: 15,
-    color: "#FFFFFF",
-  },
-  secondaryAction: {
-    flex: 1,
-    backgroundColor: Colors.light.surface,
-    borderWidth: 1,
-    borderColor: Colors.light.cardBorder,
-  },
-  secondaryActionText: {
-    fontFamily: "DMSans_600SemiBold",
-    fontSize: 15,
-    color: Colors.light.tint,
-  },
-});
+function getDynamicStyles(colors: any) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    toast: {
+      position: "absolute",
+      left: 20,
+      right: 20,
+      zIndex: 100,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: colors.success,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderRadius: 12,
+    },
+    toastText: {
+      fontFamily: "DMSans_600SemiBold",
+      fontSize: 14,
+      color: "#FFFFFF",
+    },
+    header: {
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+    },
+    headerRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    title: {
+      fontFamily: "DMSans_700Bold",
+      fontSize: 28,
+      color: colors.text,
+    },
+    subtitle: {
+      fontFamily: "DMSans_400Regular",
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    batchToggleArea: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    batchCounter: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    batchCounterText: {
+      fontFamily: "DMSans_700Bold",
+      fontSize: 12,
+    },
+    batchToggle: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 20,
+    },
+    batchToggleText: {
+      fontFamily: "DMSans_600SemiBold",
+      fontSize: 13,
+    },
+    scanArea: {
+      height: 320,
+      marginHorizontal: 20,
+      marginVertical: 12,
+      borderRadius: 20,
+      overflow: "hidden",
+    },
+    placeholder: {
+      flex: 1,
+      borderRadius: 20,
+      borderWidth: 2,
+      borderStyle: "dashed",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    crosshairContainer: {
+      width: 200,
+      height: 280,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 12,
+    },
+    corner: {
+      position: "absolute",
+      width: 30,
+      height: 30,
+    },
+    topLeft: {
+      top: 0,
+      left: 0,
+      borderTopWidth: 3,
+      borderLeftWidth: 3,
+      borderTopLeftRadius: 8,
+    },
+    topRight: {
+      top: 0,
+      right: 0,
+      borderTopWidth: 3,
+      borderRightWidth: 3,
+      borderTopRightRadius: 8,
+    },
+    bottomLeft: {
+      bottom: 0,
+      left: 0,
+      borderBottomWidth: 3,
+      borderLeftWidth: 3,
+      borderBottomLeftRadius: 8,
+    },
+    bottomRight: {
+      bottom: 0,
+      right: 0,
+      borderBottomWidth: 3,
+      borderRightWidth: 3,
+      borderBottomRightRadius: 8,
+    },
+    placeholderText: {
+      fontFamily: "DMSans_400Regular",
+      fontSize: 13,
+    },
+    previewWrapper: {
+      flex: 1,
+      borderRadius: 20,
+      overflow: "hidden",
+    },
+    preview: {
+      flex: 1,
+    },
+    scanningOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: "rgba(250, 247, 242, 0.85)",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 12,
+    },
+    scanningText: {
+      fontFamily: "DMSans_500Medium",
+      fontSize: 15,
+    },
+    clearButton: {
+      position: "absolute",
+      top: 12,
+      right: 12,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    resultCard: {
+      marginHorizontal: 20,
+      borderRadius: 16,
+      padding: 16,
+      gap: 14,
+      borderWidth: 1,
+    },
+    resultHeader: {
+      flexDirection: "row",
+      gap: 12,
+    },
+    resultInfo: {
+      flex: 1,
+      gap: 4,
+    },
+    resultName: {
+      fontFamily: "DMSans_700Bold",
+      fontSize: 17,
+    },
+    resultSet: {
+      fontFamily: "DMSans_400Regular",
+      fontSize: 13,
+    },
+    resultMeta: {
+      flexDirection: "row",
+      gap: 6,
+      marginTop: 4,
+    },
+    badge: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+    },
+    badgeText: {
+      fontFamily: "DMSans_500Medium",
+      fontSize: 11,
+    },
+    priceTag: {
+      alignItems: "flex-end",
+      justifyContent: "center",
+      gap: 2,
+    },
+    priceLabel: {
+      fontFamily: "DMSans_400Regular",
+      fontSize: 11,
+    },
+    priceValue: {
+      fontFamily: "DMSans_700Bold",
+      fontSize: 22,
+    },
+    addButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      paddingVertical: 14,
+      borderRadius: 12,
+    },
+    addButtonText: {
+      fontFamily: "DMSans_600SemiBold",
+      fontSize: 15,
+      color: "#FFFFFF",
+    },
+    actions: {
+      flexDirection: "row",
+      gap: 12,
+      paddingHorizontal: 20,
+      paddingTop: 12,
+    },
+    actionButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      paddingVertical: 14,
+      borderRadius: 14,
+    },
+    primaryAction: {
+      flex: 2,
+    },
+    primaryActionText: {
+      fontFamily: "DMSans_600SemiBold",
+      fontSize: 15,
+      color: "#FFFFFF",
+    },
+    secondaryAction: {
+      flex: 1,
+      borderWidth: 1,
+    },
+    secondaryActionText: {
+      fontFamily: "DMSans_600SemiBold",
+      fontSize: 15,
+    },
+    historySection: {
+      marginHorizontal: 20,
+      marginTop: 20,
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      overflow: "hidden",
+    },
+    historyHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+    },
+    historyHeaderLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    historyTitle: {
+      fontFamily: "DMSans_600SemiBold",
+      fontSize: 15,
+    },
+    historyCountBadge: {
+      paddingHorizontal: 7,
+      paddingVertical: 2,
+      borderRadius: 8,
+    },
+    historyCountText: {
+      fontFamily: "DMSans_500Medium",
+      fontSize: 11,
+    },
+    historyHeaderRight: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    clearText: {
+      fontFamily: "DMSans_500Medium",
+      fontSize: 13,
+    },
+    historyItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderTopWidth: 1,
+    },
+    historyItemLeft: {
+      flex: 1,
+      gap: 4,
+      marginRight: 12,
+    },
+    historyItemName: {
+      fontFamily: "DMSans_600SemiBold",
+      fontSize: 14,
+    },
+    historyItemMeta: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    historyGameBadge: {
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+    },
+    historyGameText: {
+      fontFamily: "DMSans_500Medium",
+      fontSize: 10,
+    },
+    historySetText: {
+      fontFamily: "DMSans_400Regular",
+      fontSize: 11,
+      flexShrink: 1,
+    },
+    historyItemRight: {
+      alignItems: "flex-end",
+      gap: 2,
+    },
+    historyValue: {
+      fontFamily: "DMSans_700Bold",
+      fontSize: 14,
+    },
+    historyTime: {
+      fontFamily: "DMSans_400Regular",
+      fontSize: 11,
+    },
+  });
+}

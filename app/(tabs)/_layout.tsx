@@ -6,7 +6,7 @@ import { SymbolView } from "expo-symbols";
 import { Platform, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import Colors from "@/constants/colors";
+import { useTheme } from "@/lib/ThemeContext";
 
 function NativeTabLayout() {
   return (
@@ -28,18 +28,20 @@ function NativeTabLayout() {
 }
 
 function ClassicTabLayout() {
+  const { colors, isDark } = useTheme();
+
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors.light.tint,
-        tabBarInactiveTintColor: Colors.light.tabIconDefault,
+        tabBarActiveTintColor: colors.tint,
+        tabBarInactiveTintColor: colors.tabIconDefault,
         headerShown: false,
         tabBarStyle: {
           position: "absolute" as const,
           backgroundColor: Platform.select({
             ios: "transparent",
-            android: Colors.light.surface,
-            default: Colors.light.surface,
+            android: colors.surface,
+            default: colors.surface,
           }),
           borderTopWidth: 0,
           elevation: 0,
@@ -52,7 +54,7 @@ function ClassicTabLayout() {
         },
         tabBarBackground: () =>
           Platform.OS === "ios" ? (
-            <BlurView intensity={100} tint="light" style={StyleSheet.absoluteFill} />
+            <BlurView intensity={100} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} />
           ) : null,
       }}
     >

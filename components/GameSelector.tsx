@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Pressable, Text, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import Colors from "@/constants/colors";
+import { useTheme } from "@/lib/ThemeContext";
 import type { GameId, TCGGame } from "@/lib/types";
 import { GAMES } from "@/lib/types";
 import * as Haptics from "expo-haptics";
@@ -18,6 +18,7 @@ const GAME_ICONS: Record<GameId, keyof typeof MaterialCommunityIcons.glyphMap> =
 };
 
 export function GameSelector({ selected, onSelect }: GameSelectorProps) {
+  const { colors } = useTheme();
   return (
     <View style={styles.container}>
       {GAMES.map((game) => {
@@ -27,6 +28,7 @@ export function GameSelector({ selected, onSelect }: GameSelectorProps) {
             key={game.id}
             style={[
               styles.chip,
+              { backgroundColor: colors.surfaceAlt },
               isSelected && { backgroundColor: game.color },
             ]}
             onPress={() => {
@@ -37,11 +39,12 @@ export function GameSelector({ selected, onSelect }: GameSelectorProps) {
             <MaterialCommunityIcons
               name={GAME_ICONS[game.id]}
               size={16}
-              color={isSelected ? "#FFFFFF" : Colors.light.textSecondary}
+              color={isSelected ? "#FFFFFF" : colors.textSecondary}
             />
             <Text
               style={[
                 styles.chipText,
+                { color: colors.textSecondary },
                 isSelected && styles.chipTextSelected,
               ]}
             >
@@ -67,12 +70,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: Colors.light.surfaceAlt,
   },
   chipText: {
     fontFamily: "DMSans_600SemiBold",
     fontSize: 13,
-    color: Colors.light.textSecondary,
   },
   chipTextSelected: {
     color: "#FFFFFF",

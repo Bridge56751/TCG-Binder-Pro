@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, Platform, Pressable } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
-import Colors from "@/constants/colors";
+import { useTheme } from "@/lib/ThemeContext";
 
 interface CardCellProps {
   cardId: string;
@@ -14,12 +14,13 @@ interface CardCellProps {
 }
 
 export function CardCell({ cardId, localId, name, imageUrl, isCollected, onPress }: CardCellProps) {
+  const { colors } = useTheme();
   const Wrapper = isCollected ? Pressable : View;
   const wrapperProps = isCollected ? { onPress, style: styles.container } : { style: styles.container };
   return (
     <Wrapper {...wrapperProps}>
 
-      <View style={[styles.cardWrapper, !isCollected && styles.missingWrapper]}>
+      <View style={[styles.cardWrapper, { backgroundColor: colors.surface, borderColor: colors.cardBorder, ...Platform.select({ ios: { shadowColor: colors.shadow }, default: {} }) }, !isCollected && { borderColor: colors.borderLight }]}>
         {imageUrl ? (
           <>
             <Image
@@ -31,27 +32,27 @@ export function CardCell({ cardId, localId, name, imageUrl, isCollected, onPress
             {!isCollected && <View style={styles.grayOverlay} />}
           </>
         ) : (
-          <View style={styles.noImageContent}>
+          <View style={[styles.noImageContent, { backgroundColor: colors.missing }]}>
             <Ionicons
               name="image-outline"
               size={18}
-              color={isCollected ? Colors.light.textTertiary : Colors.light.missingText}
+              color={isCollected ? colors.textTertiary : colors.missingText}
             />
-            <Text style={styles.noImageNumber}>#{localId}</Text>
+            <Text style={[styles.noImageNumber, { color: colors.missingText }]}>#{localId}</Text>
           </View>
         )}
         {isCollected && (
-          <View style={styles.collectedBadge}>
+          <View style={[styles.collectedBadge, { backgroundColor: colors.success }]}>
             <Ionicons name="checkmark" size={10} color="#FFFFFF" />
           </View>
         )}
         {!isCollected && imageUrl && (
           <View style={styles.missingBadge}>
-            <Text style={styles.missingBadgeText}>#{localId}</Text>
+            <Text style={[styles.missingBadgeText, { color: colors.textTertiary }]}>#{localId}</Text>
           </View>
         )}
       </View>
-      <Text style={[styles.cardName, !isCollected && styles.cardNameMissing]} numberOfLines={1}>
+      <Text style={[styles.cardName, { color: colors.textSecondary }, !isCollected && { color: colors.textTertiary }]} numberOfLines={1}>
         {name}
       </Text>
     </Wrapper>
@@ -68,12 +69,9 @@ const styles = StyleSheet.create({
     aspectRatio: 0.72,
     borderRadius: 8,
     overflow: "hidden",
-    backgroundColor: Colors.light.surface,
     borderWidth: 1,
-    borderColor: Colors.light.cardBorder,
     ...Platform.select({
       ios: {
-        shadowColor: Colors.light.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.08,
         shadowRadius: 4,
@@ -82,9 +80,6 @@ const styles = StyleSheet.create({
         elevation: 2,
       },
     }),
-  },
-  missingWrapper: {
-    borderColor: Colors.light.borderLight,
   },
   cardImage: {
     width: "100%",
@@ -104,7 +99,6 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: Colors.light.success,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -118,7 +112,6 @@ const styles = StyleSheet.create({
   missingBadgeText: {
     fontFamily: "DMSans_600SemiBold",
     fontSize: 10,
-    color: Colors.light.textTertiary,
     backgroundColor: "rgba(255,255,255,0.85)",
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -130,21 +123,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 4,
-    backgroundColor: Colors.light.missing,
   },
   noImageNumber: {
     fontFamily: "DMSans_500Medium",
     fontSize: 11,
-    color: Colors.light.missingText,
   },
   cardName: {
     fontFamily: "DMSans_400Regular",
     fontSize: 10,
-    color: Colors.light.textSecondary,
     textAlign: "center",
     width: "100%",
-  },
-  cardNameMissing: {
-    color: Colors.light.textTertiary,
   },
 });
