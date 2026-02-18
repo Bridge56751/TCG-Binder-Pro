@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Alert,
+  Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
@@ -35,6 +36,51 @@ import type { CardDetail, GameId } from "@/lib/types";
 import { GAMES } from "@/lib/types";
 
 const screenWidth = Dimensions.get("window").width;
+
+function getMarketplaceLinks(cardName: string, game: GameId) {
+  const encoded = encodeURIComponent(cardName);
+  const gameLabels: Record<GameId, string> = {
+    pokemon: "Pokemon",
+    yugioh: "Yu-Gi-Oh!",
+    onepiece: "One Piece",
+    mtg: "Magic: The Gathering",
+  };
+  const tcgPlayerCategories: Record<GameId, string> = {
+    pokemon: "pokemon",
+    yugioh: "yugioh",
+    onepiece: "one-piece-card-game",
+    mtg: "magic",
+  };
+  const links = [
+    {
+      name: "TCGPlayer",
+      url: `https://www.tcgplayer.com/search/all/product?q=${encoded}&productLineName=${tcgPlayerCategories[game]}`,
+      icon: "cart-outline",
+      color: "#1D4ED8",
+    },
+    {
+      name: "eBay",
+      url: `https://www.ebay.com/sch/i.html?_nkw=${encoded}+${encodeURIComponent(gameLabels[game])}+card`,
+      icon: "pricetag-outline",
+      color: "#E53238",
+    },
+    {
+      name: "Cardmarket",
+      url: `https://www.cardmarket.com/en/Search?searchString=${encoded}`,
+      icon: "globe-outline",
+      color: "#0F766E",
+    },
+  ];
+  if (game === "mtg") {
+    links.push({
+      name: "Card Kingdom",
+      url: `https://www.cardkingdom.com/catalog/search?search=header&filter%5Bname%5D=${encoded}`,
+      icon: "shield-outline",
+      color: "#7C3AED",
+    });
+  }
+  return links;
+}
 
 export default function CardDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -301,6 +347,25 @@ export default function CardDetailScreen() {
             <Text style={[styles.noPriceText, { color: colors.textTertiary }]}>Price data not available for this card</Text>
           </View>
         )}
+
+        <View style={styles.marketplaceSection}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Buy This Card</Text>
+          <View style={styles.marketplaceGrid}>
+            {getMarketplaceLinks(card.name, gameId).map((mp) => (
+              <Pressable
+                key={mp.name}
+                style={[styles.marketplaceCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+                onPress={() => Linking.openURL(mp.url)}
+              >
+                <View style={[styles.marketplaceIcon, { backgroundColor: mp.color + "18" }]}>
+                  <Ionicons name={mp.icon as any} size={20} color={mp.color} />
+                </View>
+                <Text style={[styles.marketplaceName, { color: colors.text }]}>{mp.name}</Text>
+                <Ionicons name="open-outline" size={14} color={colors.textTertiary} />
+              </Pressable>
+            ))}
+          </View>
+        </View>
       </ScrollView>
     </View>
   );
@@ -507,5 +572,33 @@ const styles = StyleSheet.create({
   noPriceText: {
     fontFamily: "DMSans_400Regular",
     fontSize: 14,
+  },
+  marketplaceSection: {
+    paddingHorizontal: 20,
+    marginTop: 24,
+    gap: 12,
+  },
+  marketplaceGrid: {
+    gap: 10,
+  },
+  marketplaceCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 12,
+  },
+  marketplaceIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  marketplaceName: {
+    flex: 1,
+    fontFamily: "DMSans_600SemiBold",
+    fontSize: 15,
   },
 });
