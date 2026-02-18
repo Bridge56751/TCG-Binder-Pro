@@ -80,6 +80,6 @@ migrations/             # Drizzle migration output
 
 - **PostgreSQL**: Required database, connected via `DATABASE_URL` environment variable. Used by Drizzle ORM for user data and chat storage.
 - **OpenAI API (via Replit AI Integrations)**: Powers card identification from camera images and chat/voice/image features. Requires `AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL` environment variables.
-- **External TCG APIs**: The app fetches card/set data from external free APIs — TCGdex (Pokemon), YGOProDeck (Yu-Gi-Oh!), OPTCG API (One Piece), and Scryfall (Magic: The Gathering). No API keys needed. Endpoints under `/api/tcg/:game/sets`. Implementation in `server/routes.ts`.
+- **External TCG APIs**: The app fetches card/set data from external free APIs — TCGdex (Pokemon), YGOProDeck (Yu-Gi-Oh!), OPTCG API (One Piece), and Scryfall (Magic: The Gathering). No API keys needed. Endpoints under `/api/tcg/:game/sets`. Implementation in `server/routes.ts`. Pokemon routes support `?lang=ja` query parameter for Japanese card data (TCGdex `/ja/` endpoint). Japanese sets use different IDs (e.g., `SV2a` for Pokemon 151 instead of English `sv03.5`).
 - **AsyncStorage**: On-device persistence for the card collection (no server-side collection sync).
 - **Expo Services**: Used for font loading, camera, image picker, haptics, and other native capabilities.
