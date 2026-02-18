@@ -2,7 +2,7 @@
 
 ## Overview
 
-CardVault is a trading card game (TCG) collection tracker built as a React Native / Expo mobile application with an Express.js backend. It supports four card games: Pokémon, Yu-Gi-Oh!, One Piece TCG, and Magic: The Gathering. Users can browse card sets, track which cards they own, and scan physical cards using their phone camera with AI-powered identification (OpenAI vision). The app stores collection data locally on-device via AsyncStorage, while the backend provides TCG data APIs and AI card identification.
+CardVault is a trading card game (TCG) collection tracker built as a React Native / Expo mobile application with an Express.js backend. It supports four card games: Pokémon, Yu-Gi-Oh!, One Piece TCG, and Magic: The Gathering. Users can browse card sets, track which cards they own, and scan physical cards using their phone camera with AI-powered identification (OpenAI vision). The app supports user accounts with server-side collection storage for data persistence across devices. Local storage (AsyncStorage) is used as the primary source, with cloud sync available for logged-in users.
 
 ## User Preferences
 
@@ -13,9 +13,10 @@ Preferred communication style: Simple, everyday language.
 ### Frontend (Expo / React Native)
 
 - **Framework**: Expo SDK 54 with expo-router for file-based routing
-- **Navigation structure**: Tab-based layout with three tabs (Collection, Scan, Sets) plus modal/card presentation screens for set details and card details
-- **State management**: React Context (`CollectionProvider`) for collection state, TanStack React Query for server data fetching and caching
-- **Local storage**: `@react-native-async-storage/async-storage` stores the user's card collection as a JSON structure keyed by game → set → card IDs. No server-side collection persistence currently exists.
+- **Navigation structure**: Tab-based layout with four tabs (Collection, Scan, Sets, Settings) plus modal/card presentation screens for set details and card details
+- **State management**: React Context (`CollectionProvider`, `AuthProvider`) for collection and auth state, TanStack React Query for server data fetching and caching
+- **Local storage**: `@react-native-async-storage/async-storage` stores the user's card collection as a JSON structure keyed by game → set → card IDs. Cloud sync available for logged-in users via `/api/collection/sync`.
+- **Authentication**: `AuthContext` manages user sessions (login/register/logout). Settings tab provides login/register UI and account management.
 - **Styling**: Plain React Native `StyleSheet` with a custom color system in `constants/colors.ts`. Uses DM Sans font family loaded via `@expo-google-fonts/dm-sans`.
 - **Key libraries**: expo-image for optimized image rendering, expo-haptics for tactile feedback, expo-camera/expo-image-picker for card scanning, react-native-reanimated for animations, react-native-chart-kit for card detail charts
 
@@ -28,14 +29,19 @@ Preferred communication style: Simple, everyday language.
   - `/api/tcg/:game/sets/:id/cards` — list cards in a set
   - `/api/tcg/:game/card/:cardId` — card detail
   - `/api/identify-card` — AI-powered card identification from camera image
+  - `/api/auth/register` — user registration
+  - `/api/auth/login` — user login
+  - `/api/auth/logout` — user logout
+  - `/api/auth/me` — get current user session
+  - `/api/collection/sync` — GET/POST collection sync for logged-in users
 - **AI Integration**: OpenAI API (via Replit AI Integrations proxy) for card identification using vision model (gpt-5.2). Configured via `AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL` environment variables.
 - **CORS**: Dynamic origin allowlist based on Replit environment variables, plus localhost for Expo web dev
 
 ### Database
 
 - **ORM**: Drizzle ORM configured for PostgreSQL (`drizzle.config.ts`)
-- **Schema location**: `shared/schema.ts` (users table) and `shared/models/chat.ts` (conversations and messages tables for chat integration)
-- **Current schema**: Basic users table (id, username, password) and chat-related tables (conversations, messages). The TCG card/set data appears to come from external APIs rather than the database.
+- **Schema location**: `shared/schema.ts` (users table, user_collections table) and `shared/models/chat.ts` (conversations and messages tables for chat integration)
+- **Current schema**: Users table (id, username, password) and user_collections table (userId FK, collection JSONB, updatedAt) and chat-related tables (conversations, messages). The TCG card/set data appears to come from external APIs rather than the database.
 - **Migration management**: Drizzle Kit with `db:push` script for schema sync
 - **Connection**: `DATABASE_URL` environment variable required
 
