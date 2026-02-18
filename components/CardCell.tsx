@@ -17,12 +17,8 @@ interface CardCellProps {
 
 export function CardCell({ cardId, localId, name, imageUrl, isCollected, quantity, onPress, onLongPress }: CardCellProps) {
   const { colors } = useTheme();
-  const Wrapper = isCollected ? Pressable : View;
-  const wrapperProps = isCollected
-    ? { onPress, onLongPress, delayLongPress: 400, style: styles.container }
-    : { style: styles.container };
   return (
-    <Wrapper {...wrapperProps}>
+    <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={400} style={styles.container}>
 
       <View style={[styles.cardWrapper, { backgroundColor: colors.surface, borderColor: colors.cardBorder, ...Platform.select({ ios: { shadowColor: colors.shadow }, default: {} }) }, !isCollected && { borderColor: colors.borderLight }]}>
         {imageUrl ? (
@@ -63,7 +59,7 @@ export function CardCell({ cardId, localId, name, imageUrl, isCollected, quantit
       <Text style={[styles.cardName, { color: colors.textSecondary }, !isCollected && { color: colors.textTertiary }]} numberOfLines={1}>
         {name}
       </Text>
-    </Wrapper>
+    </Pressable>
   );
 }
 

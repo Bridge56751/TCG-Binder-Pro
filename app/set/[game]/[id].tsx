@@ -328,12 +328,10 @@ export default function SetDetailScreen() {
                 isCollected={collected}
                 quantity={qty}
                 onPress={() => {
-                  if (collected) {
-                    const cardRoute = langParam === "ja"
-                      ? `/card/${game}/${item.id}?lang=ja`
-                      : `/card/${game}/${item.id}`;
-                    router.push(cardRoute);
-                  }
+                  const cardRoute = langParam === "ja"
+                    ? `/card/${game}/${item.id}?lang=ja`
+                    : `/card/${game}/${item.id}`;
+                  router.push(cardRoute);
                 }}
                 onLongPress={collected ? () => {
                   Alert.alert(
