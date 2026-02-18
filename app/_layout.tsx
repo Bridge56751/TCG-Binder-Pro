@@ -7,6 +7,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient } from "@/lib/query-client";
 import { CollectionProvider } from "@/lib/CollectionContext";
+import { AuthProvider } from "@/lib/AuthContext";
 import { ThemeProvider } from "@/lib/ThemeContext";
 import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold } from "@expo-google-fonts/dm-sans";
 import { StatusBar } from "expo-status-bar";
@@ -62,12 +63,14 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <GestureHandlerRootView>
           <KeyboardProvider>
-            <CollectionProvider>
-              <ThemeProvider>
-                <ThemedStatusBar />
-                <RootLayoutNav />
-              </ThemeProvider>
-            </CollectionProvider>
+            <AuthProvider>
+              <CollectionProvider>
+                <ThemeProvider>
+                  <ThemedStatusBar />
+                  <RootLayoutNav />
+                </ThemeProvider>
+              </CollectionProvider>
+            </AuthProvider>
           </KeyboardProvider>
         </GestureHandlerRootView>
       </QueryClientProvider>

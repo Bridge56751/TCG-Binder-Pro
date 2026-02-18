@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import type { CollectionData, GameId } from "./types";
 import {
   getCollection,
+  saveCollection,
   addCardToCollection,
   removeCardFromCollection,
   getCollectedCount,
@@ -9,6 +10,8 @@ import {
   isCardCollected,
   getCardQuantity,
 } from "./collection-storage";
+import { apiRequest, getApiUrl } from "./query-client";
+import { fetch } from "expo/fetch";
 
 interface CollectionContextValue {
   collection: CollectionData;
@@ -20,6 +23,8 @@ interface CollectionContextValue {
   hasCard: (game: GameId, setId: string, cardId: string) => boolean;
   cardQuantity: (game: GameId, setId: string, cardId: string) => number;
   refresh: () => Promise<void>;
+  syncCollection: () => Promise<void>;
+  loadFromCloud: () => Promise<void>;
 }
 
 const CollectionContext = createContext<CollectionContextValue | null>(null);
@@ -68,9 +73,29 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     [collection]
   );
 
+  const syncCollection = useCallback(async () => {
+    const currentData = await getCollection();
+    await apiRequest("POST", "/api/collection/sync", { collection: currentData });
+  }, []);
+
+  const loadFromCloud = useCallback(async () => {
+    try {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/collection/sync", baseUrl);
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.collection && Object.keys(data.collection).length > 0) {
+          await saveCollection(data.collection);
+          setCollection(data.collection);
+        }
+      }
+    } catch {}
+  }, []);
+
   const value = useMemo(
-    () => ({ collection, loading, addCard, removeCard, totalCards, setCards, hasCard, cardQuantity, refresh: loadCollection }),
-    [collection, loading, addCard, removeCard, totalCards, setCards, hasCard, cardQuantity, loadCollection]
+    () => ({ collection, loading, addCard, removeCard, totalCards, setCards, hasCard, cardQuantity, refresh: loadCollection, syncCollection, loadFromCloud }),
+    [collection, loading, addCard, removeCard, totalCards, setCards, hasCard, cardQuantity, loadCollection, syncCollection, loadFromCloud]
   );
 
   return <CollectionContext.Provider value={value}>{children}</CollectionContext.Provider>;

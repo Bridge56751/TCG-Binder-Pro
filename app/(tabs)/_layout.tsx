@@ -23,6 +23,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "books.vertical", selected: "books.vertical.fill" }} />
         <Label>Sets</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="settings">
+        <Icon sf={{ default: "gearshape", selected: "gearshape.fill" }} />
+        <Label>Settings</Label>
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
@@ -93,6 +97,19 @@ function ClassicTabLayout() {
               <SymbolView name="books.vertical" tintColor={color} size={size} />
             ) : (
               <Ionicons name="library" size={size} color={color} />
+            )
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Settings",
+          tabBarIcon: ({ color, size }) => (
+            Platform.OS === "ios" ? (
+              <SymbolView name="gearshape" tintColor={color} size={size} />
+            ) : (
+              <Ionicons name="settings" size={size} color={color} />
             )
           ),
         }}
