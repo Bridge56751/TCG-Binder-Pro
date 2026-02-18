@@ -15,6 +15,7 @@ const GAME_ICONS: Record<GameId, keyof typeof MaterialCommunityIcons.glyphMap> =
   pokemon: "pokeball",
   yugioh: "cards",
   onepiece: "sail-boat",
+  mtg: "magic-staff",
 };
 
 export function GameSelector({ selected, onSelect }: GameSelectorProps) {

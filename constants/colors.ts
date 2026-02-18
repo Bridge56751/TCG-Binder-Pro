@@ -24,6 +24,7 @@ const Colors = {
     pokemon: '#E3573E',
     yugioh: '#7B5EA7',
     onepiece: '#2E86C1',
+    mtg: '#A8572E',
     shadow: '#2C2520',
   },
   dark: {
@@ -51,6 +52,7 @@ const Colors = {
     pokemon: '#E3573E',
     yugioh: '#7B5EA7',
     onepiece: '#2E86C1',
+    mtg: '#A8572E',
     shadow: '#000000',
   },
 };
