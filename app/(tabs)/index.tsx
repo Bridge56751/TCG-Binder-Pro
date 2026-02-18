@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   StyleSheet,
   Text,
@@ -9,9 +9,9 @@ import {
   ActivityIndicator,
   Share,
 } from "react-native";
+import { useFocusEffect, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/lib/ThemeContext";
 import { useCollection } from "@/lib/CollectionContext";
@@ -65,7 +65,7 @@ export default function CollectionScreen() {
     return allCards.map(c => `${c.game}:${c.cardId}`).sort().join(",");
   }, [allCards]);
 
-  useEffect(() => {
+  const fetchCollectionValue = useCallback(() => {
     const currentCards = allCardsRef.current;
     if (currentCards.length === 0) {
       setValueData(null);
@@ -87,7 +87,17 @@ export default function CollectionScreen() {
       .finally(() => {
         if (fetchId === valueFetchRef.current) setValueLoading(false);
       });
+  }, []);
+
+  useEffect(() => {
+    fetchCollectionValue();
   }, [allCardsKey]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchCollectionValue();
+    }, [fetchCollectionValue])
+  );
 
   const { data: sets, isLoading } = useQuery<TCGSet[]>({
     queryKey: [`/api/tcg/${selectedGame}/sets`],
