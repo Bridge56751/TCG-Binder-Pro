@@ -13,7 +13,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/lib/ThemeContext";
-import { AppBanner } from "@/components/AppBanner";
 import { useCollection } from "@/lib/CollectionContext";
 import { apiRequest } from "@/lib/query-client";
 import { GameSelector } from "@/components/GameSelector";
@@ -215,337 +214,334 @@ export default function CollectionScreen() {
   const changePositive = dailyChange >= 0;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <AppBanner />
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: bottomInset }}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={[styles.topBar, { paddingTop: 8 }]}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={{ paddingBottom: bottomInset }}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={[styles.topBar, { paddingTop: topInset + 8 }]}>
         <View style={styles.topBarRow}>
           <View style={styles.topBarTitles}>
-              <Text style={[styles.greeting, { color: colors.text }]}>
-                My Collection
-              </Text>
-              <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                {totalCards()} cards collected
-              </Text>
-            </View>
+            <Text style={[styles.greeting, { color: colors.text }]}>
+              My Collection
+            </Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+              {totalCards()} cards collected
+            </Text>
           </View>
         </View>
+      </View>
 
-        <View style={styles.statsRow}>
-          <StatCard
-            icon="layers"
-            label="Cards"
-            value={String(totalCards(selectedGame))}
-            color={gameColor}
-          />
-          <StatCard
-            icon="albums"
-            label="Sets"
-            value={String(setsStartedForGame)}
-            color={gameColor}
-          />
-          <StatCard
-            icon="star"
-            label="Complete"
-            value={String(completedSets.length)}
-            color={colors.success}
-          />
-        </View>
+      <View style={styles.statsRow}>
+        <StatCard
+          icon="layers"
+          label="Cards"
+          value={String(totalCards(selectedGame))}
+          color={gameColor}
+        />
+        <StatCard
+          icon="albums"
+          label="Sets"
+          value={String(setsStartedForGame)}
+          color={gameColor}
+        />
+        <StatCard
+          icon="star"
+          label="Complete"
+          value={String(completedSets.length)}
+          color={colors.success}
+        />
+      </View>
 
-        <View style={styles.valueBannerWrapper}>
-          <View
-            style={[
-              styles.valueBanner,
-              {
-                backgroundColor: gameColor,
-              },
-            ]}
-          >
-            <View style={[styles.valueBannerOverlay, { backgroundColor: gameColor + "CC" }]} />
-            <View style={styles.valueBannerContent}>
-              <View style={styles.valueBannerTop}>
-                <Ionicons name="diamond" size={18} color="rgba(255,255,255,0.85)" />
-                <Text style={styles.valueBannerLabel}>Estimated Value</Text>
+      <View style={styles.valueBannerWrapper}>
+        <View
+          style={[
+            styles.valueBanner,
+            {
+              backgroundColor: gameColor,
+            },
+          ]}
+        >
+          <View style={[styles.valueBannerOverlay, { backgroundColor: gameColor + "CC" }]} />
+          <View style={styles.valueBannerContent}>
+            <View style={styles.valueBannerTop}>
+              <Ionicons name="diamond" size={18} color="rgba(255,255,255,0.85)" />
+              <Text style={styles.valueBannerLabel}>Estimated Value</Text>
+            </View>
+            {valueLoading ? (
+              <View style={styles.valueSkeletonRow}>
+                <View style={styles.valueSkeleton} />
               </View>
-              {valueLoading ? (
-                <View style={styles.valueSkeletonRow}>
-                  <View style={styles.valueSkeleton} />
-                </View>
-              ) : (
-                <>
-                  <Text style={styles.valueBannerAmount}>
-                    {formatCurrency(gameValue.total)}
-                  </Text>
-                  <View style={styles.valueBannerChangeRow}>
-                    <Ionicons
-                      name={changePositive ? "trending-up" : "trending-down"}
-                      size={16}
-                      color={
-                        changePositive
+            ) : (
+              <>
+                <Text style={styles.valueBannerAmount}>
+                  {formatCurrency(gameValue.total)}
+                </Text>
+                <View style={styles.valueBannerChangeRow}>
+                  <Ionicons
+                    name={changePositive ? "trending-up" : "trending-down"}
+                    size={16}
+                    color={
+                      changePositive
+                        ? "rgba(180,255,200,0.95)"
+                        : "rgba(255,180,170,0.95)"
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.valueBannerChange,
+                      {
+                        color: changePositive
                           ? "rgba(180,255,200,0.95)"
-                          : "rgba(255,180,170,0.95)"
-                      }
-                    />
-                    <Text
-                      style={[
-                        styles.valueBannerChange,
-                        {
-                          color: changePositive
-                            ? "rgba(180,255,200,0.95)"
-                            : "rgba(255,180,170,0.95)",
-                        },
-                      ]}
-                    >
-                      {changePositive ? "+" : ""}
-                      {formatCurrency(Math.abs(dailyChange))} (
-                      {changePositive ? "+" : ""}
-                      {dailyPct.toFixed(1)}%) today
-                    </Text>
-                  </View>
-                </>
-              )}
-            </View>
-            <View
-              style={[
-                styles.valueBannerCircle,
-                { backgroundColor: "rgba(255,255,255,0.08)" },
-              ]}
-            />
-            <View
-              style={[
-                styles.valueBannerCircle2,
-                { backgroundColor: "rgba(255,255,255,0.05)" },
-              ]}
-            />
+                          : "rgba(255,180,170,0.95)",
+                      },
+                    ]}
+                  >
+                    {changePositive ? "+" : ""}
+                    {formatCurrency(Math.abs(dailyChange))} (
+                    {changePositive ? "+" : ""}
+                    {dailyPct.toFixed(1)}%) today
+                  </Text>
+                </View>
+              </>
+            )}
           </View>
-        </View>
-
-        <View style={styles.selectorRow}>
-          <GameSelector selected={selectedGame} onSelect={setSelectedGame} />
-        </View>
-
-        <View style={styles.statsDashboard}>
-          <Text style={[styles.dashboardTitle, { color: colors.text }]}>
-            Collection Stats
-          </Text>
-          <View style={styles.dashboardGrid}>
-            <View
-              style={[
-                styles.dashboardCard,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.cardBorder,
-                },
-              ]}
-            >
-              <Ionicons name="trophy" size={20} color={colors.tint} />
-              <Text
-                style={[styles.dashboardCardLabel, { color: colors.textSecondary }]}
-              >
-                Most Valuable
-              </Text>
-              <Text
-                style={[styles.dashboardCardValue, { color: colors.text }]}
-                numberOfLines={1}
-              >
-                {mostValuableCard?.name ?? "—"}
-              </Text>
-              <Text style={[styles.dashboardCardSub, { color: colors.tint }]}>
-                {mostValuableCard?.price != null
-                  ? formatCurrency(mostValuableCard.price)
-                  : "N/A"}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.dashboardCard,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.cardBorder,
-                },
-              ]}
-            >
-              <Ionicons name="grid" size={20} color={colors.accent} />
-              <Text
-                style={[styles.dashboardCardLabel, { color: colors.textSecondary }]}
-              >
-                Unique Sets
-              </Text>
-              <Text style={[styles.dashboardCardValue, { color: colors.text }]}>
-                {uniqueSetsStarted}
-              </Text>
-              <Text
-                style={[styles.dashboardCardSub, { color: colors.textTertiary }]}
-              >
-                across all games
-              </Text>
-            </View>
-          </View>
-
           <View
             style={[
-              styles.perGameCard,
+              styles.valueBannerCircle,
+              { backgroundColor: "rgba(255,255,255,0.08)" },
+            ]}
+          />
+          <View
+            style={[
+              styles.valueBannerCircle2,
+              { backgroundColor: "rgba(255,255,255,0.05)" },
+            ]}
+          />
+        </View>
+      </View>
+
+      <View style={styles.selectorRow}>
+        <GameSelector selected={selectedGame} onSelect={setSelectedGame} />
+      </View>
+
+      <View style={styles.statsDashboard}>
+        <Text style={[styles.dashboardTitle, { color: colors.text }]}>
+          Collection Stats
+        </Text>
+        <View style={styles.dashboardGrid}>
+          <View
+            style={[
+              styles.dashboardCard,
               {
                 backgroundColor: colors.surface,
                 borderColor: colors.cardBorder,
               },
             ]}
           >
-            <View style={styles.perGameRow}>
-              {GAMES.map((game) => {
-                const count = totalCards(game.id);
-                return (
-                  <View key={game.id} style={styles.perGameItem}>
-                    <View
-                      style={[
-                        styles.perGameDot,
-                        { backgroundColor: game.color },
-                      ]}
-                    />
-                    <Text
-                      style={[styles.perGameName, { color: colors.textSecondary }]}
-                    >
-                      {game.name}
-                    </Text>
-                    <Text style={[styles.perGameCount, { color: colors.text }]}>
-                      {count}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
-            <View style={[styles.perGameTotal, { borderTopColor: colors.cardBorder }]}>
-              <View style={styles.perGameTotalRow}>
-                <Ionicons name="cube" size={14} color={colors.tint} />
-                <Text style={[styles.perGameTotalLabel, { color: colors.text }]}>
-                  Total Cards
-                </Text>
-                <Text style={[styles.perGameTotalCount, { color: colors.tint }]}>
-                  {totalCards()}
-                </Text>
-              </View>
-              <View style={styles.perGameTotalRow}>
-                <Ionicons name="diamond" size={14} color={colors.accent} />
-                <Text style={[styles.perGameTotalLabel, { color: colors.text }]}>
-                  Total Value
-                </Text>
-                <Text style={[styles.perGameTotalCount, { color: colors.accent }]}>
-                  {valueLoading ? "..." : valueData ? formatCurrency(valueData.totalValue) : "$0.00"}
-                </Text>
-              </View>
-            </View>
+            <Ionicons name="trophy" size={20} color={colors.tint} />
+            <Text
+              style={[styles.dashboardCardLabel, { color: colors.textSecondary }]}
+            >
+              Most Valuable
+            </Text>
+            <Text
+              style={[styles.dashboardCardValue, { color: colors.text }]}
+              numberOfLines={1}
+            >
+              {mostValuableCard?.name ?? "—"}
+            </Text>
+            <Text style={[styles.dashboardCardSub, { color: colors.tint }]}>
+              {mostValuableCard?.price != null
+                ? formatCurrency(mostValuableCard.price)
+                : "N/A"}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.dashboardCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.cardBorder,
+              },
+            ]}
+          >
+            <Ionicons name="grid" size={20} color={colors.accent} />
+            <Text
+              style={[styles.dashboardCardLabel, { color: colors.textSecondary }]}
+            >
+              Unique Sets
+            </Text>
+            <Text style={[styles.dashboardCardValue, { color: colors.text }]}>
+              {uniqueSetsStarted}
+            </Text>
+            <Text
+              style={[styles.dashboardCardSub, { color: colors.textTertiary }]}
+            >
+              across all games
+            </Text>
           </View>
         </View>
 
-        {isLoading && (
-          <View style={styles.loadingState}>
-            <ActivityIndicator size="large" color={colors.tint} />
+        <View
+          style={[
+            styles.perGameCard,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.cardBorder,
+            },
+          ]}
+        >
+          <View style={styles.perGameRow}>
+            {GAMES.map((game) => {
+              const count = totalCards(game.id);
+              return (
+                <View key={game.id} style={styles.perGameItem}>
+                  <View
+                    style={[
+                      styles.perGameDot,
+                      { backgroundColor: game.color },
+                    ]}
+                  />
+                  <Text
+                    style={[styles.perGameName, { color: colors.textSecondary }]}
+                  >
+                    {game.name}
+                  </Text>
+                  <Text style={[styles.perGameCount, { color: colors.text }]}>
+                    {count}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
-        )}
-
-        {!isLoading && collectedSets.length === 0 && (
-          <View style={styles.emptyState}>
-            <Ionicons
-              name="albums-outline"
-              size={48}
-              color={colors.textTertiary}
-            />
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>
-              No cards yet
-            </Text>
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              Scan your first card or browse sets to start building your
-              collection
-            </Text>
-            <Pressable
-              style={[styles.emptyButton, { backgroundColor: colors.tint }]}
-              onPress={() => router.push("/(tabs)/scan")}
-            >
-              <Ionicons name="scan" size={18} color="#FFFFFF" />
-              <Text style={styles.emptyButtonText}>Scan a Card</Text>
-            </Pressable>
-          </View>
-        )}
-
-        {inProgressSets.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="construct" size={18} color={gameColor} />
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Working On
+          <View style={[styles.perGameTotal, { borderTopColor: colors.cardBorder }]}>
+            <View style={styles.perGameTotalRow}>
+              <Ionicons name="cube" size={14} color={colors.tint} />
+              <Text style={[styles.perGameTotalLabel, { color: colors.text }]}>
+                Total Cards
               </Text>
-              <View
-                style={[
-                  styles.countBadge,
-                  { backgroundColor: gameColor + "18" },
-                ]}
-              >
-                <Text style={[styles.countBadgeText, { color: gameColor }]}>
-                  {inProgressSets.length}
-                </Text>
-              </View>
-            </View>
-            <Text
-              style={[styles.sectionSubtitle, { color: colors.textTertiary }]}
-            >
-              Sets you're actively collecting
-            </Text>
-            <View style={styles.setList}>
-              {inProgressSets.map((item) => (
-                <SetCard
-                  key={`${item.game}-${item.id}`}
-                  set={item}
-                  collectedCount={setCards(selectedGame, item.id)}
-                  onPress={() => navigateToSet(item.id)}
-                />
-              ))}
-            </View>
-          </View>
-        )}
-
-        {completedSets.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="trophy" size={18} color={colors.success} />
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Completed
+              <Text style={[styles.perGameTotalCount, { color: colors.tint }]}>
+                {totalCards()}
               </Text>
-              <View
-                style={[
-                  styles.countBadge,
-                  { backgroundColor: colors.success + "18" },
-                ]}
-              >
-                <Text
-                  style={[styles.countBadgeText, { color: colors.success }]}
-                >
-                  {completedSets.length}
-                </Text>
-              </View>
             </View>
-            <Text
-              style={[styles.sectionSubtitle, { color: colors.textTertiary }]}
-            >
-              Master sets you've finished
-            </Text>
-            <View style={styles.setList}>
-              {completedSets.map((item) => (
-                <SetCard
-                  key={`${item.game}-${item.id}`}
-                  set={item}
-                  collectedCount={setCards(selectedGame, item.id)}
-                  onPress={() => navigateToSet(item.id)}
-                />
-              ))}
+            <View style={styles.perGameTotalRow}>
+              <Ionicons name="diamond" size={14} color={colors.accent} />
+              <Text style={[styles.perGameTotalLabel, { color: colors.text }]}>
+                Total Value
+              </Text>
+              <Text style={[styles.perGameTotalCount, { color: colors.accent }]}>
+                {valueLoading ? "..." : valueData ? formatCurrency(valueData.totalValue) : "$0.00"}
+              </Text>
             </View>
           </View>
-        )}
-      </ScrollView>
-    </View>
+        </View>
+      </View>
+
+      {isLoading && (
+        <View style={styles.loadingState}>
+          <ActivityIndicator size="large" color={colors.tint} />
+        </View>
+      )}
+
+      {!isLoading && collectedSets.length === 0 && (
+        <View style={styles.emptyState}>
+          <Ionicons
+            name="albums-outline"
+            size={48}
+            color={colors.textTertiary}
+          />
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>
+            No cards yet
+          </Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            Scan your first card or browse sets to start building your
+            collection
+          </Text>
+          <Pressable
+            style={[styles.emptyButton, { backgroundColor: colors.tint }]}
+            onPress={() => router.push("/(tabs)/scan")}
+          >
+            <Ionicons name="scan" size={18} color="#FFFFFF" />
+            <Text style={styles.emptyButtonText}>Scan a Card</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {inProgressSets.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="construct" size={18} color={gameColor} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Working On
+            </Text>
+            <View
+              style={[
+                styles.countBadge,
+                { backgroundColor: gameColor + "18" },
+              ]}
+            >
+              <Text style={[styles.countBadgeText, { color: gameColor }]}>
+                {inProgressSets.length}
+              </Text>
+            </View>
+          </View>
+          <Text
+            style={[styles.sectionSubtitle, { color: colors.textTertiary }]}
+          >
+            Sets you're actively collecting
+          </Text>
+          <View style={styles.setList}>
+            {inProgressSets.map((item) => (
+              <SetCard
+                key={`${item.game}-${item.id}`}
+                set={item}
+                collectedCount={setCards(selectedGame, item.id)}
+                onPress={() => navigateToSet(item.id)}
+              />
+            ))}
+          </View>
+        </View>
+      )}
+
+      {completedSets.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="trophy" size={18} color={colors.success} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Completed
+            </Text>
+            <View
+              style={[
+                styles.countBadge,
+                { backgroundColor: colors.success + "18" },
+              ]}
+            >
+              <Text
+                style={[styles.countBadgeText, { color: colors.success }]}
+              >
+                {completedSets.length}
+              </Text>
+            </View>
+          </View>
+          <Text
+            style={[styles.sectionSubtitle, { color: colors.textTertiary }]}
+          >
+            Master sets you've finished
+          </Text>
+          <View style={styles.setList}>
+            {completedSets.map((item) => (
+              <SetCard
+                key={`${item.game}-${item.id}`}
+                set={item}
+                collectedCount={setCards(selectedGame, item.id)}
+                onPress={() => navigateToSet(item.id)}
+              />
+            ))}
+          </View>
+        </View>
+      )}
+    </ScrollView>
   );
 }
 

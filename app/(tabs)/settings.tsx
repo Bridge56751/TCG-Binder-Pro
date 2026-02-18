@@ -14,7 +14,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/lib/ThemeContext";
-import { AppBanner } from "@/components/AppBanner";
 import { useAuth } from "@/lib/AuthContext";
 import { useCollection } from "@/lib/CollectionContext";
 
@@ -128,14 +127,12 @@ export default function SettingsScreen() {
 
   if (user) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <AppBanner />
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ paddingBottom: bottomInset + 20 }}
-          showsVerticalScrollIndicator={false}
-        >
-        <View style={[styles.header, { paddingTop: 12 }]}>
+      <ScrollView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        contentContainerStyle={{ paddingBottom: bottomInset + 20 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[styles.header, { paddingTop: topInset + 12 }]}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Settings</Text>
         </View>
 
@@ -234,24 +231,21 @@ export default function SettingsScreen() {
             </Pressable>
           </View>
         </View>
-        </ScrollView>
-      </View>
+      </ScrollView>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <AppBanner />
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={0}
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={0}
+    >
+      <ScrollView
+        contentContainerStyle={[styles.authContainer, { paddingTop: topInset + 40, paddingBottom: bottomInset + 20 }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <ScrollView
-          contentContainerStyle={[styles.authContainer, { paddingTop: 40, paddingBottom: bottomInset + 20 }]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
         <View style={[styles.logoContainer, { backgroundColor: colors.tint }]}>
           <Ionicons name="layers" size={36} color="#FFFFFF" />
         </View>
@@ -349,9 +343,8 @@ export default function SettingsScreen() {
             </Text>
           </Text>
         </Pressable>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

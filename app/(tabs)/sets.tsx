@@ -18,7 +18,6 @@ import { GameSelector } from "@/components/GameSelector";
 import { SetCard } from "@/components/SetCard";
 import { useCollection } from "@/lib/CollectionContext";
 import { useTheme } from "@/lib/ThemeContext";
-import { AppBanner } from "@/components/AppBanner";
 import { apiRequest } from "@/lib/query-client";
 import type { GameId, TCGSet } from "@/lib/types";
 
@@ -278,7 +277,7 @@ export default function SetsScreen() {
 
   const renderHeader = () => (
     <View style={{ gap: 16, paddingBottom: 16 }}>
-      <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}>
+      <View style={{ paddingHorizontal: 20, paddingTop: topInset + 8, paddingBottom: 4 }}>
         <Text
           style={{
             fontFamily: "DMSans_700Bold",
@@ -414,7 +413,6 @@ export default function SetsScreen() {
   if (showCardSearch) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <AppBanner />
         <FlatList
           data={cardResults}
           keyExtractor={(item, index) => `${item.game}-${item.id}-${index}`}
@@ -506,7 +504,6 @@ export default function SetsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <AppBanner />
       <FlatList
         data={filteredSets}
         keyExtractor={(item, index) => `${item.game}-${item.id}-${index}`}

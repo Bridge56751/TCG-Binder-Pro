@@ -18,7 +18,6 @@ import { router } from "expo-router";
 import { apiRequest } from "@/lib/query-client";
 import { useCollection } from "@/lib/CollectionContext";
 import { useTheme } from "@/lib/ThemeContext";
-import { AppBanner } from "@/components/AppBanner";
 import type { CardIdentification, GameId } from "@/lib/types";
 import {
   addToScanHistory,
@@ -160,199 +159,196 @@ export default function ScanScreen() {
   const dynamicStyles = getDynamicStyles(colors);
 
   return (
-    <View style={[dynamicStyles.container, { flex: 1 }]}>
-      <AppBanner />
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: bottomInset }}
-        showsVerticalScrollIndicator={false}
-      >
-        {toastMessage && (
-          <Animated.View
-            entering={SlideInUp.duration(300)}
-            exiting={SlideOutUp.duration(300)}
-            style={[dynamicStyles.toast, { top: 4 }]}
-          >
-            <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
-            <Text style={dynamicStyles.toastText}>{toastMessage}</Text>
-          </Animated.View>
-        )}
+    <ScrollView
+      style={[dynamicStyles.container, { paddingTop: topInset }]}
+      contentContainerStyle={{ paddingBottom: bottomInset }}
+      showsVerticalScrollIndicator={false}
+    >
+      {toastMessage && (
+        <Animated.View
+          entering={SlideInUp.duration(300)}
+          exiting={SlideOutUp.duration(300)}
+          style={[dynamicStyles.toast, { top: topInset + 4 }]}
+        >
+          <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
+          <Text style={dynamicStyles.toastText}>{toastMessage}</Text>
+        </Animated.View>
+      )}
 
-        <View style={dynamicStyles.header}>
-          <View style={dynamicStyles.headerRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={dynamicStyles.title}>Scan Card</Text>
-              <Text style={dynamicStyles.subtitle}>Take a photo or pick from your library</Text>
-            </View>
-            <View style={dynamicStyles.batchToggleArea}>
-              {batchMode && batchCount > 0 && (
-                <View style={[dynamicStyles.batchCounter, { backgroundColor: colors.success + "20" }]}>
-                  <Text style={[dynamicStyles.batchCounterText, { color: colors.success }]}>
-                    {batchCount}
-                  </Text>
-                </View>
-              )}
-              <Pressable
-                style={[
-                  dynamicStyles.batchToggle,
-                  {
-                    backgroundColor: batchMode ? colors.tint : colors.surfaceAlt,
-                  },
-                ]}
-                onPress={() => {
-                  setBatchMode((b) => !b);
-                  if (!batchMode) setBatchCount(0);
-                }}
-              >
-                <Ionicons
-                  name="layers"
-                  size={16}
-                  color={batchMode ? "#FFFFFF" : colors.textSecondary}
-                />
-                <Text
-                  style={[
-                    dynamicStyles.batchToggleText,
-                    { color: batchMode ? "#FFFFFF" : colors.textSecondary },
-                  ]}
-                >
-                  Batch
-                </Text>
-              </Pressable>
-            </View>
+      <View style={dynamicStyles.header}>
+        <View style={dynamicStyles.headerRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={dynamicStyles.title}>Scan Card</Text>
+            <Text style={dynamicStyles.subtitle}>Take a photo or pick from your library</Text>
           </View>
-        </View>
-
-        <View style={dynamicStyles.scanArea}>
-          {imageUri ? (
-            <Animated.View entering={FadeIn.duration(300)} style={[dynamicStyles.previewWrapper, { backgroundColor: colors.surfaceAlt }]}>
-              <Image source={{ uri: imageUri }} style={dynamicStyles.preview} contentFit="contain" />
-              {isScanning && (
-                <View style={dynamicStyles.scanningOverlay}>
-                  <ActivityIndicator size="large" color={colors.tint} />
-                  <Text style={[dynamicStyles.scanningText, { color: colors.text }]}>Identifying card...</Text>
-                </View>
-              )}
-              <Pressable style={dynamicStyles.clearButton} onPress={resetScan}>
-                <Ionicons name="close" size={20} color="#FFFFFF" />
-              </Pressable>
-            </Animated.View>
-          ) : (
-            <View style={[dynamicStyles.placeholder, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardBorder }]}>
-              <View style={dynamicStyles.crosshairContainer}>
-                <View style={[dynamicStyles.corner, dynamicStyles.topLeft, { borderColor: colors.tint }]} />
-                <View style={[dynamicStyles.corner, dynamicStyles.topRight, { borderColor: colors.tint }]} />
-                <View style={[dynamicStyles.corner, dynamicStyles.bottomLeft, { borderColor: colors.tint }]} />
-                <View style={[dynamicStyles.corner, dynamicStyles.bottomRight, { borderColor: colors.tint }]} />
-                <MaterialCommunityIcons
-                  name="cards-outline"
-                  size={48}
-                  color={colors.textTertiary}
-                />
-                <Text style={[dynamicStyles.placeholderText, { color: colors.textTertiary }]}>Position card within frame</Text>
-              </View>
-            </View>
-          )}
-        </View>
-
-        {scanResult && (() => {
-          const cardId = scanResult.verifiedCardId || `${scanResult.setId}-${scanResult.cardNumber}`;
-          const alreadyOwned = hasCard(scanResult.game, scanResult.setId, cardId);
-          const ownedQty = alreadyOwned ? cardQuantity(scanResult.game, scanResult.setId, cardId) : 0;
-          return (
-          <Animated.View entering={FadeInDown.duration(400).springify()} style={[dynamicStyles.resultCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-            <View style={dynamicStyles.resultHeader}>
-              <View style={dynamicStyles.resultInfo}>
-                <Text style={[dynamicStyles.resultName, { color: colors.text }]}>{scanResult.name}</Text>
-                <Text style={[dynamicStyles.resultSet, { color: colors.textSecondary }]}>
-                  {scanResult.setName} - #{scanResult.cardNumber}
-                </Text>
-                <View style={dynamicStyles.resultMeta}>
-                  <View style={[dynamicStyles.badge, { backgroundColor: colors[scanResult.game] + "20" }]}>
-                    <Text style={[dynamicStyles.badgeText, { color: colors[scanResult.game] }]}>
-                      {gameLabel(scanResult.game)}
-                    </Text>
-                  </View>
-                  <View style={[dynamicStyles.badge, { backgroundColor: colors.surfaceAlt }]}>
-                    <Text style={[dynamicStyles.badgeText, { color: colors.textSecondary }]}>
-                      {scanResult.rarity}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-              <View style={dynamicStyles.priceTag}>
-                <Text style={[dynamicStyles.priceLabel, { color: colors.textTertiary }]}>Value</Text>
-                <Text style={[dynamicStyles.priceValue, { color: colors.success }]}>
-                  ${scanResult.estimatedValue?.toFixed(2) || "0.00"}
-                </Text>
-              </View>
-            </View>
-
-            {alreadyOwned && (
-              <View style={[dynamicStyles.ownedBanner, { backgroundColor: colors.tint + "15" }]}>
-                <Ionicons name="checkmark-circle" size={18} color={colors.tint} />
-                <Text style={[dynamicStyles.ownedBannerText, { color: colors.tint }]}>
-                  Already in collection ({ownedQty} owned)
+          <View style={dynamicStyles.batchToggleArea}>
+            {batchMode && batchCount > 0 && (
+              <View style={[dynamicStyles.batchCounter, { backgroundColor: colors.success + "20" }]}>
+                <Text style={[dynamicStyles.batchCounterText, { color: colors.success }]}>
+                  {batchCount}
                 </Text>
               </View>
             )}
-
-            <View style={dynamicStyles.quantityRow}>
-              <Text style={[dynamicStyles.quantityLabel, { color: colors.textSecondary }]}>
-                {alreadyOwned ? "Add more" : "Quantity"}
-              </Text>
-              <View style={dynamicStyles.quantityStepper}>
-                <Pressable
-                  style={[dynamicStyles.stepperButton, { backgroundColor: colors.surfaceAlt }]}
-                  onPress={() => setAddQuantity((q) => Math.max(1, q - 1))}
-                >
-                  <Ionicons name="remove" size={18} color={addQuantity <= 1 ? colors.textTertiary : colors.text} />
-                </Pressable>
-                <Text style={[dynamicStyles.quantityValue, { color: colors.text }]}>{addQuantity}</Text>
-                <Pressable
-                  style={[dynamicStyles.stepperButton, { backgroundColor: colors.surfaceAlt }]}
-                  onPress={() => setAddQuantity((q) => Math.min(99, q + 1))}
-                >
-                  <Ionicons name="add" size={18} color={colors.text} />
-                </Pressable>
-              </View>
-            </View>
-
             <Pressable
-              style={({ pressed }) => [dynamicStyles.addButton, { backgroundColor: colors.tint }, pressed && { opacity: 0.9 }]}
-              onPress={handleAddToCollection}
+              style={[
+                dynamicStyles.batchToggle,
+                {
+                  backgroundColor: batchMode ? colors.tint : colors.surfaceAlt,
+                },
+              ]}
+              onPress={() => {
+                setBatchMode((b) => !b);
+                if (!batchMode) setBatchCount(0);
+              }}
             >
-              <Ionicons name={alreadyOwned ? "duplicate" : "add-circle"} size={20} color="#FFFFFF" />
-              <Text style={dynamicStyles.addButtonText}>
-                {alreadyOwned
-                  ? `Add ${addQuantity} More`
-                  : addQuantity > 1
-                    ? `Add ${addQuantity} to Collection`
-                    : "Add to Collection"}
+              <Ionicons
+                name="layers"
+                size={16}
+                color={batchMode ? "#FFFFFF" : colors.textSecondary}
+              />
+              <Text
+                style={[
+                  dynamicStyles.batchToggleText,
+                  { color: batchMode ? "#FFFFFF" : colors.textSecondary },
+                ]}
+              >
+                Batch
               </Text>
             </Pressable>
-          </Animated.View>
-          );
-        })()}
-
-        <View style={dynamicStyles.actions}>
-          <Pressable
-            style={({ pressed }) => [dynamicStyles.actionButton, dynamicStyles.primaryAction, { backgroundColor: colors.tint }, pressed && { opacity: 0.9 }]}
-            onPress={takePhoto}
-          >
-            <Ionicons name="camera" size={24} color="#FFFFFF" />
-            <Text style={dynamicStyles.primaryActionText}>Take Photo</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [dynamicStyles.actionButton, dynamicStyles.secondaryAction, { backgroundColor: colors.surface, borderColor: colors.cardBorder }, pressed && { opacity: 0.9 }]}
-            onPress={pickImage}
-          >
-            <Ionicons name="images" size={22} color={colors.tint} />
-            <Text style={[dynamicStyles.secondaryActionText, { color: colors.tint }]}>Library</Text>
-          </Pressable>
+          </View>
         </View>
+      </View>
 
-      </ScrollView>
-    </View>
+      <View style={dynamicStyles.scanArea}>
+        {imageUri ? (
+          <Animated.View entering={FadeIn.duration(300)} style={[dynamicStyles.previewWrapper, { backgroundColor: colors.surfaceAlt }]}>
+            <Image source={{ uri: imageUri }} style={dynamicStyles.preview} contentFit="contain" />
+            {isScanning && (
+              <View style={dynamicStyles.scanningOverlay}>
+                <ActivityIndicator size="large" color={colors.tint} />
+                <Text style={[dynamicStyles.scanningText, { color: colors.text }]}>Identifying card...</Text>
+              </View>
+            )}
+            <Pressable style={dynamicStyles.clearButton} onPress={resetScan}>
+              <Ionicons name="close" size={20} color="#FFFFFF" />
+            </Pressable>
+          </Animated.View>
+        ) : (
+          <View style={[dynamicStyles.placeholder, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardBorder }]}>
+            <View style={dynamicStyles.crosshairContainer}>
+              <View style={[dynamicStyles.corner, dynamicStyles.topLeft, { borderColor: colors.tint }]} />
+              <View style={[dynamicStyles.corner, dynamicStyles.topRight, { borderColor: colors.tint }]} />
+              <View style={[dynamicStyles.corner, dynamicStyles.bottomLeft, { borderColor: colors.tint }]} />
+              <View style={[dynamicStyles.corner, dynamicStyles.bottomRight, { borderColor: colors.tint }]} />
+              <MaterialCommunityIcons
+                name="cards-outline"
+                size={48}
+                color={colors.textTertiary}
+              />
+              <Text style={[dynamicStyles.placeholderText, { color: colors.textTertiary }]}>Position card within frame</Text>
+            </View>
+          </View>
+        )}
+      </View>
+
+      {scanResult && (() => {
+        const cardId = scanResult.verifiedCardId || `${scanResult.setId}-${scanResult.cardNumber}`;
+        const alreadyOwned = hasCard(scanResult.game, scanResult.setId, cardId);
+        const ownedQty = alreadyOwned ? cardQuantity(scanResult.game, scanResult.setId, cardId) : 0;
+        return (
+        <Animated.View entering={FadeInDown.duration(400).springify()} style={[dynamicStyles.resultCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+          <View style={dynamicStyles.resultHeader}>
+            <View style={dynamicStyles.resultInfo}>
+              <Text style={[dynamicStyles.resultName, { color: colors.text }]}>{scanResult.name}</Text>
+              <Text style={[dynamicStyles.resultSet, { color: colors.textSecondary }]}>
+                {scanResult.setName} - #{scanResult.cardNumber}
+              </Text>
+              <View style={dynamicStyles.resultMeta}>
+                <View style={[dynamicStyles.badge, { backgroundColor: colors[scanResult.game] + "20" }]}>
+                  <Text style={[dynamicStyles.badgeText, { color: colors[scanResult.game] }]}>
+                    {gameLabel(scanResult.game)}
+                  </Text>
+                </View>
+                <View style={[dynamicStyles.badge, { backgroundColor: colors.surfaceAlt }]}>
+                  <Text style={[dynamicStyles.badgeText, { color: colors.textSecondary }]}>
+                    {scanResult.rarity}
+                  </Text>
+                </View>
+              </View>
+            </View>
+            <View style={dynamicStyles.priceTag}>
+              <Text style={[dynamicStyles.priceLabel, { color: colors.textTertiary }]}>Value</Text>
+              <Text style={[dynamicStyles.priceValue, { color: colors.success }]}>
+                ${scanResult.estimatedValue?.toFixed(2) || "0.00"}
+              </Text>
+            </View>
+          </View>
+
+          {alreadyOwned && (
+            <View style={[dynamicStyles.ownedBanner, { backgroundColor: colors.tint + "15" }]}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.tint} />
+              <Text style={[dynamicStyles.ownedBannerText, { color: colors.tint }]}>
+                Already in collection ({ownedQty} owned)
+              </Text>
+            </View>
+          )}
+
+          <View style={dynamicStyles.quantityRow}>
+            <Text style={[dynamicStyles.quantityLabel, { color: colors.textSecondary }]}>
+              {alreadyOwned ? "Add more" : "Quantity"}
+            </Text>
+            <View style={dynamicStyles.quantityStepper}>
+              <Pressable
+                style={[dynamicStyles.stepperButton, { backgroundColor: colors.surfaceAlt }]}
+                onPress={() => setAddQuantity((q) => Math.max(1, q - 1))}
+              >
+                <Ionicons name="remove" size={18} color={addQuantity <= 1 ? colors.textTertiary : colors.text} />
+              </Pressable>
+              <Text style={[dynamicStyles.quantityValue, { color: colors.text }]}>{addQuantity}</Text>
+              <Pressable
+                style={[dynamicStyles.stepperButton, { backgroundColor: colors.surfaceAlt }]}
+                onPress={() => setAddQuantity((q) => Math.min(99, q + 1))}
+              >
+                <Ionicons name="add" size={18} color={colors.text} />
+              </Pressable>
+            </View>
+          </View>
+
+          <Pressable
+            style={({ pressed }) => [dynamicStyles.addButton, { backgroundColor: colors.tint }, pressed && { opacity: 0.9 }]}
+            onPress={handleAddToCollection}
+          >
+            <Ionicons name={alreadyOwned ? "duplicate" : "add-circle"} size={20} color="#FFFFFF" />
+            <Text style={dynamicStyles.addButtonText}>
+              {alreadyOwned
+                ? `Add ${addQuantity} More`
+                : addQuantity > 1
+                  ? `Add ${addQuantity} to Collection`
+                  : "Add to Collection"}
+            </Text>
+          </Pressable>
+        </Animated.View>
+        );
+      })()}
+
+      <View style={dynamicStyles.actions}>
+        <Pressable
+          style={({ pressed }) => [dynamicStyles.actionButton, dynamicStyles.primaryAction, { backgroundColor: colors.tint }, pressed && { opacity: 0.9 }]}
+          onPress={takePhoto}
+        >
+          <Ionicons name="camera" size={24} color="#FFFFFF" />
+          <Text style={dynamicStyles.primaryActionText}>Take Photo</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [dynamicStyles.actionButton, dynamicStyles.secondaryAction, { backgroundColor: colors.surface, borderColor: colors.cardBorder }, pressed && { opacity: 0.9 }]}
+          onPress={pickImage}
+        >
+          <Ionicons name="images" size={22} color={colors.tint} />
+          <Text style={[dynamicStyles.secondaryActionText, { color: colors.tint }]}>Library</Text>
+        </Pressable>
+      </View>
+
+    </ScrollView>
   );
 }
 
