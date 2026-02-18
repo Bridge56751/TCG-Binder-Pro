@@ -78,6 +78,78 @@ async function resolveSetId(game: string, aiSetId: string, aiSetName?: string): 
   return null;
 }
 
+async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId?: string } | null> {
+  try {
+    const { game, name, setId, cardNumber } = result;
+
+    if (game === "pokemon") {
+      const cardId = `${setId}-${cardNumber}`;
+      const res = await fetch(`https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(cardId)}`);
+      if (res.ok) {
+        const card = await res.json();
+        return { name: card.name, cardId: card.id };
+      }
+      const setRes = await fetch(`https://api.tcgdex.net/v2/en/sets/${encodeURIComponent(setId)}`);
+      if (setRes.ok) {
+        const setData = await setRes.json();
+        if (setData.cards) {
+          const match = setData.cards.find((c: any) => c.localId === cardNumber);
+          if (match) return { name: match.name, cardId: match.id };
+          const byName = setData.cards.find((c: any) =>
+            c.name.toLowerCase() === name.toLowerCase()
+          );
+          if (byName) return { name: byName.name, cardId: byName.id };
+        }
+      }
+    } else if (game === "yugioh") {
+      const res = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?name=${encodeURIComponent(name)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.data?.[0]) {
+          const card = data.data[0];
+          const setInfo = card.card_sets?.find((s: any) => s.set_code?.startsWith(setId));
+          if (setInfo) return { name: card.name, cardId: setInfo.set_code };
+          if (card.card_sets?.[0]) return { name: card.name, cardId: card.card_sets[0].set_code };
+        }
+      }
+      const fuzzyRes = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(name)}`);
+      if (fuzzyRes.ok) {
+        const fuzzyData = await fuzzyRes.json();
+        if (fuzzyData?.data?.[0]) {
+          const card = fuzzyData.data[0];
+          const setInfo = card.card_sets?.find((s: any) => s.set_code?.startsWith(setId));
+          if (setInfo) return { name: card.name, cardId: setInfo.set_code };
+        }
+      }
+    } else if (game === "onepiece") {
+      const cardId = `${setId}-${cardNumber.padStart(3, "0")}`;
+      const res = await fetch(`https://optcgapi.com/api/sets/card/${cardId}/`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          return { name: data[0].card_name, cardId: data[0].card_set_id };
+        }
+      }
+    } else if (game === "mtg") {
+      const res = await fetch(`https://api.scryfall.com/cards/${encodeURIComponent(setId)}/${encodeURIComponent(cardNumber)}`);
+      if (res.ok) {
+        const card = await res.json();
+        return { name: card.name, cardId: card.id };
+      }
+      const searchRes = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${name}" set:${setId}`)}&unique=prints`);
+      if (searchRes.ok) {
+        const searchData = await searchRes.json();
+        if (searchData?.data?.[0]) {
+          return { name: searchData.data[0].name, cardId: searchData.data[0].id };
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Card verification error:", e);
+  }
+  return null;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/identify-card", async (req, res) => {
     try {
@@ -91,29 +163,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         messages: [
           {
             role: "system",
-            content: `You are a trading card game expert. When shown an image of a trading card, identify it precisely. Return a JSON object with these fields:
-- game: "pokemon" | "yugioh" | "onepiece" | "mtg" (the TCG it belongs to)
-- name: the card name
-- setName: the set/expansion name
-- setId: the set code (e.g. "base1" for Pokemon, "LOB" for Yu-Gi-Oh!, "OP01" for One Piece, "neo" for MTG)
-- cardNumber: the card number within the set (just the number, no prefix)
-- rarity: the rarity (Common, Uncommon, Rare, etc.)
-- estimatedValue: estimated market value in USD as a number
+            content: `You are an expert trading card game identifier with encyclopedic knowledge. Carefully examine the card image and identify it with high precision.
 
-For Magic: The Gathering cards, use the three-letter set code (e.g. "neo", "dmu", "one", "mkm").
+CRITICAL: Read ALL visible text on the card carefully:
+1. Card NAME - printed prominently at the top
+2. SET SYMBOL / SET CODE - look for the expansion symbol, set logo, or printed set code
+3. CARD NUMBER - usually at the bottom (e.g. "25/102", "SV049", "OP01-001")
+4. RARITY - indicated by symbol color (gold=rare, silver=uncommon, black=common for Pokemon/MTG) or text
+5. COLLECTOR INFO - any additional identifiers printed on the card
 
-If you cannot identify the card or it's not a trading card, return: {"error": "Could not identify card"}
+GAME IDENTIFICATION:
+- Pokemon: Yellow border, HP in top right, weakness/resistance at bottom, Pokemon creature art
+- Yu-Gi-Oh!: Card frame colors (normal=yellow/tan, effect=orange, fusion=purple, synchro=white, xyz=black, link=blue), ATK/DEF at bottom, star/level indicators
+- One Piece TCG: Card with power/counter values, DON!! cost, OP set codes
+- Magic: The Gathering: Mana symbols in top right, type line below art, power/toughness in bottom right box, set symbol on right side of type line
 
-Return ONLY valid JSON, no other text.`,
+SET CODE FORMATS:
+- Pokemon: Look for set symbol and number. Common codes: "base1", "base2", "gym1", "neo1", "ex1"-"ex16", "dp1"-"dp7", "bw1"-"bw11", "xy1"-"xy12", "sm1"-"sm12", "swsh1"-"swsh12", "sv1"-"sv7", etc.
+- Yu-Gi-Oh!: Alphanumeric codes like "LOB", "MRD", "SDK", "PSV", "LON", "DUEA", "ROTD", etc.
+- One Piece: Codes like "OP01", "OP02", "ST01", "ST02", etc.
+- MTG: Three-letter codes like "lea" (Alpha), "2ed" (Beta), "dmu", "bro", "one", "mom", "woe", "mkm", "otj", "blb", "dsk", "fdn", etc.
+
+Return a JSON object:
+{
+  "game": "pokemon" | "yugioh" | "onepiece" | "mtg",
+  "name": "exact card name as printed",
+  "setName": "full expansion/set name",
+  "setId": "set code in the format described above",
+  "cardNumber": "collector number only (no set prefix)",
+  "rarity": "Common/Uncommon/Rare/Holo Rare/Ultra Rare/Secret Rare/etc",
+  "estimatedValue": estimated USD market value as number
+}
+
+If you cannot identify it, return: {"error": "Could not identify card"}
+Return ONLY valid JSON.`,
           },
           {
             role: "user",
             content: [
               {
                 type: "image_url",
-                image_url: { url: `data:image/jpeg;base64,${image}` },
+                image_url: { url: `data:image/jpeg;base64,${image}`, detail: "high" },
               },
-              { type: "text", text: "Identify this trading card." },
+              { type: "text", text: "Identify this trading card. Read all text carefully, especially the card name, set symbol, card number, and any collector information printed on the card." },
             ],
           },
         ],
@@ -132,6 +224,16 @@ Return ONLY valid JSON, no other text.`,
           }
         } catch (e) {
           console.error("Error resolving set ID:", e);
+        }
+
+        try {
+          const verified = await verifyCardInDatabase(result);
+          if (verified) {
+            result.name = verified.name || result.name;
+            if (verified.cardId) result.verifiedCardId = verified.cardId;
+          }
+        } catch (e) {
+          console.error("Error verifying card:", e);
         }
       }
 
@@ -402,11 +504,11 @@ Return ONLY valid JSON, no other text.`,
       let url: string | null = `https://api.scryfall.com/cards/search?order=set&q=set:${encodeURIComponent(id)}&unique=prints`;
 
       while (url) {
-        const response = await fetch(url);
-        if (!response.ok) break;
-        const data = await response.json();
-        if (data.data) allCards.push(...data.data);
-        url = data.has_more ? data.next_page : null;
+        const pageRes: Response = await fetch(url);
+        if (!pageRes.ok) break;
+        const pageData: any = await pageRes.json();
+        if (pageData.data) allCards.push(...pageData.data);
+        url = pageData.has_more ? pageData.next_page : null;
         if (url) await new Promise(r => setTimeout(r, 100));
       }
 
