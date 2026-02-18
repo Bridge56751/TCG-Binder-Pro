@@ -44,14 +44,36 @@ async function resolveSetId(game: string, aiSetId: string, aiSetName?: string): 
   if (game === "pokemon") {
     const exact = sets.find((s: any) => s.id === aiSetId);
     if (exact) return aiSetId;
+    const idNoDots = aiSetId.replace(/\./g, "").replace(/pt/gi, ".");
+    const exactAlt = sets.find((s: any) => s.id === idNoDots);
+    if (exactAlt) return exactAlt.id;
     const byName = sets.find((s: any) =>
       normalize(s.name) === normalizedId || normalize(s.name) === normalizedName
     );
     if (byName) return byName.id;
-    const fuzzy = sets.find((s: any) =>
-      normalizedId.includes(normalize(s.name)) || normalize(s.name).includes(normalizedId) ||
-      (normalizedName && (normalizedName.includes(normalize(s.name)) || normalize(s.name).includes(normalizedName)))
-    );
+    if (normalizedName) {
+      const byExactName = sets.find((s: any) =>
+        s.name.toLowerCase() === (aiSetName || "").toLowerCase()
+      );
+      if (byExactName) return byExactName.id;
+    }
+    const svMatch = aiSetId.match(/^sv(\d+)(?:pt|\.)?(\d+)?$/i);
+    if (svMatch) {
+      const major = svMatch[1].padStart(2, "0");
+      const minor = svMatch[2] || null;
+      const targetId = minor ? `sv${major}.${minor}` : `sv${major}`;
+      const found = sets.find((s: any) => s.id === targetId);
+      if (found) return found.id;
+      const altId = minor ? `sv${parseInt(major)}.${minor}` : `sv${parseInt(major)}`;
+      const altFound = sets.find((s: any) => s.id === altId);
+      if (altFound) return altFound.id;
+    }
+    const fuzzy = sets.find((s: any) => {
+      const sName = normalize(s.name);
+      if (sName.length < 3) return sName === normalizedId || sName === normalizedName;
+      return normalizedId.includes(sName) || sName.includes(normalizedId) ||
+        (normalizedName && (normalizedName.includes(sName) || sName.includes(normalizedName)));
+    });
     if (fuzzy) return fuzzy.id;
   } else if (game === "yugioh") {
     const exact = sets.find((s: any) => s.set_code === aiSetId);
@@ -179,7 +201,7 @@ GAME IDENTIFICATION:
 - Magic: The Gathering: Mana symbols in top right, type line below art, power/toughness in bottom right box, set symbol on right side of type line
 
 SET CODE FORMATS:
-- Pokemon: Look for set symbol and number. Common codes: "base1", "base2", "gym1", "neo1", "ex1"-"ex16", "dp1"-"dp7", "bw1"-"bw11", "xy1"-"xy12", "sm1"-"sm12", "swsh1"-"swsh12", "sv1"-"sv7", etc.
+- Pokemon: Look for set symbol and number. Common TCGdex codes include: "base1", "base2", "gym1", "neo1", "ex1"-"ex16", "dp1"-"dp7", "bw1"-"bw11", "xy1"-"xy12", "sm1"-"sm12", "swsh1"-"swsh12", "sv01"-"sv07", "sv03.5" (Pokemon 151), "sv04.5" (Paldean Fates), "sv05.5", "sv06.5" (Prismatic Evolutions). Sub-sets use decimal notation like "sv03.5". If unsure of the exact code, return the full set name in setName and your best guess for setId.
 - Yu-Gi-Oh!: Alphanumeric codes like "LOB", "MRD", "SDK", "PSV", "LON", "DUEA", "ROTD", etc.
 - One Piece: Codes like "OP01", "OP02", "ST01", "ST02", etc.
 - MTG: Three-letter codes like "lea" (Alpha), "2ed" (Beta), "dmu", "bro", "one", "mom", "woe", "mkm", "otj", "blb", "dsk", "fdn", etc.
