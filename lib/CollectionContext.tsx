@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, type ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from "react";
 import type { CollectionData, GameId } from "./types";
 import {
   getCollection,
@@ -11,6 +11,7 @@ import {
   getCardQuantity,
 } from "./collection-storage";
 import { apiRequest, getApiUrl } from "./query-client";
+import { useAuth } from "./AuthContext";
 import { fetch } from "expo/fetch";
 
 interface CollectionContextValue {
@@ -32,6 +33,23 @@ const CollectionContext = createContext<CollectionContextValue | null>(null);
 export function CollectionProvider({ children }: { children: ReactNode }) {
   const [collection, setCollection] = useState<CollectionData>({});
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevUserRef = useRef<string | null>(null);
+
+  const syncToServer = useCallback(async (data: CollectionData) => {
+    try {
+      await apiRequest("POST", "/api/collection/sync", { collection: data });
+    } catch {}
+  }, []);
+
+  const debouncedSync = useCallback((data: CollectionData) => {
+    if (!user) return;
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    syncTimeoutRef.current = setTimeout(() => {
+      syncToServer(data);
+    }, 1500);
+  }, [user, syncToServer]);
 
   const loadCollection = useCallback(async () => {
     const data = await getCollection();
@@ -39,19 +57,46 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    loadCollection();
+  const loadFromCloud = useCallback(async () => {
+    try {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/collection/sync", baseUrl);
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.collection && Object.keys(data.collection).length > 0) {
+          await saveCollection(data.collection);
+          setCollection(data.collection);
+          return;
+        }
+      }
+    } catch {}
+    await loadCollection();
   }, [loadCollection]);
+
+  useEffect(() => {
+    if (user && prevUserRef.current !== user.id) {
+      prevUserRef.current = user.id;
+      loadFromCloud();
+    } else if (!user && prevUserRef.current) {
+      prevUserRef.current = null;
+      loadCollection();
+    } else {
+      loadCollection();
+    }
+  }, [user, loadCollection, loadFromCloud]);
 
   const addCard = useCallback(async (game: GameId, setId: string, cardId: string, quantity: number = 1) => {
     const updated = await addCardToCollection(game, setId, cardId, quantity);
     setCollection(updated);
-  }, []);
+    debouncedSync(updated);
+  }, [debouncedSync]);
 
   const removeCard = useCallback(async (game: GameId, setId: string, cardId: string) => {
     const updated = await removeCardFromCollection(game, setId, cardId);
     setCollection(updated);
-  }, []);
+    debouncedSync(updated);
+  }, [debouncedSync]);
 
   const totalCards = useCallback(
     (game?: GameId) => getCollectedCount(collection, game),
@@ -76,21 +121,6 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
   const syncCollection = useCallback(async () => {
     const currentData = await getCollection();
     await apiRequest("POST", "/api/collection/sync", { collection: currentData });
-  }, []);
-
-  const loadFromCloud = useCallback(async () => {
-    try {
-      const baseUrl = getApiUrl();
-      const url = new URL("/api/collection/sync", baseUrl);
-      const res = await fetch(url.toString(), { credentials: "include" });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.collection && Object.keys(data.collection).length > 0) {
-          await saveCollection(data.collection);
-          setCollection(data.collection);
-        }
-      }
-    } catch {}
   }, []);
 
   const value = useMemo(
