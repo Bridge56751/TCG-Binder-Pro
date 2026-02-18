@@ -457,6 +457,25 @@ Return ONLY valid JSON.`,
           if (verified) {
             result.name = verified.name || result.name;
             if (verified.cardId) result.verifiedCardId = verified.cardId;
+            if (verified.setId) {
+              result.setId = verified.setId;
+              const sets = await fetchSetsForGame(result.game, result.language === "ja" ? "ja" : "en");
+              let setName: string | null = null;
+              if (result.game === "pokemon") {
+                const s = sets.find((s: any) => s.id === verified.setId);
+                if (s) setName = s.name;
+              } else if (result.game === "yugioh") {
+                const s = sets.find((s: any) => s.set_code === verified.setId);
+                if (s) setName = s.set_name;
+              } else if (result.game === "onepiece") {
+                const s = sets.find((s: any) => s.id === verified.setId || s.set_id === verified.setId);
+                if (s) setName = s.name || s.set_name;
+              } else if (result.game === "mtg") {
+                const s = sets.find((s: any) => s.code === verified.setId);
+                if (s) setName = s.name;
+              }
+              if (setName) result.setName = setName;
+            }
           }
         } catch (e) {
           console.error("Error verifying card:", e);
