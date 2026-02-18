@@ -20,10 +20,7 @@ import { useCollection } from "@/lib/CollectionContext";
 import { useTheme } from "@/lib/ThemeContext";
 import type { CardIdentification, GameId } from "@/lib/types";
 import {
-  getScanHistory,
   addToScanHistory,
-  clearScanHistory,
-  type ScanHistoryItem,
 } from "@/lib/scan-history-storage";
 import Animated, {
   FadeIn,
@@ -63,15 +60,8 @@ export default function ScanScreen() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>([]);
-  const [historyExpanded, setHistoryExpanded] = useState(false);
-
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 84 + 34 : 100;
-
-  useEffect(() => {
-    getScanHistory().then(setScanHistory);
-  }, []);
 
   const showToast = useCallback((msg: string) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -138,8 +128,7 @@ export default function ScanScreen() {
       scanResult.setId,
       `${scanResult.setId}-${scanResult.cardNumber}`
     );
-    const updatedHistory = await addToScanHistory(scanResult, true);
-    setScanHistory(updatedHistory);
+    await addToScanHistory(scanResult, true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     if (batchMode) {
@@ -170,13 +159,6 @@ export default function ScanScreen() {
     setScanResult(null);
     setIsScanning(false);
   };
-
-  const handleClearHistory = async () => {
-    await clearScanHistory();
-    setScanHistory([]);
-  };
-
-  const historyItems = scanHistory.slice(0, 10);
 
   const dynamicStyles = getDynamicStyles(colors);
 
@@ -328,77 +310,6 @@ export default function ScanScreen() {
         </Pressable>
       </View>
 
-      {scanHistory.length > 0 && (
-        <View style={dynamicStyles.historySection}>
-          <Pressable
-            style={dynamicStyles.historyHeader}
-            onPress={() => setHistoryExpanded((e) => !e)}
-          >
-            <View style={dynamicStyles.historyHeaderLeft}>
-              <Ionicons name="time-outline" size={18} color={colors.textSecondary} />
-              <Text style={[dynamicStyles.historyTitle, { color: colors.text }]}>Recent Scans</Text>
-              <View style={[dynamicStyles.historyCountBadge, { backgroundColor: colors.surfaceAlt }]}>
-                <Text style={[dynamicStyles.historyCountText, { color: colors.textSecondary }]}>
-                  {historyItems.length}
-                </Text>
-              </View>
-            </View>
-            <View style={dynamicStyles.historyHeaderRight}>
-              {historyExpanded && (
-                <Pressable onPress={handleClearHistory} hitSlop={8}>
-                  <Text style={[dynamicStyles.clearText, { color: colors.error }]}>Clear</Text>
-                </Pressable>
-              )}
-              <Ionicons
-                name={historyExpanded ? "chevron-up" : "chevron-down"}
-                size={18}
-                color={colors.textTertiary}
-              />
-            </View>
-          </Pressable>
-
-          {historyExpanded && (
-            <Animated.View entering={FadeIn.duration(200)}>
-              {historyItems.map((item) => (
-                <Pressable
-                  key={item.id}
-                  style={[dynamicStyles.historyItem, { borderTopColor: colors.cardBorder }]}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/card/[game]/[cardId]",
-                      params: { game: item.game, cardId: `${item.setId}-${item.cardNumber}` },
-                    })
-                  }
-                >
-                  <View style={dynamicStyles.historyItemLeft}>
-                    <Text style={[dynamicStyles.historyItemName, { color: colors.text }]} numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    <View style={dynamicStyles.historyItemMeta}>
-                      <View style={[dynamicStyles.historyGameBadge, { backgroundColor: colors[item.game] + "15" }]}>
-                        <Text style={[dynamicStyles.historyGameText, { color: colors[item.game] }]}>
-                          {gameLabel(item.game)}
-                        </Text>
-                      </View>
-                      <Text style={[dynamicStyles.historySetText, { color: colors.textTertiary }]} numberOfLines={1}>
-                        {item.setName}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={dynamicStyles.historyItemRight}>
-                    <Text style={[dynamicStyles.historyValue, { color: colors.success }]}>
-                      ${item.estimatedValue?.toFixed(2) || "0.00"}
-                    </Text>
-                    <Text style={[dynamicStyles.historyTime, { color: colors.textTertiary }]}>
-                      {timeAgo(item.scannedAt)}
-                    </Text>
-                  </View>
-                </Pressable>
-              ))}
-            </Animated.View>
-          )}
-        </View>
-      )}
     </ScrollView>
   );
 }
@@ -656,97 +567,6 @@ function getDynamicStyles(colors: any) {
     secondaryActionText: {
       fontFamily: "DMSans_600SemiBold",
       fontSize: 15,
-    },
-    historySection: {
-      marginHorizontal: 20,
-      marginTop: 20,
-      backgroundColor: colors.surface,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: colors.cardBorder,
-      overflow: "hidden",
-    },
-    historyHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-    },
-    historyHeaderLeft: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-    },
-    historyTitle: {
-      fontFamily: "DMSans_600SemiBold",
-      fontSize: 15,
-    },
-    historyCountBadge: {
-      paddingHorizontal: 7,
-      paddingVertical: 2,
-      borderRadius: 8,
-    },
-    historyCountText: {
-      fontFamily: "DMSans_500Medium",
-      fontSize: 11,
-    },
-    historyHeaderRight: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-    },
-    clearText: {
-      fontFamily: "DMSans_500Medium",
-      fontSize: 13,
-    },
-    historyItem: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderTopWidth: 1,
-    },
-    historyItemLeft: {
-      flex: 1,
-      gap: 4,
-      marginRight: 12,
-    },
-    historyItemName: {
-      fontFamily: "DMSans_600SemiBold",
-      fontSize: 14,
-    },
-    historyItemMeta: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-    },
-    historyGameBadge: {
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      borderRadius: 4,
-    },
-    historyGameText: {
-      fontFamily: "DMSans_500Medium",
-      fontSize: 10,
-    },
-    historySetText: {
-      fontFamily: "DMSans_400Regular",
-      fontSize: 11,
-      flexShrink: 1,
-    },
-    historyItemRight: {
-      alignItems: "flex-end",
-      gap: 2,
-    },
-    historyValue: {
-      fontFamily: "DMSans_700Bold",
-      fontSize: 14,
-    },
-    historyTime: {
-      fontFamily: "DMSans_400Regular",
-      fontSize: 11,
     },
   });
 }
