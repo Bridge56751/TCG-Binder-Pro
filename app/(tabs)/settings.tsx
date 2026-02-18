@@ -183,6 +183,28 @@ export default function SettingsScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+            PURCHASES
+          </Text>
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+            <Pressable style={styles.menuItem} onPress={() => Alert.alert("Restore Purchases", "No previous purchases found.")}>
+              <View style={[styles.menuIcon, { backgroundColor: colors.tint + "18" }]}>
+                <Ionicons name="receipt-outline" size={20} color={colors.tint} />
+              </View>
+              <View style={styles.menuContent}>
+                <Text style={[styles.menuLabel, { color: colors.text }]}>
+                  Restore Purchases
+                </Text>
+                <Text style={[styles.menuHint, { color: colors.textSecondary }]}>
+                  Recover previous subscriptions
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
             ACCOUNT
           </Text>
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
