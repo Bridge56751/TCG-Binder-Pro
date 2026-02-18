@@ -10,11 +10,12 @@ interface CardCellProps {
   name: string;
   imageUrl: string | null;
   isCollected: boolean;
+  quantity?: number;
   onPress: () => void;
   onLongPress?: () => void;
 }
 
-export function CardCell({ cardId, localId, name, imageUrl, isCollected, onPress, onLongPress }: CardCellProps) {
+export function CardCell({ cardId, localId, name, imageUrl, isCollected, quantity, onPress, onLongPress }: CardCellProps) {
   const { colors } = useTheme();
   const Wrapper = isCollected ? Pressable : View;
   const wrapperProps = isCollected
@@ -45,8 +46,12 @@ export function CardCell({ cardId, localId, name, imageUrl, isCollected, onPress
           </View>
         )}
         {isCollected && (
-          <View style={[styles.collectedBadge, { backgroundColor: colors.success }]}>
-            <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+          <View style={[styles.collectedBadge, { backgroundColor: colors.success }, (quantity ?? 0) > 1 ? styles.collectedBadgeWide : undefined]}>
+            {quantity && quantity > 1 ? (
+              <Text style={styles.quantityBadgeText}>x{quantity}</Text>
+            ) : (
+              <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+            )}
           </View>
         )}
         {!isCollected && imageUrl && (
@@ -104,6 +109,17 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
+  },
+  collectedBadgeWide: {
+    width: "auto" as any,
+    paddingHorizontal: 5,
+    borderRadius: 8,
+    minWidth: 22,
+  },
+  quantityBadgeText: {
+    fontFamily: "DMSans_700Bold",
+    fontSize: 9,
+    color: "#FFFFFF",
   },
   missingBadge: {
     position: "absolute",

@@ -42,7 +42,7 @@ export default function CardDetailScreen() {
   const { colors, isDark } = useTheme();
   const { game, cardId, lang } = useLocalSearchParams<{ game: string; cardId: string; lang?: string }>();
   const gameId = game as GameId;
-  const { hasCard, removeCard } = useCollection();
+  const { hasCard, removeCard, cardQuantity } = useCollection();
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
 
@@ -225,6 +225,17 @@ export default function CardDetailScreen() {
                 </Text>
               </View>
             )}
+            {isInCollection && (() => {
+              const qty = cardQuantity(gameId, card.setId, cardId || "");
+              return (
+                <View style={[styles.badge, { backgroundColor: colors.success + "18" }]}>
+                  <Ionicons name="layers" size={12} color={colors.success} />
+                  <Text style={[styles.badgeText, { color: colors.success }]}>
+                    x{qty} owned
+                  </Text>
+                </View>
+              );
+            })()}
           </View>
 
           {card.artist && (

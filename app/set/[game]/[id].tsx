@@ -28,7 +28,7 @@ export default function SetDetailScreen() {
   const insets = useSafeAreaInsets();
   const { game, id, lang } = useLocalSearchParams<{ game: string; id: string; lang?: string }>();
   const gameId = game as GameId;
-  const { hasCard, setCards, removeCard } = useCollection();
+  const { hasCard, setCards, removeCard, cardQuantity } = useCollection();
   const { colors } = useTheme();
 
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
@@ -317,6 +317,7 @@ export default function SetDetailScreen() {
         ListHeaderComponent={renderHeader}
         renderItem={({ item }) => {
           const collected = hasCard(gameId, id || "", item.id);
+          const qty = collected ? cardQuantity(gameId, id || "", item.id) : 0;
           return (
             <View style={styles.cellWrapper}>
               <CardCell
@@ -325,6 +326,7 @@ export default function SetDetailScreen() {
                 name={item.name}
                 imageUrl={item.image}
                 isCollected={collected}
+                quantity={qty}
                 onPress={() => {
                   if (collected) {
                     const cardRoute = langParam === "ja"
