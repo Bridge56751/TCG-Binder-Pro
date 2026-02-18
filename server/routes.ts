@@ -7,6 +7,66 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
+const setsCache: Record<string, any[]> = {};
+
+async function fetchSetsForGame(game: string): Promise<any[]> {
+  if (setsCache[game]) return setsCache[game];
+  let sets: any[] = [];
+  try {
+    if (game === "pokemon") {
+      const res = await fetch("https://api.tcgdex.net/v2/en/sets");
+      sets = await res.json();
+    } else if (game === "yugioh") {
+      const res = await fetch("https://db.ygoprodeck.com/api/v7/cardsets.php");
+      sets = await res.json();
+    } else if (game === "onepiece") {
+      const res = await fetch("https://optcgapi.com/api/sets/");
+      const data = await res.json();
+      sets = Array.isArray(data) ? data : [];
+    }
+  } catch (_) {}
+  setsCache[game] = sets;
+  return sets;
+}
+
+async function resolveSetId(game: string, aiSetId: string, aiSetName?: string): Promise<string | null> {
+  const sets = await fetchSetsForGame(game);
+  if (!sets.length) return null;
+
+  const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const normalizedId = normalize(aiSetId);
+  const normalizedName = aiSetName ? normalize(aiSetName) : "";
+
+  if (game === "pokemon") {
+    const exact = sets.find((s: any) => s.id === aiSetId);
+    if (exact) return aiSetId;
+    const byName = sets.find((s: any) =>
+      normalize(s.name) === normalizedId || normalize(s.name) === normalizedName
+    );
+    if (byName) return byName.id;
+    const fuzzy = sets.find((s: any) =>
+      normalizedId.includes(normalize(s.name)) || normalize(s.name).includes(normalizedId) ||
+      (normalizedName && (normalizedName.includes(normalize(s.name)) || normalize(s.name).includes(normalizedName)))
+    );
+    if (fuzzy) return fuzzy.id;
+  } else if (game === "yugioh") {
+    const exact = sets.find((s: any) => s.set_code === aiSetId);
+    if (exact) return aiSetId;
+    const byName = sets.find((s: any) =>
+      normalize(s.set_name) === normalizedId || normalize(s.set_name) === normalizedName
+    );
+    if (byName) return byName.set_code;
+  } else if (game === "onepiece") {
+    const exact = sets.find((s: any) => s.id === aiSetId);
+    if (exact) return aiSetId;
+    const byName = sets.find((s: any) =>
+      normalize(s.name) === normalizedId || normalize(s.name) === normalizedName
+    );
+    if (byName) return byName.id;
+  }
+  return null;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/identify-card", async (req, res) => {
     try {
@@ -50,6 +110,18 @@ Return ONLY valid JSON, no other text.`,
       const content = response.choices[0]?.message?.content || "{}";
       const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       const result = JSON.parse(cleaned);
+
+      if (!result.error && result.game && result.setId) {
+        try {
+          const resolvedSetId = await resolveSetId(result.game, result.setId, result.setName);
+          if (resolvedSetId) {
+            result.setId = resolvedSetId;
+          }
+        } catch (e) {
+          console.error("Error resolving set ID:", e);
+        }
+      }
+
       res.json(result);
     } catch (error) {
       console.error("Error identifying card:", error);
@@ -121,8 +193,14 @@ Return ONLY valid JSON, no other text.`,
     try {
       const response = await fetch("https://db.ygoprodeck.com/api/v7/cardsets.php");
       const sets = await response.json();
+      const seen = new Set<string>();
       const formatted = sets
-        .filter((s: any) => s.num_of_cards > 0 && s.set_code)
+        .filter((s: any) => {
+          if (!s.num_of_cards || s.num_of_cards <= 0 || !s.set_code) return false;
+          if (seen.has(s.set_code)) return false;
+          seen.add(s.set_code);
+          return true;
+        })
         .slice(0, 200)
         .map((s: any) => ({
           id: s.set_code,
@@ -144,8 +222,7 @@ Return ONLY valid JSON, no other text.`,
     try {
       const { id } = req.params;
 
-      const setsRes = await fetch("https://db.ygoprodeck.com/api/v7/cardsets.php");
-      const allSets = await setsRes.json();
+      const allSets = await fetchSetsForGame("yugioh");
       const setMeta = (allSets as any[]).find((s: any) => s.set_code === id);
       const setName = setMeta?.set_name || id;
 
@@ -418,19 +495,43 @@ Return ONLY valid JSON, no other text.`,
 
       async function fetchCardPrice(card: { game: string; cardId: string }): Promise<{ cardId: string; name: string; price: number | null }> {
         if (card.game === "pokemon") {
-          const response = await fetch(`https://api.tcgdex.net/v2/en/cards/${card.cardId}`);
-          if (!response.ok) return { cardId: card.cardId, name: card.cardId, price: null };
-          const c = await response.json();
-          const tcgPrice = c.pricing?.tcgplayer;
-          const cmPrice = c.pricing?.cardmarket;
-          const priceData = tcgPrice?.holofoil || tcgPrice?.normal || tcgPrice?.reverseHolofoil;
-          const price = priceData?.marketPrice ?? priceData?.midPrice ?? cmPrice?.trend ?? null;
-          return { cardId: card.cardId, name: c.name || card.cardId, price };
+          const response = await fetch(`https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(card.cardId)}`);
+          if (response.ok) {
+            const c = await response.json();
+            const tcgPrice = c.pricing?.tcgplayer;
+            const cmPrice = c.pricing?.cardmarket;
+            const priceData = tcgPrice?.holofoil || tcgPrice?.normal || tcgPrice?.reverseHolofoil;
+            const price = priceData?.marketPrice ?? priceData?.midPrice ?? cmPrice?.trend ?? null;
+            return { cardId: card.cardId, name: c.name || card.cardId, price };
+          }
+          const parts = card.cardId.split("-");
+          if (parts.length >= 2) {
+            const setCode = parts.slice(0, -1).join("-");
+            try {
+              const setRes = await fetch(`https://api.tcgdex.net/v2/en/sets/${encodeURIComponent(setCode)}`);
+              if (setRes.ok) {
+                const setData = await setRes.json();
+                const localId = parts[parts.length - 1];
+                const match = setData.cards?.find((c: any) => c.localId === localId);
+                if (match) {
+                  const cardRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(match.id)}`);
+                  if (cardRes.ok) {
+                    const c = await cardRes.json();
+                    const tcgPrice = c.pricing?.tcgplayer;
+                    const cmPrice = c.pricing?.cardmarket;
+                    const priceData = tcgPrice?.holofoil || tcgPrice?.normal || tcgPrice?.reverseHolofoil;
+                    const price = priceData?.marketPrice ?? priceData?.midPrice ?? cmPrice?.trend ?? null;
+                    return { cardId: card.cardId, name: c.name || card.cardId, price };
+                  }
+                }
+              }
+            } catch (_) {}
+          }
+          return { cardId: card.cardId, name: card.cardId, price: null };
         } else if (card.game === "yugioh") {
           const parts = card.cardId.split("-");
           const setCode = parts.slice(0, -1).join("-");
-          const setsRes = await fetch("https://db.ygoprodeck.com/api/v7/cardsets.php");
-          const allSets = await setsRes.json();
+          const allSets = await fetchSetsForGame("yugioh");
           const setMeta = (allSets as any[]).find((s: any) => s.set_code === setCode);
           const setName = setMeta?.set_name || setCode;
           const response = await fetch(
