@@ -119,20 +119,51 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
         if (setData.cards) {
           const match = setData.cards.find((c: any) => c.localId === cardNumber);
           if (match) return { name: match.name, cardId: match.id };
-          const byName = setData.cards.find((c: any) =>
+          const numPadded = cardNumber.replace(/^0+/, "");
+          const matchPadded = setData.cards.find((c: any) => c.localId.replace(/^0+/, "") === numPadded);
+          if (matchPadded) return { name: matchPadded.name, cardId: matchPadded.id };
+          const nameMatches = setData.cards.filter((c: any) =>
             c.name.toLowerCase() === name.toLowerCase()
           );
-          if (byName) return { name: byName.name, cardId: byName.id };
+          if (nameMatches.length === 1) {
+            return { name: nameMatches[0].name, cardId: nameMatches[0].id };
+          }
+          if (nameMatches.length > 1) {
+            const cardNum = parseInt(cardNumber, 10);
+            if (!isNaN(cardNum)) {
+              let closest = nameMatches[0];
+              let closestDist = Math.abs(parseInt(closest.localId, 10) - cardNum);
+              for (const nm of nameMatches) {
+                const dist = Math.abs(parseInt(nm.localId, 10) - cardNum);
+                if (dist < closestDist) {
+                  closest = nm;
+                  closestDist = dist;
+                }
+              }
+              return { name: closest.name, cardId: closest.id };
+            }
+            return { name: nameMatches[0].name, cardId: nameMatches[0].id };
+          }
         }
       }
     } else if (game === "yugioh") {
+      const rarity = result.rarity?.toLowerCase() || "";
       const res = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?name=${encodeURIComponent(name)}`);
       if (res.ok) {
         const data = await res.json();
         if (data?.data?.[0]) {
           const card = data.data[0];
-          const setInfo = card.card_sets?.find((s: any) => s.set_code?.startsWith(setId));
-          if (setInfo) return { name: card.name, cardId: setInfo.set_code };
+          const setsInSet = card.card_sets?.filter((s: any) => s.set_code?.startsWith(setId)) || [];
+          if (setsInSet.length > 1 && rarity) {
+            const rarityMatch = setsInSet.find((s: any) => s.set_rarity?.toLowerCase().includes(rarity));
+            if (rarityMatch) return { name: card.name, cardId: rarityMatch.set_code };
+            const codeWithNum = setsInSet.find((s: any) => {
+              const suffix = s.set_code?.split("-").pop() || "";
+              return suffix.includes(cardNumber);
+            });
+            if (codeWithNum) return { name: card.name, cardId: codeWithNum.set_code };
+          }
+          if (setsInSet.length > 0) return { name: card.name, cardId: setsInSet[0].set_code };
           if (card.card_sets?.[0]) return { name: card.name, cardId: card.card_sets[0].set_code };
         }
       }
@@ -160,11 +191,23 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
         const card = await res.json();
         return { name: card.name, cardId: card.id };
       }
-      const searchRes = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${name}" set:${setId}`)}&unique=prints`);
+      const searchRes = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${name}" set:${setId} cn:${cardNumber}`)}&unique=prints`);
       if (searchRes.ok) {
         const searchData = await searchRes.json();
         if (searchData?.data?.[0]) {
           return { name: searchData.data[0].name, cardId: searchData.data[0].id };
+        }
+      }
+      const broadSearchRes = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${name}" set:${setId}`)}&unique=prints`);
+      if (broadSearchRes.ok) {
+        const broadData = await broadSearchRes.json();
+        if (broadData?.data?.length === 1) {
+          return { name: broadData.data[0].name, cardId: broadData.data[0].id };
+        }
+        if (broadData?.data?.length > 1) {
+          const exactNum = broadData.data.find((c: any) => c.collector_number === cardNumber);
+          if (exactNum) return { name: exactNum.name, cardId: exactNum.id };
+          return { name: broadData.data[0].name, cardId: broadData.data[0].id };
         }
       }
     }
@@ -192,9 +235,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 CRITICAL: Read ALL visible text on the card carefully:
 1. Card NAME - printed prominently at the top
 2. SET SYMBOL / SET CODE - look for the expansion symbol, set logo, or printed set code
-3. CARD NUMBER - usually at the bottom (e.g. "25/102", "SV049", "OP01-001")
+3. CARD NUMBER - usually at the bottom (e.g. "25/102", "SV049", "OP01-001"). READ THIS EXACTLY. This is the most important identifier.
 4. RARITY - indicated by symbol color (gold=rare, silver=uncommon, black=common for Pokemon/MTG) or text
 5. COLLECTOR INFO - any additional identifiers printed on the card
+
+VARIANT / RARITY IDENTIFICATION (VERY IMPORTANT):
+Many cards have multiple printings with DIFFERENT collector numbers. You MUST read the exact collector number printed on the card to distinguish them:
+- Pokemon: Regular cards are numbered within the main set (e.g. 1/165). Full Art, Illustration Rare, Special Art Rare, and Secret Rare cards have numbers ABOVE the official set count (e.g. 166/165, 198/165). The number after the slash is the official count. If the first number exceeds the second, it is a special variant. Read the EXACT number - do NOT substitute a lower number.
+- Pokemon rarity symbols: Circle=Common, Diamond=Uncommon, Star=Rare, Star H=Holo Rare, V/VMAX/VSTAR/ex with full art=Ultra Rare, Gold card=Secret Rare, Illustration with textured art=Special/Illustration Rare
+- Yu-Gi-Oh!: Different rarities have different visual treatments (Common=no foil, Rare=silver name, Super Rare=holo art, Ultra Rare=gold name+holo art, Secret Rare=rainbow name+holo art, Starlight Rare=embossed). Card code suffix matters (e.g. EN001 vs EN001a).
+- MTG: Different printings may have different collector numbers. Extended art, borderless, and showcase variants have higher collector numbers.
+- One Piece: Alt art cards (AA/manga art) have different card IDs from regular versions.
 
 GAME IDENTIFICATION:
 - Pokemon: Yellow border, HP in top right, weakness/resistance at bottom, Pokemon creature art
@@ -234,7 +285,7 @@ Return ONLY valid JSON.`,
                 type: "image_url",
                 image_url: { url: `data:image/jpeg;base64,${image}`, detail: "high" },
               },
-              { type: "text", text: "Identify this trading card. Read all text carefully, especially the card name, set symbol, card number, and any collector information printed on the card." },
+              { type: "text", text: "Identify this trading card. Read all text carefully, especially the card name, set symbol, card number, and any collector information printed on the card. Pay special attention to the exact collector number - if this is a full art, holo, illustration rare, or secret rare variant, the number will be higher than the main set count. Read the EXACT number printed, do not round down or substitute." },
             ],
           },
         ],
