@@ -1,8 +1,8 @@
 import React from "react";
-import { View, Pressable, Text, StyleSheet } from "react-native";
+import { ScrollView, Pressable, Text, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useTheme } from "@/lib/ThemeContext";
-import type { GameId, TCGGame } from "@/lib/types";
+import type { GameId } from "@/lib/types";
 import { GAMES } from "@/lib/types";
 import * as Haptics from "expo-haptics";
 
@@ -21,7 +21,11 @@ const GAME_ICONS: Record<GameId, keyof typeof MaterialCommunityIcons.glyphMap> =
 export function GameSelector({ selected, onSelect }: GameSelectorProps) {
   const { colors } = useTheme();
   return (
-    <View style={styles.container}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.container}
+    >
       {GAMES.map((game) => {
         const isSelected = selected === game.id;
         return (
@@ -54,7 +58,7 @@ export function GameSelector({ selected, onSelect }: GameSelectorProps) {
           </Pressable>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
 
