@@ -87,16 +87,16 @@ export default function ScanScreen() {
     setIsCapturing(true);
     try {
       const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.8,
-        base64: true,
+        quality: 1,
       });
       if (photo) {
         setCameraOpen(false);
         setImageUri(photo.uri);
         setScanResult(null);
-        if (photo.base64) {
-          identifyCard(photo.base64);
-        }
+        const fileBase64 = await FileSystem.readAsStringAsync(photo.uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        identifyCard(fileBase64);
       }
     } catch (e) {
       Alert.alert("Error", "Failed to capture photo. Please try again.");
