@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Share,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
@@ -22,7 +23,9 @@ import Animated, {
   withTiming,
   interpolate,
 } from "react-native-reanimated";
+import * as Haptics from "expo-haptics";
 import { useTheme } from "@/lib/ThemeContext";
+import { useCollection } from "@/lib/CollectionContext";
 import {
   getTradeList,
   addToTradeList,
@@ -40,6 +43,7 @@ export default function CardDetailScreen() {
   const { colors, isDark } = useTheme();
   const { game, cardId } = useLocalSearchParams<{ game: string; cardId: string }>();
   const gameId = game as GameId;
+  const { hasCard, removeCard } = useCollection();
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
 
@@ -89,6 +93,28 @@ export default function CardDetailScreen() {
     try {
       await Share.share({ message });
     } catch {}
+  };
+
+  const isInCollection = card ? hasCard(gameId, card.setId, cardId || "") : false;
+
+  const handleRemoveCard = () => {
+    if (!card) return;
+    Alert.alert(
+      "Remove Card",
+      `Remove ${card.name} from your collection?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: async () => {
+            await removeCard(gameId, card.setId, cardId || "");
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            router.back();
+          },
+        },
+      ]
+    );
   };
 
   if (isLoading) {
@@ -151,6 +177,11 @@ export default function CardDetailScreen() {
               {card.setName} - #{card.localId}
             </Text>
           </View>
+          {isInCollection && (
+            <Pressable style={styles.actionButton} onPress={handleRemoveCard}>
+              <Ionicons name="trash-outline" size={22} color={colors.error} />
+            </Pressable>
+          )}
           <Pressable style={styles.actionButton} onPress={handleTradeToggle}>
             <Ionicons
               name="swap-horizontal"
