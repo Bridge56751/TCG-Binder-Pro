@@ -57,6 +57,8 @@ Return ONLY valid JSON, no other text.`,
     }
   });
 
+  // ───── POKEMON (TCGdex API) ─────
+
   app.get("/api/tcg/pokemon/sets", async (_req, res) => {
     try {
       const response = await fetch("https://api.tcgdex.net/v2/en/sets");
@@ -105,6 +107,8 @@ Return ONLY valid JSON, no other text.`,
     }
   });
 
+  // ───── YU-GI-OH! (YGOProDeck API) ─────
+
   app.get("/api/tcg/yugioh/sets", async (_req, res) => {
     try {
       const response = await fetch("https://db.ygoprodeck.com/api/v7/cardsets.php");
@@ -118,7 +122,7 @@ Return ONLY valid JSON, no other text.`,
           game: "yugioh",
           totalCards: s.num_of_cards,
           logo: null,
-          symbol: null,
+          symbol: s.set_image || null,
         }));
       res.json(formatted);
     } catch (error) {
@@ -130,8 +134,14 @@ Return ONLY valid JSON, no other text.`,
   app.get("/api/tcg/yugioh/sets/:id/cards", async (req, res) => {
     try {
       const { id } = req.params;
+
+      const setsRes = await fetch("https://db.ygoprodeck.com/api/v7/cardsets.php");
+      const allSets = await setsRes.json();
+      const setMeta = (allSets as any[]).find((s: any) => s.set_code === id);
+      const setName = setMeta?.set_name || id;
+
       const response = await fetch(
-        `https://db.ygoprodeck.com/api/v7/cardinfo.php?cardset=${encodeURIComponent(id)}`
+        `https://db.ygoprodeck.com/api/v7/cardinfo.php?cardset=${encodeURIComponent(setName)}`
       );
       const data = await response.json();
 
@@ -151,7 +161,7 @@ Return ONLY valid JSON, no other text.`,
 
       res.json({
         id,
-        name: id,
+        name: setName,
         totalCards: cards.length,
         cards,
       });
@@ -161,25 +171,37 @@ Return ONLY valid JSON, no other text.`,
     }
   });
 
+  // ───── ONE PIECE (OPTCG API) ─────
+
   app.get("/api/tcg/onepiece/sets", async (_req, res) => {
     try {
-      const opSets = [
-        { id: "OP01", name: "Romance Dawn", totalCards: 121 },
-        { id: "OP02", name: "Paramount War", totalCards: 121 },
-        { id: "OP03", name: "Pillars of Strength", totalCards: 122 },
-        { id: "OP04", name: "Kingdoms of Intrigue", totalCards: 121 },
-        { id: "OP05", name: "Awakening of the New Era", totalCards: 120 },
-        { id: "OP06", name: "Wings of the Captain", totalCards: 130 },
-        { id: "OP07", name: "500 Years in the Future", totalCards: 130 },
-        { id: "OP08", name: "Two Legends", totalCards: 130 },
-        { id: "OP09", name: "The Four Emperors", totalCards: 130 },
-        { id: "ST01", name: "Straw Hat Crew", totalCards: 17 },
-        { id: "ST02", name: "Worst Generation", totalCards: 17 },
-        { id: "ST03", name: "The Seven Warlords of the Sea", totalCards: 17 },
-        { id: "ST04", name: "Animal Kingdom Pirates", totalCards: 17 },
-      ].map((s) => ({ ...s, game: "onepiece", logo: null, symbol: null }));
+      const [setsRes, decksRes] = await Promise.all([
+        fetch("https://optcgapi.com/api/allSets/"),
+        fetch("https://optcgapi.com/api/allDecks/"),
+      ]);
 
-      res.json(opSets);
+      const boosterSets = await setsRes.json();
+      const starterDecks = await decksRes.json();
+
+      const formattedBoosters = (boosterSets as any[]).map((s: any) => ({
+        id: s.set_id,
+        name: s.set_name,
+        game: "onepiece",
+        totalCards: 0,
+        logo: null,
+        symbol: null,
+      }));
+
+      const formattedDecks = (starterDecks as any[]).map((s: any) => ({
+        id: s.structure_deck_id,
+        name: s.structure_deck_name,
+        game: "onepiece",
+        totalCards: 0,
+        logo: null,
+        symbol: null,
+      }));
+
+      res.json([...formattedBoosters, ...formattedDecks]);
     } catch (error) {
       console.error("Error fetching One Piece sets:", error);
       res.status(500).json({ error: "Failed to fetch One Piece sets" });
@@ -189,38 +211,50 @@ Return ONLY valid JSON, no other text.`,
   app.get("/api/tcg/onepiece/sets/:id/cards", async (req, res) => {
     try {
       const { id } = req.params;
-      const setInfo = {
-        OP01: { name: "Romance Dawn", total: 121 },
-        OP02: { name: "Paramount War", total: 121 },
-        OP03: { name: "Pillars of Strength", total: 122 },
-        OP04: { name: "Kingdoms of Intrigue", total: 121 },
-        OP05: { name: "Awakening of the New Era", total: 120 },
-        OP06: { name: "Wings of the Captain", total: 130 },
-        OP07: { name: "500 Years in the Future", total: 130 },
-        OP08: { name: "Two Legends", total: 130 },
-        OP09: { name: "The Four Emperors", total: 130 },
-        ST01: { name: "Straw Hat Crew", total: 17 },
-        ST02: { name: "Worst Generation", total: 17 },
-        ST03: { name: "The Seven Warlords of the Sea", total: 17 },
-        ST04: { name: "Animal Kingdom Pirates", total: 17 },
-      } as Record<string, { name: string; total: number }>;
 
-      const info = setInfo[id];
-      if (!info) {
+      const isStarterDeck = id.startsWith("ST-");
+
+      const apiUrl = isStarterDeck
+        ? `https://optcgapi.com/api/decks/${id}/`
+        : `https://optcgapi.com/api/sets/${id}/`;
+
+      const response = await fetch(apiUrl);
+
+      if (!response.ok) {
         return res.status(404).json({ error: "Set not found" });
       }
 
-      const cards = Array.from({ length: info.total }, (_, i) => ({
-        id: `${id}-${String(i + 1).padStart(3, "0")}`,
-        localId: String(i + 1).padStart(3, "0"),
-        name: `Card #${i + 1}`,
-        image: null,
-      }));
+      const data = await response.json();
+
+      if (!Array.isArray(data) || data.length === 0) {
+        return res.status(404).json({ error: "No cards found for this set" });
+      }
+
+      const uniqueCards = new Map<string, any>();
+      for (const c of data) {
+        if (!uniqueCards.has(c.card_set_id)) {
+          uniqueCards.set(c.card_set_id, c);
+        }
+      }
+
+      const cards = Array.from(uniqueCards.values()).map((c: any) => {
+        const numPart = c.card_set_id?.split("-").pop() || "000";
+        return {
+          id: c.card_set_id,
+          localId: numPart,
+          name: c.card_name,
+          image: c.card_image || null,
+        };
+      });
+
+      cards.sort((a, b) => a.localId.localeCompare(b.localId, undefined, { numeric: true }));
+
+      const setName = data[0]?.set_name || id;
 
       res.json({
         id,
-        name: info.name,
-        totalCards: info.total,
+        name: setName,
+        totalCards: cards.length,
         cards,
       });
     } catch (error) {
