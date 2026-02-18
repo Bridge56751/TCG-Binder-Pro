@@ -23,6 +23,10 @@ async function fetchSetsForGame(game: string): Promise<any[]> {
       const res = await fetch("https://optcgapi.com/api/sets/");
       const data = await res.json();
       sets = Array.isArray(data) ? data : [];
+    } else if (game === "mtg") {
+      const res = await fetch("https://api.scryfall.com/sets");
+      const data = await res.json();
+      sets = Array.isArray(data?.data) ? data.data : [];
     }
   } catch (_) {}
   setsCache[game] = sets;
@@ -63,6 +67,13 @@ async function resolveSetId(game: string, aiSetId: string, aiSetName?: string): 
       normalize(s.name) === normalizedId || normalize(s.name) === normalizedName
     );
     if (byName) return byName.id;
+  } else if (game === "mtg") {
+    const exact = sets.find((s: any) => s.code === aiSetId.toLowerCase());
+    if (exact) return exact.code;
+    const byName = sets.find((s: any) =>
+      normalize(s.name) === normalizedId || normalize(s.name) === normalizedName
+    );
+    if (byName) return byName.code;
   }
   return null;
 }
@@ -81,13 +92,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           {
             role: "system",
             content: `You are a trading card game expert. When shown an image of a trading card, identify it precisely. Return a JSON object with these fields:
-- game: "pokemon" | "yugioh" | "onepiece" (the TCG it belongs to)
+- game: "pokemon" | "yugioh" | "onepiece" | "mtg" (the TCG it belongs to)
 - name: the card name
 - setName: the set/expansion name
-- setId: the set code (e.g. "base1", "LOB", "OP01")
+- setId: the set code (e.g. "base1" for Pokemon, "LOB" for Yu-Gi-Oh!, "OP01" for One Piece, "neo" for MTG)
 - cardNumber: the card number within the set (just the number, no prefix)
 - rarity: the rarity (Common, Uncommon, Rare, etc.)
 - estimatedValue: estimated market value in USD as a number
+
+For Magic: The Gathering cards, use the three-letter set code (e.g. "neo", "dmu", "one", "mkm").
 
 If you cannot identify the card or it's not a trading card, return: {"error": "Could not identify card"}
 
@@ -201,7 +214,6 @@ Return ONLY valid JSON, no other text.`,
           seen.add(s.set_code);
           return true;
         })
-        .slice(0, 200)
         .map((s: any) => ({
           id: s.set_code,
           name: s.set_name,
@@ -358,6 +370,78 @@ Return ONLY valid JSON, no other text.`,
     }
   });
 
+  // ───── MAGIC: THE GATHERING (Scryfall API) ─────
+
+  app.get("/api/tcg/mtg/sets", async (_req, res) => {
+    try {
+      const sets = await fetchSetsForGame("mtg");
+      const validTypes = new Set(["core", "expansion", "masters", "draft_innovation", "commander", "funny", "starter", "planechase", "archenemy", "from_the_vault", "premium_deck", "duel_deck", "box", "arsenal", "spellbook"]);
+      const formatted = (sets as any[])
+        .filter((s: any) => validTypes.has(s.set_type) && s.card_count > 0 && !s.digital)
+        .map((s: any) => ({
+          id: s.code,
+          name: s.name,
+          game: "mtg",
+          totalCards: s.card_count,
+          logo: null,
+          symbol: s.icon_svg_uri || null,
+          releaseDate: s.released_at || null,
+        }));
+      formatted.sort((a: any, b: any) => (b.releaseDate || "").localeCompare(a.releaseDate || ""));
+      res.json(formatted);
+    } catch (error) {
+      console.error("Error fetching MTG sets:", error);
+      res.status(500).json({ error: "Failed to fetch MTG sets" });
+    }
+  });
+
+  app.get("/api/tcg/mtg/sets/:id/cards", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const allCards: any[] = [];
+      let url: string | null = `https://api.scryfall.com/cards/search?order=set&q=set:${encodeURIComponent(id)}&unique=prints`;
+
+      while (url) {
+        const response = await fetch(url);
+        if (!response.ok) break;
+        const data = await response.json();
+        if (data.data) allCards.push(...data.data);
+        url = data.has_more ? data.next_page : null;
+        if (url) await new Promise(r => setTimeout(r, 100));
+      }
+
+      if (allCards.length === 0) {
+        return res.status(404).json({ error: "Set not found" });
+      }
+
+      const cards = allCards.map((c: any) => ({
+        id: c.id,
+        localId: c.collector_number || "0",
+        name: c.name,
+        image: c.image_uris?.small || c.card_faces?.[0]?.image_uris?.small || null,
+      }));
+
+      cards.sort((a: any, b: any) => {
+        const numA = parseInt(a.localId, 10);
+        const numB = parseInt(b.localId, 10);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return a.localId.localeCompare(b.localId, undefined, { numeric: true });
+      });
+
+      const setName = allCards[0]?.set_name || id;
+
+      res.json({
+        id,
+        name: setName,
+        totalCards: cards.length,
+        cards,
+      });
+    } catch (error) {
+      console.error("Error fetching MTG set cards:", error);
+      res.status(500).json({ error: "Failed to fetch set cards" });
+    }
+  });
+
   // ───── CARD DETAIL ENDPOINTS ─────
 
   app.get("/api/tcg/pokemon/card/:cardId", async (req, res) => {
@@ -484,6 +568,42 @@ Return ONLY valid JSON, no other text.`,
     }
   });
 
+  app.get("/api/tcg/mtg/card/:cardId", async (req, res) => {
+    try {
+      const { cardId } = req.params;
+      const response = await fetch(`https://api.scryfall.com/cards/${cardId}`);
+      if (!response.ok) return res.status(404).json({ error: "Card not found" });
+      const c = await response.json();
+
+      const prices = c.prices || {};
+      const currentPrice = prices.usd ? parseFloat(prices.usd) : (prices.usd_foil ? parseFloat(prices.usd_foil) : null);
+      const priceHistory = generatePriceHistory(currentPrice, 90);
+
+      res.json({
+        id: c.id,
+        localId: c.collector_number || "0",
+        name: c.name,
+        image: c.image_uris?.large || c.image_uris?.normal || c.card_faces?.[0]?.image_uris?.large || null,
+        game: "mtg",
+        setId: c.set || "",
+        setName: c.set_name || "",
+        rarity: c.rarity ? c.rarity.charAt(0).toUpperCase() + c.rarity.slice(1) : null,
+        cardType: c.type_line || null,
+        hp: c.power ? parseInt(c.power, 10) : null,
+        description: c.oracle_text || c.card_faces?.[0]?.oracle_text || null,
+        artist: c.artist || null,
+        currentPrice,
+        priceUnit: "USD",
+        priceLow: currentPrice ? currentPrice * 0.7 : null,
+        priceHigh: prices.usd_foil ? parseFloat(prices.usd_foil) : (currentPrice ? currentPrice * 1.5 : null),
+        priceHistory,
+      });
+    } catch (error) {
+      console.error("Error fetching MTG card detail:", error);
+      res.status(500).json({ error: "Failed to fetch card detail" });
+    }
+  });
+
   // ───── COLLECTION VALUE ─────
 
   app.post("/api/collection/value", async (req, res) => {
@@ -557,6 +677,13 @@ Return ONLY valid JSON, no other text.`,
           const c = data[0];
           const price = c.market_price ?? c.inventory_price ?? null;
           return { cardId: card.cardId, name: c.card_name || card.cardId, price };
+        } else if (card.game === "mtg") {
+          const response = await fetch(`https://api.scryfall.com/cards/${card.cardId}`);
+          if (!response.ok) return { cardId: card.cardId, name: card.cardId, price: null };
+          const c = await response.json();
+          const prices = c.prices || {};
+          const price = prices.usd ? parseFloat(prices.usd) : (prices.usd_foil ? parseFloat(prices.usd_foil) : null);
+          return { cardId: card.cardId, name: c.name || card.cardId, price };
         }
         return { cardId: card.cardId, name: card.cardId, price: null };
       }
@@ -658,10 +785,32 @@ Return ONLY valid JSON, no other text.`,
         } catch { return []; }
       }
 
+      async function searchMtg(): Promise<typeof results> {
+        try {
+          const response = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(searchTerm)}&unique=cards`);
+          if (!response.ok) return [];
+          const data = await response.json();
+          if (!data?.data || !Array.isArray(data.data)) return [];
+          return data.data.slice(0, limitPerGame).map((c: any) => {
+            const prices = c.prices || {};
+            const price = prices.usd ? parseFloat(prices.usd) : (prices.usd_foil ? parseFloat(prices.usd_foil) : null);
+            return {
+              id: c.id,
+              name: c.name,
+              game: "mtg",
+              setName: c.set_name || "",
+              image: c.image_uris?.small || c.card_faces?.[0]?.image_uris?.small || null,
+              price: price && price > 0 ? price : null,
+            };
+          });
+        } catch { return []; }
+      }
+
       const searches: Promise<typeof results>[] = [];
       if (!game || game === "pokemon") searches.push(searchPokemon());
       if (!game || game === "yugioh") searches.push(searchYugioh());
       if (!game || game === "onepiece") searches.push(searchOnePiece());
+      if (!game || game === "mtg") searches.push(searchMtg());
 
       const settled = await Promise.allSettled(searches);
       for (const result of settled) {

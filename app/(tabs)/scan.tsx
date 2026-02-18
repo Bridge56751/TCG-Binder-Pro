@@ -46,6 +46,7 @@ function timeAgo(timestamp: number): string {
 function gameLabel(game: GameId): string {
   if (game === "pokemon") return "Pokemon";
   if (game === "yugioh") return "Yu-Gi-Oh!";
+  if (game === "mtg") return "Magic";
   return "One Piece";
 }
 

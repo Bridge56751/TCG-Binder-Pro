@@ -241,7 +241,7 @@ export default function CardDetailScreen() {
               <View style={[styles.badge, { backgroundColor: colors.error + "18" }]}>
                 <Ionicons name="heart" size={12} color={colors.error} />
                 <Text style={[styles.badgeText, { color: colors.error }]}>
-                  {gameId === "yugioh" ? `ATK ${card.hp}` : `HP ${card.hp}`}
+                  {gameId === "yugioh" ? `ATK ${card.hp}` : gameId === "mtg" ? `P ${card.hp}` : `HP ${card.hp}`}
                 </Text>
               </View>
             )}
