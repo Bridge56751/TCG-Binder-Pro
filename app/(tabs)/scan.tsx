@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   StyleSheet,
   Text,
@@ -8,10 +8,13 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Dimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import * as FileSystem from "expo-file-system";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
@@ -30,15 +33,7 @@ import Animated, {
   SlideOutUp,
 } from "react-native-reanimated";
 
-function timeAgo(timestamp: number): string {
-  const diff = Date.now() - timestamp;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 function gameLabel(game: GameId): string {
   if (game === "pokemon") return "Pokemon";
@@ -60,6 +55,11 @@ export default function ScanScreen() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const cameraRef = useRef<CameraView>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
+
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 84 + 34 : 100;
 
@@ -71,21 +71,37 @@ export default function ScanScreen() {
     }, 2000);
   }, []);
 
-  const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission needed", "Camera access is required to scan cards");
-      return;
+  const openCamera = async () => {
+    if (!cameraPermission?.granted) {
+      const result = await requestCameraPermission();
+      if (!result.granted) {
+        Alert.alert("Permission needed", "Camera access is required to scan cards");
+        return;
+      }
     }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ["images"],
-      quality: 0.8,
-      base64: true,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
-      setScanResult(null);
-      identifyCard(result.assets[0].base64!);
+    setCameraOpen(true);
+  };
+
+  const capturePhoto = async () => {
+    if (!cameraRef.current || isCapturing) return;
+    setIsCapturing(true);
+    try {
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.8,
+        base64: true,
+      });
+      if (photo) {
+        setCameraOpen(false);
+        setImageUri(photo.uri);
+        setScanResult(null);
+        if (photo.base64) {
+          identifyCard(photo.base64);
+        }
+      }
+    } catch (e) {
+      Alert.alert("Error", "Failed to capture photo. Please try again.");
+    } finally {
+      setIsCapturing(false);
     }
   };
 
@@ -162,6 +178,59 @@ export default function ScanScreen() {
 
   const dynamicStyles = getDynamicStyles(colors);
 
+  if (cameraOpen) {
+    return (
+      <View style={cameraStyles.container}>
+        <CameraView
+          ref={cameraRef}
+          style={cameraStyles.camera}
+          facing="back"
+        >
+          <View style={cameraStyles.overlay} pointerEvents="box-none">
+            <View style={[cameraStyles.dimArea, cameraStyles.dimTop]} />
+            <View style={cameraStyles.middleRow}>
+              <View style={cameraStyles.dimSide} />
+              <View style={cameraStyles.cardCutout}>
+                <View style={[cameraStyles.guideCorner, cameraStyles.guideTL]} />
+                <View style={[cameraStyles.guideCorner, cameraStyles.guideTR]} />
+                <View style={[cameraStyles.guideCorner, cameraStyles.guideBL]} />
+                <View style={[cameraStyles.guideCorner, cameraStyles.guideBR]} />
+                <Text style={cameraStyles.guideText}>Align card here</Text>
+              </View>
+              <View style={cameraStyles.dimSide} />
+            </View>
+            <View style={[cameraStyles.dimArea, cameraStyles.dimBottom]} />
+          </View>
+
+          <View style={[cameraStyles.topBar, { paddingTop: topInset + 8 }]}>
+            <Pressable onPress={() => setCameraOpen(false)} style={cameraStyles.closeBtn}>
+              <Ionicons name="close" size={28} color="#FFFFFF" />
+            </Pressable>
+          </View>
+
+          <View style={[cameraStyles.bottomBar, { paddingBottom: Platform.OS === "web" ? 40 : insets.bottom + 20 }]}>
+            <View style={cameraStyles.shutterOuter}>
+              <Pressable
+                onPress={capturePhoto}
+                disabled={isCapturing}
+                style={({ pressed }) => [
+                  cameraStyles.shutterBtn,
+                  pressed && { transform: [{ scale: 0.92 }] },
+                ]}
+              >
+                {isCapturing ? (
+                  <ActivityIndicator size="small" color="#333" />
+                ) : (
+                  <View style={cameraStyles.shutterInner} />
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </CameraView>
+      </View>
+    );
+  }
+
   return (
     <ScrollView
       style={[dynamicStyles.container, { paddingTop: topInset }]}
@@ -227,12 +296,6 @@ export default function ScanScreen() {
         {imageUri ? (
           <Animated.View entering={FadeIn.duration(300)} style={[dynamicStyles.previewWrapper, { backgroundColor: colors.surfaceAlt }]}>
             <Image source={{ uri: imageUri }} style={dynamicStyles.preview} contentFit="contain" />
-            <View style={dynamicStyles.cardFrameOverlay} pointerEvents="none">
-              <View style={[dynamicStyles.frameCorner, dynamicStyles.frameTL, { borderColor: colors.tint }]} />
-              <View style={[dynamicStyles.frameCorner, dynamicStyles.frameTR, { borderColor: colors.tint }]} />
-              <View style={[dynamicStyles.frameCorner, dynamicStyles.frameBL, { borderColor: colors.tint }]} />
-              <View style={[dynamicStyles.frameCorner, dynamicStyles.frameBR, { borderColor: colors.tint }]} />
-            </View>
             {isScanning && (
               <View style={dynamicStyles.scanningOverlay}>
                 <ActivityIndicator size="large" color={colors.tint} />
@@ -302,7 +365,7 @@ export default function ScanScreen() {
       <View style={dynamicStyles.actions}>
         <Pressable
           style={({ pressed }) => [dynamicStyles.actionButton, dynamicStyles.primaryAction, { backgroundColor: colors.tint }, pressed && { opacity: 0.9 }]}
-          onPress={takePhoto}
+          onPress={openCamera}
         >
           <Ionicons name="camera" size={24} color="#FFFFFF" />
           <Text style={dynamicStyles.primaryActionText}>Take Photo</Text>
@@ -319,6 +382,136 @@ export default function ScanScreen() {
     </ScrollView>
   );
 }
+
+const CARD_WIDTH = SCREEN_WIDTH * 0.7;
+const CARD_HEIGHT = CARD_WIDTH * 1.4;
+
+const cameraStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#000",
+  },
+  camera: {
+    flex: 1,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  dimTop: {
+    flex: 1,
+  },
+  dimBottom: {
+    flex: 1,
+  },
+  dimArea: {
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  middleRow: {
+    flexDirection: "row",
+    height: CARD_HEIGHT,
+  },
+  dimSide: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  cardCutout: {
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  guideCorner: {
+    position: "absolute",
+    width: 28,
+    height: 28,
+    borderColor: "#FFFFFF",
+  },
+  guideTL: {
+    top: -1,
+    left: -1,
+    borderTopWidth: 4,
+    borderLeftWidth: 4,
+    borderTopLeftRadius: 12,
+  },
+  guideTR: {
+    top: -1,
+    right: -1,
+    borderTopWidth: 4,
+    borderRightWidth: 4,
+    borderTopRightRadius: 12,
+  },
+  guideBL: {
+    bottom: -1,
+    left: -1,
+    borderBottomWidth: 4,
+    borderLeftWidth: 4,
+    borderBottomLeftRadius: 12,
+  },
+  guideBR: {
+    bottom: -1,
+    right: -1,
+    borderBottomWidth: 4,
+    borderRightWidth: 4,
+    borderBottomRightRadius: 12,
+  },
+  guideText: {
+    color: "rgba(255,255,255,0.7)",
+    fontFamily: "DMSans_500Medium",
+    fontSize: 14,
+    marginTop: 60,
+  },
+  topBar: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    zIndex: 10,
+  },
+  closeBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bottomBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    paddingTop: 20,
+    zIndex: 10,
+  },
+  shutterOuter: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    borderWidth: 4,
+    borderColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  shutterBtn: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  shutterInner: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: "#FFFFFF",
+  },
+});
 
 function getDynamicStyles(colors: any) {
   return StyleSheet.create({
@@ -458,48 +651,6 @@ function getDynamicStyles(colors: any) {
     },
     preview: {
       flex: 1,
-    },
-    cardFrameOverlay: {
-      position: "absolute",
-      top: "8%",
-      bottom: "8%",
-      left: "15%",
-      right: "15%",
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    frameCorner: {
-      position: "absolute",
-      width: 24,
-      height: 24,
-    },
-    frameTL: {
-      top: 0,
-      left: 0,
-      borderTopWidth: 3,
-      borderLeftWidth: 3,
-      borderTopLeftRadius: 6,
-    },
-    frameTR: {
-      top: 0,
-      right: 0,
-      borderTopWidth: 3,
-      borderRightWidth: 3,
-      borderTopRightRadius: 6,
-    },
-    frameBL: {
-      bottom: 0,
-      left: 0,
-      borderBottomWidth: 3,
-      borderLeftWidth: 3,
-      borderBottomLeftRadius: 6,
-    },
-    frameBR: {
-      bottom: 0,
-      right: 0,
-      borderBottomWidth: 3,
-      borderRightWidth: 3,
-      borderBottomRightRadius: 6,
     },
     scanningOverlay: {
       ...StyleSheet.absoluteFillObject,
