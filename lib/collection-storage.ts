@@ -39,7 +39,15 @@ export async function removeCardFromCollection(
 ): Promise<CollectionData> {
   const collection = await getCollection();
   if (collection[game]?.[setId]) {
-    collection[game][setId] = collection[game][setId].filter((id) => id !== cardId);
+    const cardIdLower = cardId.toLowerCase();
+    collection[game][setId] = collection[game][setId].filter((id) => {
+      if (id === cardId) return false;
+      if (id.toLowerCase() === cardIdLower) return false;
+      const storedNum = id.toLowerCase().split("-").pop() || "";
+      const cardNum = cardIdLower.split("-").pop() || "";
+      if (storedNum && cardNum && storedNum === cardNum && id.toLowerCase().startsWith(setId.toLowerCase())) return false;
+      return true;
+    });
     if (collection[game][setId].length === 0) delete collection[game][setId];
     if (Object.keys(collection[game]).length === 0) delete collection[game];
   }
@@ -73,5 +81,16 @@ export function isCardCollected(
   setId: string,
   cardId: string
 ): boolean {
-  return collection[game]?.[setId]?.includes(cardId) || false;
+  const cards = collection[game]?.[setId];
+  if (!cards || cards.length === 0) return false;
+  if (cards.includes(cardId)) return true;
+  const cardIdLower = cardId.toLowerCase();
+  for (const stored of cards) {
+    const storedLower = stored.toLowerCase();
+    if (storedLower === cardIdLower) return true;
+    const storedNum = storedLower.split("-").pop() || "";
+    const cardNum = cardIdLower.split("-").pop() || "";
+    if (storedNum && cardNum && storedNum === cardNum && storedLower.startsWith(setId.toLowerCase())) return true;
+  }
+  return false;
 }

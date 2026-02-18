@@ -139,10 +139,11 @@ export default function ScanScreen() {
 
   const handleAddToCollection = async () => {
     if (!scanResult) return;
+    const cardId = scanResult.verifiedCardId || `${scanResult.setId}-${scanResult.cardNumber}`;
     await addCard(
       scanResult.game,
       scanResult.setId,
-      `${scanResult.setId}-${scanResult.cardNumber}`
+      cardId
     );
     await addToScanHistory(scanResult, true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
