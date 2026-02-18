@@ -1,9 +1,9 @@
-import React, { useState, useCallback } from "react";
+import React, { useState } from "react";
 import {
   StyleSheet,
   Text,
   View,
-  FlatList,
+  ScrollView,
   Platform,
   Pressable,
   ActivityIndicator,
@@ -19,7 +19,6 @@ import { SetCard } from "@/components/SetCard";
 import { StatCard } from "@/components/StatCard";
 import type { GameId, TCGSet } from "@/lib/types";
 import { GAMES } from "@/lib/types";
-import { getApiUrl } from "@/lib/query-client";
 
 export default function CollectionScreen() {
   const insets = useSafeAreaInsets();
@@ -34,19 +33,37 @@ export default function CollectionScreen() {
     (s) => (collection[selectedGame]?.[s.id]?.length || 0) > 0
   ) || [];
 
+  const inProgressSets = collectedSets.filter(
+    (s) => s.totalCards > 0 && (collection[selectedGame]?.[s.id]?.length || 0) < s.totalCards
+  );
+
+  const completedSets = collectedSets.filter(
+    (s) => s.totalCards > 0 && (collection[selectedGame]?.[s.id]?.length || 0) >= s.totalCards
+  );
+
   const topInset = Platform.OS === "web" ? 67 : insets.top;
+  const bottomInset = Platform.OS === "web" ? 84 + 34 : 100;
 
   const gameColor = GAMES.find((g) => g.id === selectedGame)?.color || Colors.light.tint;
 
-  const renderHeader = () => (
-    <View style={styles.headerContent}>
+  const navigateToSet = (setId: string) => {
+    router.push({
+      pathname: "/set/[game]/[id]",
+      params: { game: selectedGame, id: setId },
+    });
+  };
+
+  return (
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: bottomInset }}
+      showsVerticalScrollIndicator={false}
+    >
       <View style={[styles.topBar, { paddingTop: topInset + 8 }]}>
-        <View>
-          <Text style={styles.greeting}>My Collection</Text>
-          <Text style={styles.subtitle}>
-            {totalCards()} cards collected
-          </Text>
-        </View>
+        <Text style={styles.greeting}>My Collection</Text>
+        <Text style={styles.subtitle}>
+          {totalCards()} cards collected
+        </Text>
       </View>
 
       <View style={styles.statsRow}>
@@ -65,76 +82,92 @@ export default function CollectionScreen() {
         <StatCard
           icon="star"
           label="Complete"
-          value={String(
-            sets?.filter(
-              (s) => s.totalCards > 0 && (collection[selectedGame]?.[s.id]?.length || 0) >= s.totalCards
-            ).length || 0
-          )}
+          value={String(completedSets.length)}
           color={Colors.light.success}
         />
       </View>
 
-      <GameSelector selected={selectedGame} onSelect={setSelectedGame} />
+      <View style={styles.selectorRow}>
+        <GameSelector selected={selectedGame} onSelect={setSelectedGame} />
+      </View>
 
-      {collectedSets.length > 0 && (
-        <Text style={styles.sectionTitle}>In Progress</Text>
-      )}
-    </View>
-  );
-
-  const renderEmpty = () => {
-    if (isLoading) {
-      return (
-        <View style={styles.emptyState}>
+      {isLoading && (
+        <View style={styles.loadingState}>
           <ActivityIndicator size="large" color={Colors.light.tint} />
         </View>
-      );
-    }
-    return (
-      <View style={styles.emptyState}>
-        <Ionicons name="albums-outline" size={48} color={Colors.light.textTertiary} />
-        <Text style={styles.emptyTitle}>No cards yet</Text>
-        <Text style={styles.emptyText}>
-          Scan your first card or browse sets to start building your collection
-        </Text>
-        <Pressable
-          style={styles.emptyButton}
-          onPress={() => router.push("/(tabs)/scan")}
-        >
-          <Ionicons name="scan" size={18} color="#FFFFFF" />
-          <Text style={styles.emptyButtonText}>Scan a Card</Text>
-        </Pressable>
-      </View>
-    );
-  };
+      )}
 
-  return (
-    <View style={styles.container}>
-      <FlatList
-        data={collectedSets}
-        keyExtractor={(item) => `${item.game}-${item.id}`}
-        ListHeaderComponent={renderHeader}
-        ListEmptyComponent={renderEmpty}
-        renderItem={({ item }) => (
-          <SetCard
-            set={item}
-            collectedCount={setCards(selectedGame, item.id)}
-            onPress={() =>
-              router.push({
-                pathname: "/set/[game]/[id]",
-                params: { game: selectedGame, id: item.id },
-              })
-            }
-          />
-        )}
-        contentContainerStyle={[
-          styles.listContent,
-          { paddingBottom: Platform.OS === "web" ? 84 + 34 : 100 },
-        ]}
-        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-        showsVerticalScrollIndicator={false}
-      />
-    </View>
+      {!isLoading && collectedSets.length === 0 && (
+        <View style={styles.emptyState}>
+          <Ionicons name="albums-outline" size={48} color={Colors.light.textTertiary} />
+          <Text style={styles.emptyTitle}>No cards yet</Text>
+          <Text style={styles.emptyText}>
+            Scan your first card or browse sets to start building your collection
+          </Text>
+          <Pressable
+            style={styles.emptyButton}
+            onPress={() => router.push("/(tabs)/scan")}
+          >
+            <Ionicons name="scan" size={18} color="#FFFFFF" />
+            <Text style={styles.emptyButtonText}>Scan a Card</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {inProgressSets.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="construct" size={18} color={gameColor} />
+            <Text style={styles.sectionTitle}>Working On</Text>
+            <View style={[styles.countBadge, { backgroundColor: gameColor + "18" }]}>
+              <Text style={[styles.countBadgeText, { color: gameColor }]}>
+                {inProgressSets.length}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.sectionSubtitle}>
+            Sets you're actively collecting
+          </Text>
+          <View style={styles.setList}>
+            {inProgressSets.map((item) => (
+              <SetCard
+                key={`${item.game}-${item.id}`}
+                set={item}
+                collectedCount={setCards(selectedGame, item.id)}
+                onPress={() => navigateToSet(item.id)}
+              />
+            ))}
+          </View>
+        </View>
+      )}
+
+      {completedSets.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="trophy" size={18} color={Colors.light.success} />
+            <Text style={styles.sectionTitle}>Completed</Text>
+            <View style={[styles.countBadge, { backgroundColor: Colors.light.success + "18" }]}>
+              <Text style={[styles.countBadgeText, { color: Colors.light.success }]}>
+                {completedSets.length}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.sectionSubtitle}>
+            Master sets you've finished
+          </Text>
+          <View style={styles.setList}>
+            {completedSets.map((item) => (
+              <SetCard
+                key={`${item.game}-${item.id}`}
+                set={item}
+                collectedCount={setCards(selectedGame, item.id)}
+                onPress={() => navigateToSet(item.id)}
+              />
+            ))}
+          </View>
+        </View>
+      )}
+    </ScrollView>
   );
 }
 
@@ -143,13 +176,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.light.background,
   },
-  headerContent: {
-    gap: 16,
-    paddingBottom: 16,
-  },
   topBar: {
     paddingHorizontal: 20,
-    paddingBottom: 4,
+    paddingBottom: 16,
   },
   greeting: {
     fontFamily: "DMSans_700Bold",
@@ -166,16 +195,49 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  selectorRow: {
+    marginBottom: 8,
+  },
+  section: {
+    marginTop: 20,
+    gap: 10,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 20,
   },
   sectionTitle: {
     fontFamily: "DMSans_600SemiBold",
-    fontSize: 16,
+    fontSize: 17,
     color: Colors.light.text,
-    paddingHorizontal: 20,
-    marginTop: 4,
+    flex: 1,
   },
-  listContent: {
-    gap: 0,
+  sectionSubtitle: {
+    fontFamily: "DMSans_400Regular",
+    fontSize: 13,
+    color: Colors.light.textTertiary,
+    paddingHorizontal: 20,
+    marginTop: -4,
+  },
+  countBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  countBadgeText: {
+    fontFamily: "DMSans_600SemiBold",
+    fontSize: 13,
+  },
+  setList: {
+    gap: 10,
+  },
+  loadingState: {
+    paddingVertical: 60,
+    alignItems: "center",
   },
   emptyState: {
     alignItems: "center",
