@@ -7,16 +7,18 @@ import {
   getCollectedCount,
   getSetCollectedCount,
   isCardCollected,
+  getCardQuantity,
 } from "./collection-storage";
 
 interface CollectionContextValue {
   collection: CollectionData;
   loading: boolean;
-  addCard: (game: GameId, setId: string, cardId: string) => Promise<void>;
+  addCard: (game: GameId, setId: string, cardId: string, quantity?: number) => Promise<void>;
   removeCard: (game: GameId, setId: string, cardId: string) => Promise<void>;
   totalCards: (game?: GameId) => number;
   setCards: (game: GameId, setId: string) => number;
   hasCard: (game: GameId, setId: string, cardId: string) => boolean;
+  cardQuantity: (game: GameId, setId: string, cardId: string) => number;
   refresh: () => Promise<void>;
 }
 
@@ -36,8 +38,8 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     loadCollection();
   }, [loadCollection]);
 
-  const addCard = useCallback(async (game: GameId, setId: string, cardId: string) => {
-    const updated = await addCardToCollection(game, setId, cardId);
+  const addCard = useCallback(async (game: GameId, setId: string, cardId: string, quantity: number = 1) => {
+    const updated = await addCardToCollection(game, setId, cardId, quantity);
     setCollection(updated);
   }, []);
 
@@ -61,9 +63,14 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     [collection]
   );
 
+  const cardQuantity = useCallback(
+    (game: GameId, setId: string, cardId: string) => getCardQuantity(collection, game, setId, cardId),
+    [collection]
+  );
+
   const value = useMemo(
-    () => ({ collection, loading, addCard, removeCard, totalCards, setCards, hasCard, refresh: loadCollection }),
-    [collection, loading, addCard, removeCard, totalCards, setCards, hasCard, loadCollection]
+    () => ({ collection, loading, addCard, removeCard, totalCards, setCards, hasCard, cardQuantity, refresh: loadCollection }),
+    [collection, loading, addCard, removeCard, totalCards, setCards, hasCard, cardQuantity, loadCollection]
   );
 
   return <CollectionContext.Provider value={value}>{children}</CollectionContext.Provider>;
