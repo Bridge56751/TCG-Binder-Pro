@@ -1,8 +1,9 @@
 import React from "react";
 import { View, Pressable, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { useTheme } from "@/lib/ThemeContext";
-import type { GameId, TCGSet } from "@/lib/types";
+import type { TCGSet } from "@/lib/types";
 import { GAMES } from "@/lib/types";
 import * as Haptics from "expo-haptics";
 
@@ -17,6 +18,7 @@ export function SetCard({ set, collectedCount, onPress }: SetCardProps) {
   const game = GAMES.find((g) => g.id === set.game);
   const progress = set.totalCards > 0 ? collectedCount / set.totalCards : 0;
   const isComplete = progress >= 1;
+  const imageUrl = set.logo || set.symbol;
 
   return (
     <Pressable
@@ -27,6 +29,20 @@ export function SetCard({ set, collectedCount, onPress }: SetCardProps) {
       }}
     >
       <View style={[styles.accentBar, { backgroundColor: game?.color || colors.tint }]} />
+      {imageUrl ? (
+        <View style={styles.logoContainer}>
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.logo}
+            contentFit="contain"
+            transition={200}
+          />
+        </View>
+      ) : (
+        <View style={[styles.logoPlaceholder, { backgroundColor: (game?.color || colors.tint) + "14" }]}>
+          <Ionicons name="albums-outline" size={22} color={game?.color || colors.tint} />
+        </View>
+      )}
       <View style={styles.content}>
         <View style={styles.header}>
           <View style={styles.titleRow}>
@@ -77,6 +93,25 @@ const styles = StyleSheet.create({
   accentBar: {
     width: 4,
     alignSelf: "stretch",
+  },
+  logoContainer: {
+    width: 48,
+    height: 48,
+    marginLeft: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  logo: {
+    width: 44,
+    height: 44,
+  },
+  logoPlaceholder: {
+    width: 48,
+    height: 48,
+    marginLeft: 12,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
   },
   content: {
     flex: 1,
