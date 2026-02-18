@@ -140,6 +140,10 @@ export default function CardDetailScreen() {
   }
 
   const hasPrice = card.currentPrice != null && card.currentPrice > 0;
+  const priceChangePercent = card.priceLow != null && card.currentPrice != null && card.priceLow > 0
+    ? Math.round(((card.currentPrice - card.priceLow) / card.priceLow) * 100)
+    : 0;
+  const priceUp = priceChangePercent >= 0;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

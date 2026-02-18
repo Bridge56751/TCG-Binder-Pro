@@ -415,7 +415,7 @@ export default function SetsScreen() {
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <FlatList
           data={cardResults}
-          keyExtractor={(item) => `${item.game}-${item.id}`}
+          keyExtractor={(item, index) => `${item.game}-${item.id}-${index}`}
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={() =>
             isSearching ? (
@@ -506,7 +506,7 @@ export default function SetsScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <FlatList
         data={filteredSets}
-        keyExtractor={(item) => `${item.game}-${item.id}`}
+        keyExtractor={(item, index) => `${item.game}-${item.id}-${index}`}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={() =>
           isLoading ? (
