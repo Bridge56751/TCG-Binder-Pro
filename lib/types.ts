@@ -58,7 +58,6 @@ export interface CardDetail {
   priceUnit: string;
   priceLow: number | null;
   priceHigh: number | null;
-  priceHistory: { date: string; price: number }[];
 }
 
 export interface CollectionData {

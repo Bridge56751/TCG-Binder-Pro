@@ -16,7 +16,6 @@ import { useLocalSearchParams, router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { LineChart } from "react-native-chart-kit";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -136,30 +135,6 @@ export default function CardDetailScreen() {
   }
 
   const hasPrice = card.currentPrice != null && card.currentPrice > 0;
-  const hasPriceHistory = card.priceHistory && card.priceHistory.length > 0;
-
-  const chartLabels = hasPriceHistory
-    ? card.priceHistory
-        .filter((_: any, i: number) => i % 15 === 0 || i === card.priceHistory.length - 1)
-        .map((p: any) => {
-          const d = new Date(p.date);
-          return `${d.getMonth() + 1}/${d.getDate()}`;
-        })
-    : [];
-
-  const chartData = hasPriceHistory ? card.priceHistory.map((p: any) => p.price) : [];
-
-  const priceChange = hasPriceHistory && card.priceHistory.length >= 2
-    ? card.priceHistory[card.priceHistory.length - 1].price - card.priceHistory[0].price
-    : 0;
-
-  const priceChangePercent = hasPriceHistory && card.priceHistory.length >= 2 && card.priceHistory[0].price > 0
-    ? ((priceChange / card.priceHistory[0].price) * 100).toFixed(1)
-    : "0";
-
-  const priceUp = priceChange >= 0;
-
-  const chartBg = isDark ? colors.surface : "#FFFFFF";
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -308,57 +283,6 @@ export default function CardDetailScreen() {
                   </View>
                 )}
               </View>
-            </View>
-          </View>
-        )}
-
-        {hasPriceHistory && chartData.length > 2 && (
-          <View style={styles.chartSection}>
-            <View style={styles.chartHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>90-Day Price History</Text>
-              <View style={[styles.trendIcon, priceUp ? styles.trendUp : styles.trendDown]}>
-                <MaterialCommunityIcons
-                  name={priceUp ? "arrow-top-right" : "arrow-bottom-right"}
-                  size={16}
-                  color={priceUp ? "#2D8B55" : "#D4675A"}
-                />
-              </View>
-            </View>
-
-            <View style={[styles.chartCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-              <LineChart
-                data={{
-                  labels: chartLabels,
-                  datasets: [{ data: chartData }],
-                }}
-                width={screenWidth - 72}
-                height={200}
-                yAxisLabel="$"
-                yAxisSuffix=""
-                withInnerLines={false}
-                withOuterLines={false}
-                withDots={false}
-                withShadow={false}
-                chartConfig={{
-                  backgroundColor: chartBg,
-                  backgroundGradientFrom: chartBg,
-                  backgroundGradientTo: chartBg,
-                  decimalPlaces: 2,
-                  color: () => gameInfo?.color || colors.tint,
-                  labelColor: () => colors.textTertiary,
-                  propsForBackgroundLines: {
-                    strokeDasharray: "",
-                    stroke: colors.surfaceAlt,
-                    strokeWidth: 1,
-                  },
-                  propsForLabels: {
-                    fontSize: 10,
-                    fontFamily: "DMSans_400Regular",
-                  },
-                }}
-                bezier
-                style={styles.chart}
-              />
             </View>
           </View>
         )}
@@ -566,38 +490,6 @@ const styles = StyleSheet.create({
   priceRangeValue: {
     fontFamily: "DMSans_600SemiBold",
     fontSize: 15,
-  },
-  chartSection: {
-    paddingHorizontal: 20,
-    marginTop: 24,
-    gap: 12,
-  },
-  chartHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  trendIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  trendUp: {
-    backgroundColor: "#E8F5ED",
-  },
-  trendDown: {
-    backgroundColor: "#FDE8E5",
-  },
-  chartCard: {
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    alignItems: "center",
-  },
-  chart: {
-    borderRadius: 12,
   },
   noPriceSection: {
     alignItems: "center",

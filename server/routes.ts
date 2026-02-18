@@ -560,8 +560,6 @@ Return ONLY valid JSON.`,
       const priceLow = priceData?.lowPrice ?? cmPrice?.low ?? null;
       const priceHigh = priceData?.highPrice ?? null;
 
-      const priceHistory = generatePriceHistory(currentPrice, 90);
-
       res.json({
         id: c.id,
         localId: c.localId,
@@ -580,7 +578,6 @@ Return ONLY valid JSON.`,
         priceUnit: tcgPrice ? "USD" : cmPrice ? "EUR" : "USD",
         priceLow,
         priceHigh,
-        priceHistory,
       });
     } catch (error) {
       console.error("Error fetching Pokemon card detail:", error);
@@ -617,8 +614,6 @@ Return ONLY valid JSON.`,
       const currentPrice = price && price > 0 ? price :
         (prices.tcgplayer_price ? parseFloat(prices.tcgplayer_price) : null);
 
-      const priceHistory = generatePriceHistory(currentPrice, 90);
-
       res.json({
         id: cardId,
         localId: cardNum,
@@ -636,7 +631,6 @@ Return ONLY valid JSON.`,
         priceUnit: "USD",
         priceLow: prices.tcgplayer_price ? parseFloat(prices.tcgplayer_price) * 0.7 : null,
         priceHigh: prices.tcgplayer_price ? parseFloat(prices.tcgplayer_price) * 1.5 : null,
-        priceHistory,
       });
     } catch (error) {
       console.error("Error fetching Yu-Gi-Oh! card detail:", error);
@@ -679,8 +673,6 @@ Return ONLY valid JSON.`,
 
       const prices = c.prices || {};
       const currentPrice = prices.usd ? parseFloat(prices.usd) : (prices.usd_foil ? parseFloat(prices.usd_foil) : null);
-      const priceHistory = generatePriceHistory(currentPrice, 90);
-
       res.json({
         id: c.id,
         localId: c.collector_number || "0",
@@ -698,7 +690,6 @@ Return ONLY valid JSON.`,
         priceUnit: "USD",
         priceLow: currentPrice ? currentPrice * 0.7 : null,
         priceHigh: prices.usd_foil ? parseFloat(prices.usd_foil) : (currentPrice ? currentPrice * 1.5 : null),
-        priceHistory,
       });
     } catch (error) {
       console.error("Error fetching MTG card detail:", error);
@@ -934,7 +925,6 @@ Return ONLY valid JSON.`,
 
 function formatOnePieceCard(c: any) {
   const currentPrice = c.market_price ?? c.inventory_price ?? null;
-  const priceHistory = generatePriceHistory(currentPrice, 90);
 
   return {
     id: c.card_set_id,
@@ -953,33 +943,6 @@ function formatOnePieceCard(c: any) {
     priceUnit: "USD",
     priceLow: c.inventory_price ?? null,
     priceHigh: currentPrice ? currentPrice * 1.5 : null,
-    priceHistory,
   };
 }
 
-function generatePriceHistory(currentPrice: number | null, days: number) {
-  if (!currentPrice || currentPrice <= 0) return [];
-
-  const history: { date: string; price: number }[] = [];
-  const now = new Date();
-  let price = currentPrice * (0.8 + Math.random() * 0.3);
-
-  for (let i = days; i >= 0; i--) {
-    const date = new Date(now);
-    date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().split("T")[0];
-
-    const volatility = 0.03;
-    const drift = (currentPrice - price) / (i + 1) * 0.3;
-    const change = price * volatility * (Math.random() * 2 - 1) + drift;
-    price = Math.max(price + change, currentPrice * 0.3);
-
-    if (i === 0) price = currentPrice;
-
-    history.push({
-      date: dateStr,
-      price: Math.round(price * 100) / 100,
-    });
-  }
-  return history;
-}
