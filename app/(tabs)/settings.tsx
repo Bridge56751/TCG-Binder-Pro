@@ -20,7 +20,7 @@ import { useCollection } from "@/lib/CollectionContext";
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { colors, toggle, isDark } = useTheme();
-  const { user, loading: authLoading, login, register, logout } = useAuth();
+  const { user, loading: authLoading, login, register, logout, deleteAccount } = useAuth();
   const { totalCards, syncCollection, collection } = useCollection();
 
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -84,6 +84,25 @@ export default function SettingsScreen() {
         },
       },
     ]);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete Account",
+      "This will permanently delete your account and all cloud data. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteAccount();
+            } catch {}
+          },
+        },
+      ]
+    );
   };
 
   const handleSync = async () => {
@@ -191,6 +210,21 @@ export default function SettingsScreen() {
               <View style={styles.menuContent}>
                 <Text style={[styles.menuLabel, { color: colors.error }]}>
                   Log Out
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </Pressable>
+            <View style={[styles.separator, { backgroundColor: colors.cardBorder }]} />
+            <Pressable style={styles.menuItem} onPress={handleDeleteAccount}>
+              <View style={[styles.menuIcon, { backgroundColor: colors.error + "18" }]}>
+                <Ionicons name="trash" size={20} color={colors.error} />
+              </View>
+              <View style={styles.menuContent}>
+                <Text style={[styles.menuLabel, { color: colors.error }]}>
+                  Delete Account
+                </Text>
+                <Text style={[styles.menuHint, { color: colors.textSecondary }]}>
+                  Permanently remove your data
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
@@ -385,6 +419,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
+  },
+  separator: {
+    height: 1,
+    marginLeft: 64,
   },
   menuContent: {
     flex: 1,

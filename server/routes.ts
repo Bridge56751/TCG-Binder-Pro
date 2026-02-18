@@ -286,6 +286,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  app.delete("/api/auth/account", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Not logged in" });
+    }
+    try {
+      await storage.deleteUser(req.session.userId);
+      req.session.destroy(() => {});
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to delete account" });
+    }
+  });
+
   app.get("/api/auth/me", async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ error: "Not logged in" });

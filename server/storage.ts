@@ -6,6 +6,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  deleteUser(id: string): Promise<void>;
   getCollection(userId: string): Promise<Record<string, any>>;
   saveCollection(userId: string, data: Record<string, any>): Promise<void>;
 }
@@ -24,6 +25,11 @@ export const storage: IStorage = {
   async createUser(insertUser: InsertUser) {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
+  },
+
+  async deleteUser(id: string) {
+    await db.delete(userCollections).where(eq(userCollections.userId, id));
+    await db.delete(users).where(eq(users.id, id));
   },
 
   async getCollection(userId: string) {
