@@ -40,12 +40,13 @@ export async function removeCardFromCollection(
   const collection = await getCollection();
   if (collection[game]?.[setId]) {
     const cardIdLower = cardId.toLowerCase();
+    const stripZeros = (s: string) => s.replace(/^0+/, "") || "0";
     collection[game][setId] = collection[game][setId].filter((id) => {
       if (id === cardId) return false;
       if (id.toLowerCase() === cardIdLower) return false;
       const storedNum = id.toLowerCase().split("-").pop() || "";
       const cardNum = cardIdLower.split("-").pop() || "";
-      if (storedNum && cardNum && storedNum === cardNum && id.toLowerCase().startsWith(setId.toLowerCase())) return false;
+      if (storedNum && cardNum && stripZeros(storedNum) === stripZeros(cardNum) && id.toLowerCase().startsWith(setId.toLowerCase())) return false;
       return true;
     });
     if (collection[game][setId].length === 0) delete collection[game][setId];
@@ -85,12 +86,13 @@ export function isCardCollected(
   if (!cards || cards.length === 0) return false;
   if (cards.includes(cardId)) return true;
   const cardIdLower = cardId.toLowerCase();
+  const stripZeros = (s: string) => s.replace(/^0+/, "") || "0";
   for (const stored of cards) {
     const storedLower = stored.toLowerCase();
     if (storedLower === cardIdLower) return true;
     const storedNum = storedLower.split("-").pop() || "";
     const cardNum = cardIdLower.split("-").pop() || "";
-    if (storedNum && cardNum && storedNum === cardNum && storedLower.startsWith(setId.toLowerCase())) return true;
+    if (storedNum && cardNum && stripZeros(storedNum) === stripZeros(cardNum) && storedLower.startsWith(setId.toLowerCase())) return true;
   }
   return false;
 }
