@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
@@ -20,9 +20,28 @@ function ThemedStatusBar() {
   return <StatusBar style={isDark ? "light" : "dark"} />;
 }
 
-function RootLayoutNav() {
+function useProtectedRoute() {
   const { user, loading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) return;
+
+    const inAuthScreen = segments[0] === "auth";
+
+    if (!user && !inAuthScreen) {
+      router.replace("/auth");
+    } else if (user && inAuthScreen) {
+      router.replace("/(tabs)");
+    }
+  }, [user, loading, segments]);
+}
+
+function RootLayoutNav() {
+  const { loading } = useAuth();
   const { colors } = useTheme();
+  useProtectedRoute();
 
   if (loading) {
     return (
@@ -34,27 +53,22 @@ function RootLayoutNav() {
 
   return (
     <Stack screenOptions={{ headerBackTitle: "Back" }}>
-      {user ? (
-        <>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="set/[game]/[id]"
-            options={{
-              headerShown: false,
-              presentation: "card",
-            }}
-          />
-          <Stack.Screen
-            name="card/[game]/[cardId]"
-            options={{
-              headerShown: false,
-              presentation: "modal",
-            }}
-          />
-        </>
-      ) : (
-        <Stack.Screen name="auth" options={{ headerShown: false }} />
-      )}
+      <Stack.Screen name="auth" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="set/[game]/[id]"
+        options={{
+          headerShown: false,
+          presentation: "card",
+        }}
+      />
+      <Stack.Screen
+        name="card/[game]/[cardId]"
+        options={{
+          headerShown: false,
+          presentation: "modal",
+        }}
+      />
     </Stack>
   );
 }
