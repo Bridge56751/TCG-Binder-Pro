@@ -7,7 +7,6 @@ import {
   Platform,
   Pressable,
   ActivityIndicator,
-  Share,
 } from "react-native";
 import { useFocusEffect, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -189,30 +188,6 @@ export default function CollectionScreen() {
     });
   };
 
-  const handleExport = async () => {
-    const total = totalCards();
-    let message = `My CardVault Collection\n========================\nTotal Cards: ${total}\n`;
-
-    for (const game of GAMES) {
-      const gameData = collection[game.id];
-      if (!gameData) continue;
-      const gameTotal = totalCards(game.id);
-      if (gameTotal === 0) continue;
-      message += `\n${game.name} (${gameTotal} cards):\n`;
-      for (const setId of Object.keys(gameData)) {
-        const count = gameData[setId]?.length ?? 0;
-        if (count > 0) {
-          message += `  - Set ${setId}: ${count} cards\n`;
-        }
-      }
-    }
-
-    message += `\nTracked with CardVault`;
-
-    try {
-      await Share.share({ message });
-    } catch (_) {}
-  };
 
   const gameValue = useMemo(() => {
     if (!valueData?.cards?.length || !allCards.length) return { total: 0, change: 0 };
@@ -255,9 +230,6 @@ export default function CollectionScreen() {
             </Text>
           </View>
           <View style={styles.topBarActions}>
-            <Pressable onPress={handleExport} hitSlop={8}>
-              <Ionicons name="share-outline" size={22} color={colors.text} />
-            </Pressable>
             <Pressable onPress={toggle} hitSlop={8}>
               <Ionicons
                 name={isDark ? "sunny-outline" : "moon-outline"}
