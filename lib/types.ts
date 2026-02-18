@@ -39,6 +39,7 @@ export interface CardIdentification {
   rarity: string;
   estimatedValue: number;
   verifiedCardId?: string;
+  language?: string;
   error?: string;
 }
 
