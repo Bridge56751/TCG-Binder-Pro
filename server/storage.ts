@@ -1,38 +1,44 @@
-import { type User, type InsertUser } from "@shared/schema";
-import { randomUUID } from "crypto";
-
-// modify the interface with any CRUD methods
-// you might need
+import { db } from "./db";
+import { users, userCollections, type User, type InsertUser } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  getCollection(userId: string): Promise<Record<string, any>>;
+  saveCollection(userId: string, data: Record<string, any>): Promise<void>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-
-  constructor() {
-    this.users = new Map();
-  }
-
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+export const storage: IStorage = {
+  async getUser(id: string) {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
-  }
-}
+  },
 
-export const storage = new MemStorage();
+  async getUserByUsername(username: string) {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  },
+
+  async createUser(insertUser: InsertUser) {
+    const [user] = await db.insert(users).values(insertUser).returning();
+    return user;
+  },
+
+  async getCollection(userId: string) {
+    const [row] = await db.select().from(userCollections).where(eq(userCollections.userId, userId));
+    return (row?.data as Record<string, any>) || {};
+  },
+
+  async saveCollection(userId: string, data: Record<string, any>) {
+    const [existing] = await db.select().from(userCollections).where(eq(userCollections.userId, userId));
+    if (existing) {
+      await db.update(userCollections)
+        .set({ data, updatedAt: new Date() })
+        .where(eq(userCollections.userId, userId));
+    } else {
+      await db.insert(userCollections).values({ userId, data });
+    }
+  },
+};

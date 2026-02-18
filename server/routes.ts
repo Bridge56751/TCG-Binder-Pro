@@ -1,6 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "node:http";
 import OpenAI from "openai";
+import bcrypt from "bcryptjs";
+import { storage } from "./storage";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -226,6 +228,105 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      if (!username || !password) {
+        return res.status(400).json({ error: "Username and password are required" });
+      }
+      if (username.length < 3) {
+        return res.status(400).json({ error: "Username must be at least 3 characters" });
+      }
+      if (password.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+      const existing = await storage.getUserByUsername(username);
+      if (existing) {
+        return res.status(409).json({ error: "Username already taken" });
+      }
+      const hashed = await bcrypt.hash(password, 10);
+      const user = await storage.createUser({ username, password: hashed });
+      req.session.userId = user.id;
+      res.json({ id: user.id, username: user.username });
+    } catch (error) {
+      console.error("Register error:", error);
+      res.status(500).json({ error: "Registration failed" });
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      if (!username || !password) {
+        return res.status(400).json({ error: "Username and password are required" });
+      }
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(401).json({ error: "Invalid username or password" });
+      }
+      const valid = await bcrypt.compare(password, user.password);
+      if (!valid) {
+        return res.status(401).json({ error: "Invalid username or password" });
+      }
+      req.session.userId = user.id;
+      res.json({ id: user.id, username: user.username });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ error: "Login failed" });
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ error: "Logout failed" });
+      }
+      res.json({ ok: true });
+    });
+  });
+
+  app.get("/api/auth/me", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Not logged in" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user) {
+      return res.status(401).json({ error: "User not found" });
+    }
+    res.json({ id: user.id, username: user.username });
+  });
+
+  app.get("/api/collection/sync", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Not logged in" });
+    }
+    try {
+      const data = await storage.getCollection(req.session.userId);
+      res.json({ collection: data });
+    } catch (error) {
+      console.error("Collection sync error:", error);
+      res.status(500).json({ error: "Failed to load collection" });
+    }
+  });
+
+  app.post("/api/collection/sync", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Not logged in" });
+    }
+    try {
+      const { collection } = req.body;
+      if (!collection || typeof collection !== "object") {
+        return res.status(400).json({ error: "Collection data is required" });
+      }
+      await storage.saveCollection(req.session.userId, collection);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Collection save error:", error);
+      res.status(500).json({ error: "Failed to save collection" });
+    }
+  });
+
   app.post("/api/identify-card", async (req, res) => {
     try {
       const { image } = req.body;

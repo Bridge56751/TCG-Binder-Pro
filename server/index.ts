@@ -1,5 +1,7 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
+import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import { registerRoutes } from "./routes";
 import * as fs from "fs";
 import * as path from "path";
@@ -10,6 +12,12 @@ const log = console.log;
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
+  }
+}
+
+declare module "express-session" {
+  interface SessionData {
+    userId: string;
   }
 }
 
@@ -226,9 +234,31 @@ function setupErrorHandler(app: express.Application) {
   });
 }
 
+function setupSession(app: express.Application) {
+  const PgStore = connectPgSimple(session);
+  app.use(
+    session({
+      store: new PgStore({
+        conString: process.env.DATABASE_URL,
+        createTableIfMissing: true,
+      }),
+      secret: process.env.SESSION_SECRET || "cardvault-dev-secret",
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+        httpOnly: true,
+        secure: false,
+        sameSite: "lax",
+      },
+    })
+  );
+}
+
 (async () => {
   setupCors(app);
   setupBodyParsing(app);
+  setupSession(app);
   setupRequestLogging(app);
 
   configureExpoAndLanding(app);
