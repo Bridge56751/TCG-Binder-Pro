@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Platform,
   Alert,
+  Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -127,6 +128,28 @@ export default function SettingsScreen() {
                 </Text>
                 <Text style={[styles.menuHint, { color: colors.textSecondary }]}>
                   Switch appearance
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+            SUPPORT
+          </Text>
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+            <Pressable style={styles.menuItem} onPress={() => Linking.openURL("mailto:protcgbinder@gmail.com")}>
+              <View style={[styles.menuIcon, { backgroundColor: colors.tint + "18" }]}>
+                <Ionicons name="mail" size={20} color={colors.tint} />
+              </View>
+              <View style={styles.menuContent}>
+                <Text style={[styles.menuLabel, { color: colors.text }]}>
+                  Contact Support
+                </Text>
+                <Text style={[styles.menuHint, { color: colors.textSecondary }]}>
+                  protcgbinder@gmail.com
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
