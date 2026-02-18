@@ -117,7 +117,11 @@ export default function SetDetailScreen() {
               name={item.name}
               imageUrl={item.image}
               isCollected={hasCard(gameId, id || "", item.id)}
-              onPress={() => {}}
+              onPress={() => {
+                if (hasCard(gameId, id || "", item.id)) {
+                  router.push(`/card/${game}/${item.id}`);
+                }
+              }}
             />
           </View>
         )}

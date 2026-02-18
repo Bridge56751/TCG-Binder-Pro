@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Platform } from "react-native";
+import { View, Text, StyleSheet, Platform, Pressable } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
@@ -14,8 +14,10 @@ interface CardCellProps {
 }
 
 export function CardCell({ cardId, localId, name, imageUrl, isCollected, onPress }: CardCellProps) {
+  const Wrapper = isCollected ? Pressable : View;
+  const wrapperProps = isCollected ? { onPress, style: styles.container } : { style: styles.container };
   return (
-    <View style={styles.container}>
+    <Wrapper {...wrapperProps}>
 
       <View style={[styles.cardWrapper, !isCollected && styles.missingWrapper]}>
         {imageUrl ? (
@@ -52,7 +54,7 @@ export function CardCell({ cardId, localId, name, imageUrl, isCollected, onPress
       <Text style={[styles.cardName, !isCollected && styles.cardNameMissing]} numberOfLines={1}>
         {name}
       </Text>
-    </View>
+    </Wrapper>
   );
 }
 
