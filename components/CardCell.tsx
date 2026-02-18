@@ -23,28 +23,40 @@ export function CardCell({ cardId, localId, name, imageUrl, isCollected, onPress
         onPress();
       }}
     >
-      {isCollected && imageUrl ? (
-        <View style={styles.cardWrapper}>
-          <Image
-            source={{ uri: imageUrl }}
-            style={styles.cardImage}
-            contentFit="contain"
-            transition={300}
-          />
+      <View style={[styles.cardWrapper, !isCollected && styles.missingWrapper]}>
+        {imageUrl ? (
+          <>
+            <Image
+              source={{ uri: imageUrl }}
+              style={[styles.cardImage, !isCollected && styles.grayedImage]}
+              contentFit="contain"
+              transition={300}
+            />
+            {!isCollected && <View style={styles.grayOverlay} />}
+          </>
+        ) : (
+          <View style={styles.noImageContent}>
+            <Ionicons
+              name="image-outline"
+              size={18}
+              color={isCollected ? Colors.light.textTertiary : Colors.light.missingText}
+            />
+            <Text style={styles.noImageNumber}>#{localId}</Text>
+          </View>
+        )}
+        {isCollected && (
           <View style={styles.collectedBadge}>
             <Ionicons name="checkmark" size={10} color="#FFFFFF" />
           </View>
-        </View>
-      ) : (
-        <View style={[styles.cardWrapper, styles.missingCard]}>
-          <View style={styles.missingContent}>
-            <Ionicons name="help" size={20} color={Colors.light.missingText} />
-            <Text style={styles.missingNumber}>#{localId}</Text>
+        )}
+        {!isCollected && imageUrl && (
+          <View style={styles.missingBadge}>
+            <Text style={styles.missingBadgeText}>#{localId}</Text>
           </View>
-        </View>
-      )}
+        )}
+      </View>
       <Text style={[styles.cardName, !isCollected && styles.cardNameMissing]} numberOfLines={1}>
-        {isCollected ? name : `#${localId}`}
+        {name}
       </Text>
     </Pressable>
   );
@@ -79,9 +91,19 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  missingWrapper: {
+    borderColor: Colors.light.borderLight,
+  },
   cardImage: {
     width: "100%",
     height: "100%",
+  },
+  grayedImage: {
+    opacity: 0.35,
+  },
+  grayOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(200, 195, 185, 0.3)",
   },
   collectedBadge: {
     position: "absolute",
@@ -94,18 +116,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  missingCard: {
-    backgroundColor: Colors.light.missing,
-    borderColor: Colors.light.borderLight,
-    borderStyle: "dashed",
+  missingBadge: {
+    position: "absolute",
+    bottom: 4,
+    left: 0,
+    right: 0,
+    alignItems: "center",
   },
-  missingContent: {
+  missingBadgeText: {
+    fontFamily: "DMSans_600SemiBold",
+    fontSize: 10,
+    color: Colors.light.textTertiary,
+    backgroundColor: "rgba(255,255,255,0.85)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  noImageContent: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     gap: 4,
+    backgroundColor: Colors.light.missing,
   },
-  missingNumber: {
+  noImageNumber: {
     fontFamily: "DMSans_500Medium",
     fontSize: 11,
     color: Colors.light.missingText,
