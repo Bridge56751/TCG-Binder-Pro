@@ -113,6 +113,14 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
         const card = await res.json();
         return { name: card.name, cardId: card.id };
       }
+      if (lang === "ja" && cardNumber.length < 3) {
+        const paddedId = `${setId}-${cardNumber.padStart(3, "0")}`;
+        const paddedRes = await fetch(`https://api.tcgdex.net/v2/ja/cards/${encodeURIComponent(paddedId)}`);
+        if (paddedRes.ok) {
+          const card = await paddedRes.json();
+          return { name: card.name, cardId: card.id };
+        }
+      }
       const setRes = await fetch(`https://api.tcgdex.net/v2/${lang}/sets/${encodeURIComponent(setId)}`);
       if (setRes.ok) {
         const setData = await setRes.json();
@@ -332,15 +340,22 @@ Return ONLY valid JSON.`,
       const lang = req.query.lang === "ja" ? "ja" : "en";
       const response = await fetch(`https://api.tcgdex.net/v2/${lang}/sets`);
       const sets = await response.json();
-      const formatted = sets.map((s: any) => ({
-        id: s.id,
-        name: s.name,
-        game: "pokemon",
-        logo: s.logo ? `${s.logo}.png` : null,
-        symbol: s.symbol ? `${s.symbol}.png` : null,
-        totalCards: s.cardCount?.total || 0,
-        releaseDate: s.releaseDate || null,
-      }));
+      const seen = new Set<string>();
+      const formatted = sets
+        .map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          game: "pokemon",
+          logo: s.logo ? `${s.logo}.png` : null,
+          symbol: s.symbol ? `${s.symbol}.png` : null,
+          totalCards: s.cardCount?.total || 0,
+          releaseDate: s.releaseDate || null,
+        }))
+        .filter((s: any) => {
+          if (seen.has(s.id)) return false;
+          seen.add(s.id);
+          return true;
+        });
       res.json(formatted);
     } catch (error) {
       console.error("Error fetching Pokemon sets:", error);
