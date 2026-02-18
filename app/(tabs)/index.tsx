@@ -361,42 +361,55 @@ export default function CollectionScreen() {
 
         <View
           style={[
-            styles.perGameRow,
+            styles.perGameCard,
             {
               backgroundColor: colors.surface,
               borderColor: colors.cardBorder,
             },
           ]}
         >
-          {GAMES.map((game) => {
-            const count = totalCards(game.id);
-            return (
-              <View key={game.id} style={styles.perGameItem}>
-                <View
-                  style={[
-                    styles.perGameDot,
-                    { backgroundColor: game.color },
-                  ]}
-                />
-                <Text
-                  style={[styles.perGameName, { color: colors.textSecondary }]}
-                >
-                  {game.name}
-                </Text>
-                <Text style={[styles.perGameCount, { color: colors.text }]}>
-                  {count}
-                </Text>
-              </View>
-            );
-          })}
+          <View style={styles.perGameRow}>
+            {GAMES.map((game) => {
+              const count = totalCards(game.id);
+              return (
+                <View key={game.id} style={styles.perGameItem}>
+                  <View
+                    style={[
+                      styles.perGameDot,
+                      { backgroundColor: game.color },
+                    ]}
+                  />
+                  <Text
+                    style={[styles.perGameName, { color: colors.textSecondary }]}
+                  >
+                    {game.name}
+                  </Text>
+                  <Text style={[styles.perGameCount, { color: colors.text }]}>
+                    {count}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
           <View style={[styles.perGameTotal, { borderTopColor: colors.cardBorder }]}>
-            <Ionicons name="cube" size={14} color={colors.tint} />
-            <Text style={[styles.perGameTotalLabel, { color: colors.text }]}>
-              Total Collection
-            </Text>
-            <Text style={[styles.perGameTotalCount, { color: colors.tint }]}>
-              {totalCards()}
-            </Text>
+            <View style={styles.perGameTotalRow}>
+              <Ionicons name="cube" size={14} color={colors.tint} />
+              <Text style={[styles.perGameTotalLabel, { color: colors.text }]}>
+                Total Cards
+              </Text>
+              <Text style={[styles.perGameTotalCount, { color: colors.tint }]}>
+                {totalCards()}
+              </Text>
+            </View>
+            <View style={styles.perGameTotalRow}>
+              <Ionicons name="diamond" size={14} color={colors.accent} />
+              <Text style={[styles.perGameTotalLabel, { color: colors.text }]}>
+                Total Value
+              </Text>
+              <Text style={[styles.perGameTotalCount, { color: colors.accent }]}>
+                {valueLoading ? "..." : valueData ? formatCurrency(valueData.totalValue) : "$0.00"}
+              </Text>
+            </View>
           </View>
         </View>
       </View>
@@ -651,15 +664,17 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_400Regular",
     fontSize: 11,
   },
-  perGameRow: {
-    flexDirection: "row",
+  perGameCard: {
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    justifyContent: "space-between",
+  },
+  perGameRow: {
+    flexDirection: "row" as const,
+    justifyContent: "space-between" as const,
   },
   perGameItem: {
-    alignItems: "center",
+    alignItems: "center" as const,
     gap: 4,
     flex: 1,
   },
@@ -677,21 +692,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   perGameTotal: {
+    paddingTop: 12,
+    marginTop: 12,
+    borderTopWidth: 1,
+    gap: 8,
+  },
+  perGameTotalRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    paddingTop: 10,
-    marginTop: 6,
-    borderTopWidth: 1,
     gap: 8,
   },
   perGameTotalLabel: {
     flex: 1,
-    fontFamily: "DMSans_600SemiBold",
-    fontSize: 14,
+    fontFamily: "DMSans_500Medium",
+    fontSize: 13,
   },
   perGameTotalCount: {
     fontFamily: "DMSans_700Bold",
-    fontSize: 18,
+    fontSize: 15,
   },
   selectorRow: {
     marginBottom: 8,
