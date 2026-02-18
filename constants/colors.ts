@@ -1,12 +1,31 @@
-// template
-const tintColorLight = "#2f95dc";
-
-export default {
+const Colors = {
   light: {
-    text: "#000",
-    background: "#fff",
-    tint: tintColorLight,
-    tabIconDefault: "#ccc",
-    tabIconSelected: tintColorLight,
+    background: '#FAF7F2',
+    surface: '#FFFFFF',
+    surfaceAlt: '#F0EBE1',
+    card: '#FFFFFF',
+    cardBorder: '#E8E2D6',
+    text: '#2C2520',
+    textSecondary: '#8A7E72',
+    textTertiary: '#B5A99A',
+    tint: '#C4985A',
+    tintDark: '#A67B3D',
+    accent: '#D4A96A',
+    tabIconDefault: '#B5A99A',
+    tabIconSelected: '#C4985A',
+    border: '#E8E2D6',
+    borderLight: '#F0EBE1',
+    overlay: 'rgba(44, 37, 32, 0.5)',
+    success: '#5CAB7D',
+    error: '#D4675A',
+    missing: '#E8E2D6',
+    missingText: '#C5BDB0',
+    shimmer: '#F0EBE1',
+    pokemon: '#E3573E',
+    yugioh: '#7B5EA7',
+    onepiece: '#2E86C1',
+    shadow: '#2C2520',
   },
 };
+
+export default Colors;

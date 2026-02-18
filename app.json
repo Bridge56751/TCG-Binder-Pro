@@ -1,26 +1,29 @@
 {
   "expo": {
-    "name": "My App",
-    "slug": "my-app",
+    "name": "CardVault",
+    "slug": "card-vault",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "scheme": "cardvault",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#F5F0E8"
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.myapp"
+      "bundleIdentifier": "com.cardvault",
+      "infoPlist": {
+        "NSCameraUsageDescription": "CardVault needs camera access to scan your trading cards"
+      }
     },
     "android": {
-      "package": "com.myapp",
+      "package": "com.cardvault",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#F5F0E8",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -37,7 +40,13 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow CardVault to use your camera to scan trading cards"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
