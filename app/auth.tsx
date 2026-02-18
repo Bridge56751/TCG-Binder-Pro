@@ -174,6 +174,28 @@ export default function AuthScreen() {
             </Text>
           </Text>
         </Pressable>
+
+        <Pressable
+          style={[styles.devButton, { borderColor: colors.cardBorder }]}
+          onPress={async () => {
+            setError("");
+            setSubmitting(true);
+            try {
+              await login("dev", "dev123");
+            } catch {
+              try {
+                await register("dev", "dev123");
+              } catch (err: any) {
+                setError("Dev login failed");
+              }
+            }
+            setSubmitting(false);
+          }}
+          disabled={submitting}
+        >
+          <Ionicons name="code-slash" size={16} color={colors.textTertiary} />
+          <Text style={[styles.devButtonText, { color: colors.textTertiary }]}>Dev Login</Text>
+        </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -272,5 +294,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "DMSans_400Regular",
     textAlign: "center",
+  },
+  devButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 32,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderStyle: "dashed",
+  },
+  devButtonText: {
+    fontSize: 14,
+    fontFamily: "DMSans_500Medium",
   },
 });
