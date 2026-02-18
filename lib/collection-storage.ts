@@ -20,12 +20,13 @@ export async function saveCollection(collection: CollectionData): Promise<void> 
 export async function addCardToCollection(
   game: GameId,
   setId: string,
-  cardId: string
+  cardId: string,
+  quantity: number = 1
 ): Promise<CollectionData> {
   const collection = await getCollection();
   if (!collection[game]) collection[game] = {};
   if (!collection[game][setId]) collection[game][setId] = [];
-  if (!collection[game][setId].includes(cardId)) {
+  for (let i = 0; i < quantity; i++) {
     collection[game][setId].push(cardId);
   }
   await saveCollection(collection);
@@ -62,7 +63,7 @@ export function getCollectedCount(collection: CollectionData, game?: GameId): nu
   for (const g of games) {
     if (!collection[g]) continue;
     for (const setId of Object.keys(collection[g])) {
-      count += collection[g][setId].length;
+      count += new Set(collection[g][setId].map((c) => c.toLowerCase())).size;
     }
   }
   return count;
@@ -73,7 +74,30 @@ export function getSetCollectedCount(
   game: GameId,
   setId: string
 ): number {
-  return collection[game]?.[setId]?.length || 0;
+  const cards = collection[game]?.[setId];
+  if (!cards) return 0;
+  return new Set(cards.map((c) => c.toLowerCase())).size;
+}
+
+export function getCardQuantity(
+  collection: CollectionData,
+  game: GameId,
+  setId: string,
+  cardId: string
+): number {
+  const cards = collection[game]?.[setId];
+  if (!cards || cards.length === 0) return 0;
+  const cardIdLower = cardId.toLowerCase();
+  const stripZeros = (s: string) => s.replace(/^0+/, "") || "0";
+  let count = 0;
+  for (const stored of cards) {
+    const storedLower = stored.toLowerCase();
+    if (storedLower === cardIdLower) { count++; continue; }
+    const storedNum = storedLower.split("-").pop() || "";
+    const cardNum = cardIdLower.split("-").pop() || "";
+    if (storedNum && cardNum && stripZeros(storedNum) === stripZeros(cardNum) && storedLower.startsWith(setId.toLowerCase())) count++;
+  }
+  return count;
 }
 
 export function isCardCollected(
