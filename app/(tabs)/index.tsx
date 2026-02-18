@@ -110,6 +110,16 @@ export default function CollectionScreen() {
       (collection[selectedGame]?.[s.id]?.length || 0) >= s.totalCards
   );
 
+  const setsStartedForGame = useMemo(() => {
+    const gameSets = collection[selectedGame];
+    if (!gameSets) return 0;
+    let count = 0;
+    for (const setId of Object.keys(gameSets)) {
+      if (gameSets[setId]?.length > 0) count++;
+    }
+    return count;
+  }, [collection, selectedGame]);
+
   const uniqueSetsStarted = useMemo(() => {
     let count = 0;
     for (const game of Object.keys(collection)) {
@@ -210,17 +220,21 @@ export default function CollectionScreen() {
         </View>
       </View>
 
+      <View style={styles.selectorRow}>
+        <GameSelector selected={selectedGame} onSelect={setSelectedGame} />
+      </View>
+
       <View style={styles.statsRow}>
         <StatCard
           icon="layers"
-          label="Total Cards"
-          value={String(totalCards())}
-          color={colors.tint}
+          label="Cards"
+          value={String(totalCards(selectedGame))}
+          color={gameColor}
         />
         <StatCard
           icon="albums"
           label="Sets Started"
-          value={String(uniqueSetsStarted)}
+          value={String(setsStartedForGame)}
           color={gameColor}
         />
         <StatCard
@@ -412,10 +426,6 @@ export default function CollectionScreen() {
             </View>
           </View>
         </View>
-      </View>
-
-      <View style={styles.selectorRow}>
-        <GameSelector selected={selectedGame} onSelect={setSelectedGame} />
       </View>
 
       {isLoading && (
