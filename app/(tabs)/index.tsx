@@ -223,15 +223,21 @@ export default function CollectionScreen() {
       <View style={styles.statsRow}>
         <StatCard
           icon="layers"
-          label="Total Cards"
-          value={String(totalCards())}
-          color={colors.tint}
+          label="Cards"
+          value={String(totalCards(selectedGame))}
+          color={gameColor}
         />
         <StatCard
           icon="albums"
-          label="Sets Started"
-          value={String(uniqueSetsStarted)}
-          color={colors.accent}
+          label="Sets"
+          value={String(setsStartedForGame)}
+          color={gameColor}
+        />
+        <StatCard
+          icon="star"
+          label="Complete"
+          value={String(completedSets.length)}
+          color={colors.success}
         />
       </View>
 
@@ -303,6 +309,10 @@ export default function CollectionScreen() {
             ]}
           />
         </View>
+      </View>
+
+      <View style={styles.selectorRow}>
+        <GameSelector selected={selectedGame} onSelect={setSelectedGame} />
       </View>
 
       <View style={styles.statsDashboard}>
@@ -416,31 +426,6 @@ export default function CollectionScreen() {
             </View>
           </View>
         </View>
-      </View>
-
-      <View style={styles.selectorRow}>
-        <GameSelector selected={selectedGame} onSelect={setSelectedGame} />
-      </View>
-
-      <View style={styles.statsRow}>
-        <StatCard
-          icon="layers"
-          label="Cards"
-          value={String(totalCards(selectedGame))}
-          color={gameColor}
-        />
-        <StatCard
-          icon="albums"
-          label="Sets"
-          value={String(setsStartedForGame)}
-          color={gameColor}
-        />
-        <StatCard
-          icon="star"
-          label="Complete"
-          value={String(completedSets.length)}
-          color={colors.success}
-        />
       </View>
 
       {isLoading && (
