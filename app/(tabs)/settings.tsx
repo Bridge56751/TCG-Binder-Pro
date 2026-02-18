@@ -154,6 +154,30 @@ export default function SettingsScreen() {
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             </Pressable>
+            <View style={[styles.separator, { backgroundColor: colors.cardBorder }]} />
+            <Pressable style={styles.menuItem} onPress={() => Linking.openURL("https://example.com")}>
+              <View style={[styles.menuIcon, { backgroundColor: colors.tint + "18" }]}>
+                <Ionicons name="globe-outline" size={20} color={colors.tint} />
+              </View>
+              <View style={styles.menuContent}>
+                <Text style={[styles.menuLabel, { color: colors.text }]}>
+                  Website
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </Pressable>
+            <View style={[styles.separator, { backgroundColor: colors.cardBorder }]} />
+            <Pressable style={styles.menuItem} onPress={() => Linking.openURL("https://example.com/privacy")}>
+              <View style={[styles.menuIcon, { backgroundColor: colors.tint + "18" }]}>
+                <Ionicons name="shield-checkmark-outline" size={20} color={colors.tint} />
+              </View>
+              <View style={styles.menuContent}>
+                <Text style={[styles.menuLabel, { color: colors.text }]}>
+                  Privacy Policy
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </Pressable>
           </View>
         </View>
 
