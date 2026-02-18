@@ -133,16 +133,19 @@ export default function CollectionScreen() {
   }, [collection]);
 
   const mostValuableCard = useMemo(() => {
-    if (!valueData?.cards?.length) return null;
+    if (!valueData?.cards?.length || !allCards.length) return null;
+    const gameCardIds = new Set(
+      allCards.filter(c => c.game === selectedGame).map(c => c.cardId)
+    );
     let best: { cardId: string; name: string; price: number | null } | null =
       null;
     for (const c of valueData.cards) {
-      if (c.price != null && (best == null || (best.price ?? 0) < c.price)) {
+      if (gameCardIds.has(c.cardId) && c.price != null && (best == null || (best.price ?? 0) < c.price)) {
         best = c;
       }
     }
     return best;
-  }, [valueData]);
+  }, [valueData, allCards, selectedGame]);
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 84 + 34 : 100;
@@ -182,10 +185,27 @@ export default function CollectionScreen() {
     } catch (_) {}
   };
 
-  const dailyChange = valueData?.dailyChange ?? 0;
+  const gameValue = useMemo(() => {
+    if (!valueData?.cards?.length || !allCards.length) return { total: 0, change: 0 };
+    const gameCardIds = new Set(
+      allCards.filter(c => c.game === selectedGame).map(c => c.cardId)
+    );
+    let total = 0;
+    for (const c of valueData.cards) {
+      if (gameCardIds.has(c.cardId) && c.price != null) {
+        total += c.price;
+      }
+    }
+    total = Math.round(total * 100) / 100;
+    const ratio = valueData.totalValue > 0 ? total / valueData.totalValue : 0;
+    const change = Math.round((valueData.dailyChange ?? 0) * ratio * 100) / 100;
+    return { total, change };
+  }, [valueData, allCards, selectedGame]);
+
+  const dailyChange = gameValue.change;
   const dailyPct =
-    valueData && valueData.totalValue > 0
-      ? (dailyChange / (valueData.totalValue - dailyChange)) * 100
+    gameValue.total > 0
+      ? (dailyChange / (gameValue.total - dailyChange)) * 100
       : 0;
   const changePositive = dailyChange >= 0;
 
@@ -263,9 +283,7 @@ export default function CollectionScreen() {
             ) : (
               <>
                 <Text style={styles.valueBannerAmount}>
-                  {valueData
-                    ? formatCurrency(valueData.totalValue)
-                    : "$0.00"}
+                  {formatCurrency(gameValue.total)}
                 </Text>
                 <View style={styles.valueBannerChangeRow}>
                   <Ionicons
