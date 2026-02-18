@@ -43,12 +43,13 @@ export default function ScanScreen() {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<CardIdentification | null>(null);
-  const { addCard } = useCollection();
+  const { addCard, hasCard, cardQuantity } = useCollection();
 
   const [batchMode, setBatchMode] = useState(false);
   const [batchCount, setBatchCount] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [addQuantity, setAddQuantity] = useState(1);
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 84 + 34 : 100;
@@ -117,19 +118,22 @@ export default function ScanScreen() {
     await addCard(
       scanResult.game,
       scanResult.setId,
-      cardId
+      cardId,
+      addQuantity
     );
     await addToScanHistory(scanResult, true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
+    const qtyLabel = addQuantity > 1 ? `${addQuantity} copies of ` : "";
+
     if (batchMode) {
-      setBatchCount((c) => c + 1);
-      showToast(`${scanResult.name} added!`);
+      setBatchCount((c) => c + addQuantity);
+      showToast(`${qtyLabel}${scanResult.name} added!`);
       resetScan();
     } else {
       Alert.alert(
         "Added!",
-        `${scanResult.name} has been added to your collection.`,
+        `${qtyLabel}${scanResult.name} has been added to your collection.`,
         [
           { text: "Scan Another", onPress: resetScan },
           {
@@ -149,6 +153,7 @@ export default function ScanScreen() {
     setImageUri(null);
     setScanResult(null);
     setIsScanning(false);
+    setAddQuantity(1);
   };
 
   const dynamicStyles = getDynamicStyles(colors);
@@ -246,7 +251,11 @@ export default function ScanScreen() {
         )}
       </View>
 
-      {scanResult && (
+      {scanResult && (() => {
+        const cardId = scanResult.verifiedCardId || `${scanResult.setId}-${scanResult.cardNumber}`;
+        const alreadyOwned = hasCard(scanResult.game, scanResult.setId, cardId);
+        const ownedQty = alreadyOwned ? cardQuantity(scanResult.game, scanResult.setId, cardId) : 0;
+        return (
         <Animated.View entering={FadeInDown.duration(400).springify()} style={[dynamicStyles.resultCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           <View style={dynamicStyles.resultHeader}>
             <View style={dynamicStyles.resultInfo}>
@@ -274,15 +283,53 @@ export default function ScanScreen() {
               </Text>
             </View>
           </View>
+
+          {alreadyOwned && (
+            <View style={[dynamicStyles.ownedBanner, { backgroundColor: colors.tint + "15" }]}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.tint} />
+              <Text style={[dynamicStyles.ownedBannerText, { color: colors.tint }]}>
+                Already in collection ({ownedQty} owned)
+              </Text>
+            </View>
+          )}
+
+          <View style={dynamicStyles.quantityRow}>
+            <Text style={[dynamicStyles.quantityLabel, { color: colors.textSecondary }]}>
+              {alreadyOwned ? "Add more" : "Quantity"}
+            </Text>
+            <View style={dynamicStyles.quantityStepper}>
+              <Pressable
+                style={[dynamicStyles.stepperButton, { backgroundColor: colors.surfaceAlt }]}
+                onPress={() => setAddQuantity((q) => Math.max(1, q - 1))}
+              >
+                <Ionicons name="remove" size={18} color={addQuantity <= 1 ? colors.textTertiary : colors.text} />
+              </Pressable>
+              <Text style={[dynamicStyles.quantityValue, { color: colors.text }]}>{addQuantity}</Text>
+              <Pressable
+                style={[dynamicStyles.stepperButton, { backgroundColor: colors.surfaceAlt }]}
+                onPress={() => setAddQuantity((q) => Math.min(99, q + 1))}
+              >
+                <Ionicons name="add" size={18} color={colors.text} />
+              </Pressable>
+            </View>
+          </View>
+
           <Pressable
             style={({ pressed }) => [dynamicStyles.addButton, { backgroundColor: colors.tint }, pressed && { opacity: 0.9 }]}
             onPress={handleAddToCollection}
           >
-            <Ionicons name="add-circle" size={20} color="#FFFFFF" />
-            <Text style={dynamicStyles.addButtonText}>Add to Collection</Text>
+            <Ionicons name={alreadyOwned ? "duplicate" : "add-circle"} size={20} color="#FFFFFF" />
+            <Text style={dynamicStyles.addButtonText}>
+              {alreadyOwned
+                ? `Add ${addQuantity} More`
+                : addQuantity > 1
+                  ? `Add ${addQuantity} to Collection`
+                  : "Add to Collection"}
+            </Text>
           </Pressable>
         </Animated.View>
-      )}
+        );
+      })()}
 
       <View style={dynamicStyles.actions}>
         <Pressable
@@ -515,6 +562,45 @@ function getDynamicStyles(colors: any) {
     priceValue: {
       fontFamily: "DMSans_700Bold",
       fontSize: 22,
+    },
+    ownedBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 10,
+    },
+    ownedBannerText: {
+      fontFamily: "DMSans_600SemiBold",
+      fontSize: 13,
+    },
+    quantityRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    quantityLabel: {
+      fontFamily: "DMSans_500Medium",
+      fontSize: 14,
+    },
+    quantityStepper: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    stepperButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    quantityValue: {
+      fontFamily: "DMSans_700Bold",
+      fontSize: 18,
+      minWidth: 32,
+      textAlign: "center" as const,
     },
     addButton: {
       flexDirection: "row",
