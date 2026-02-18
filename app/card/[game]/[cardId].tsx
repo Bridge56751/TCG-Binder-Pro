@@ -37,36 +37,45 @@ import { GAMES } from "@/lib/types";
 
 const screenWidth = Dimensions.get("window").width;
 
-function getMarketplaceLinks(cardName: string, game: GameId) {
-  const encoded = encodeURIComponent(cardName);
-  const gameLabels: Record<GameId, string> = {
-    pokemon: "Pokemon",
-    yugioh: "Yu-Gi-Oh!",
-    onepiece: "One Piece",
-    mtg: "Magic: The Gathering",
-  };
+function getMarketplaceLinks(card: CardDetail) {
+  const game = card.game;
+  const cardName = card.name;
+  const setName = card.setName;
+  const localId = card.localId;
+
   const tcgPlayerCategories: Record<GameId, string> = {
     pokemon: "pokemon",
     yugioh: "yugioh",
     onepiece: "one-piece-card-game",
     mtg: "magic",
   };
+  const cardmarketGames: Record<GameId, string> = {
+    pokemon: "Pokemon",
+    yugioh: "YuGiOh",
+    onepiece: "OnePiece",
+    mtg: "Magic",
+  };
+
+  const tcgQuery = encodeURIComponent(`${cardName} ${setName}`);
+  const ebayQuery = encodeURIComponent(`${cardName} ${localId} ${setName}`);
+  const cmQuery = encodeURIComponent(`${cardName}`);
+
   const links = [
     {
       name: "TCGPlayer",
-      url: `https://www.tcgplayer.com/search/all/product?q=${encoded}&productLineName=${tcgPlayerCategories[game]}`,
+      url: `https://www.tcgplayer.com/search/all/product?q=${tcgQuery}&productLineName=${tcgPlayerCategories[game]}`,
       icon: "cart-outline",
       color: "#1D4ED8",
     },
     {
       name: "eBay",
-      url: `https://www.ebay.com/sch/i.html?_nkw=${encoded}+${encodeURIComponent(gameLabels[game])}+card`,
+      url: `https://www.ebay.com/sch/i.html?_nkw=${ebayQuery}`,
       icon: "pricetag-outline",
       color: "#E53238",
     },
     {
       name: "Cardmarket",
-      url: `https://www.cardmarket.com/en/Search?searchString=${encoded}`,
+      url: `https://www.cardmarket.com/en/${cardmarketGames[game]}/Cards?searchString=${cmQuery}`,
       icon: "globe-outline",
       color: "#0F766E",
     },
@@ -74,7 +83,7 @@ function getMarketplaceLinks(cardName: string, game: GameId) {
   if (game === "mtg") {
     links.push({
       name: "Card Kingdom",
-      url: `https://www.cardkingdom.com/catalog/search?search=header&filter%5Bname%5D=${encoded}`,
+      url: `https://www.cardkingdom.com/catalog/search?search=header&filter%5Bname%5D=${encodeURIComponent(cardName)}`,
       icon: "shield-outline",
       color: "#7C3AED",
     });
@@ -351,7 +360,7 @@ export default function CardDetailScreen() {
         <View style={styles.marketplaceSection}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Buy This Card</Text>
           <View style={styles.marketplaceGrid}>
-            {getMarketplaceLinks(card.name, gameId).map((mp) => (
+            {getMarketplaceLinks(card).map((mp) => (
               <Pressable
                 key={mp.name}
                 style={[styles.marketplaceCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
