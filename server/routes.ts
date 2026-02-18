@@ -95,6 +95,13 @@ Return ONLY valid JSON, no other text.`,
         image: c.image ? `${c.image}/low.png` : null,
       }));
 
+      cards.sort((a: any, b: any) => {
+        const numA = parseInt(a.localId, 10);
+        const numB = parseInt(b.localId, 10);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return a.localId.localeCompare(b.localId, undefined, { numeric: true });
+      });
+
       res.json({
         id: setData.id,
         name: setData.name,
@@ -157,6 +164,13 @@ Return ONLY valid JSON, no other text.`,
           name: c.name,
           image: c.card_images?.[0]?.image_url_small || null,
         };
+      });
+
+      cards.sort((a: any, b: any) => {
+        const numA = parseInt(a.localId, 10);
+        const numB = parseInt(b.localId, 10);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return a.localId.localeCompare(b.localId, undefined, { numeric: true });
       });
 
       res.json({
