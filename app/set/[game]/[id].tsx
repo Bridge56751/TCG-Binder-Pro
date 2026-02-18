@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React from "react";
 import {
   StyleSheet,
   Text,
@@ -7,17 +7,15 @@ import {
   Platform,
   Pressable,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { CardCell } from "@/components/CardCell";
 import { useCollection } from "@/lib/CollectionContext";
-import type { GameId, SetDetail, TCGCard } from "@/lib/types";
+import type { GameId, SetDetail } from "@/lib/types";
 import { GAMES } from "@/lib/types";
 
 const NUM_COLUMNS = 3;
@@ -26,7 +24,7 @@ export default function SetDetailScreen() {
   const insets = useSafeAreaInsets();
   const { game, id } = useLocalSearchParams<{ game: string; id: string }>();
   const gameId = game as GameId;
-  const { hasCard, addCard, removeCard, setCards } = useCollection();
+  const { hasCard, setCards } = useCollection();
 
   const { data: setDetail, isLoading } = useQuery<SetDetail>({
     queryKey: [`/api/tcg/${game}/sets/${id}/cards`],
@@ -39,29 +37,6 @@ export default function SetDetailScreen() {
   const collectedCount = setCards(gameId, id || "");
   const totalCards = setDetail?.totalCards || 0;
   const progress = totalCards > 0 ? collectedCount / totalCards : 0;
-
-  const handleCardPress = useCallback(
-    (card: TCGCard) => {
-      const isCollected = hasCard(gameId, id || "", card.id);
-      if (isCollected) {
-        Alert.alert("Remove Card", `Remove ${card.name} from your collection?`, [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Remove",
-            style: "destructive",
-            onPress: () => {
-              removeCard(gameId, id || "", card.id);
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            },
-          },
-        ]);
-      } else {
-        addCard(gameId, id || "", card.id);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-    },
-    [gameId, id, hasCard, addCard, removeCard]
-  );
 
   const renderHeader = () => (
     <View style={styles.headerSection}>
@@ -77,6 +52,12 @@ export default function SetDetailScreen() {
             {id} - {gameInfo?.name}
           </Text>
         </View>
+        <Pressable
+          style={styles.scanButton}
+          onPress={() => router.push("/(tabs)/scan")}
+        >
+          <Ionicons name="scan" size={18} color="#FFFFFF" />
+        </Pressable>
       </View>
 
       <View style={styles.progressSection}>
@@ -103,8 +84,12 @@ export default function SetDetailScreen() {
         </Text>
       </View>
 
-      <Text style={styles.binderTitle}>Binder View</Text>
-      <Text style={styles.binderSubtitle}>Tap a card to add or remove it</Text>
+      <View style={styles.binderHeader}>
+        <View>
+          <Text style={styles.binderTitle}>Binder View</Text>
+          <Text style={styles.binderSubtitle}>Scan cards to fill in your collection</Text>
+        </View>
+      </View>
     </View>
   );
 
@@ -132,7 +117,7 @@ export default function SetDetailScreen() {
               name={item.name}
               imageUrl={item.image}
               isCollected={hasCard(gameId, id || "", item.id)}
-              onPress={() => handleCardPress(item)}
+              onPress={() => {}}
             />
           </View>
         )}
@@ -192,6 +177,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.light.textSecondary,
   },
+  scanButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: Colors.light.tint,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   progressSection: {
     marginHorizontal: 20,
     backgroundColor: Colors.light.surface,
@@ -232,18 +225,22 @@ const styles = StyleSheet.create({
     color: Colors.light.textTertiary,
     textAlign: "right",
   },
+  binderHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    marginTop: 16,
+  },
   binderTitle: {
     fontFamily: "DMSans_600SemiBold",
     fontSize: 16,
     color: Colors.light.text,
-    paddingHorizontal: 20,
-    marginTop: 16,
   },
   binderSubtitle: {
     fontFamily: "DMSans_400Regular",
     fontSize: 12,
     color: Colors.light.textTertiary,
-    paddingHorizontal: 20,
     marginTop: 2,
   },
   gridContent: {

@@ -1,9 +1,8 @@
 import React from "react";
-import { View, Pressable, Text, StyleSheet, Platform } from "react-native";
+import { View, Text, StyleSheet, Platform } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import * as Haptics from "expo-haptics";
 
 interface CardCellProps {
   cardId: string;
@@ -16,13 +15,8 @@ interface CardCellProps {
 
 export function CardCell({ cardId, localId, name, imageUrl, isCollected, onPress }: CardCellProps) {
   return (
-    <Pressable
-      style={({ pressed }) => [styles.container, pressed && styles.pressed]}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        onPress();
-      }}
-    >
+    <View style={styles.container}>
+
       <View style={[styles.cardWrapper, !isCollected && styles.missingWrapper]}>
         {imageUrl ? (
           <>
@@ -58,7 +52,7 @@ export function CardCell({ cardId, localId, name, imageUrl, isCollected, onPress
       <Text style={[styles.cardName, !isCollected && styles.cardNameMissing]} numberOfLines={1}>
         {name}
       </Text>
-    </Pressable>
+    </View>
   );
 }
 
@@ -66,10 +60,6 @@ const styles = StyleSheet.create({
   container: {
     alignItems: "center",
     gap: 4,
-  },
-  pressed: {
-    opacity: 0.8,
-    transform: [{ scale: 0.95 }],
   },
   cardWrapper: {
     width: "100%",
