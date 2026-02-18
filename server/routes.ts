@@ -88,6 +88,12 @@ async function resolveSetId(game: string, aiSetId: string, aiSetName?: string, l
   } else if (game === "onepiece") {
     const exact = sets.find((s: any) => s.id === aiSetId);
     if (exact) return aiSetId;
+    const withDash = aiSetId.replace(/^(OP|ST|EB|PRB)(\d)/, "$1-0$2").replace(/^(OP|ST|EB|PRB)0(\d{2})/, "$1-$2");
+    const dashExact = sets.find((s: any) => s.id === withDash);
+    if (dashExact) return dashExact.id;
+    const noDash = aiSetId.replace("-", "");
+    const noDashExact = sets.find((s: any) => s.id.replace("-", "") === noDash);
+    if (noDashExact) return noDashExact.id;
     const byName = sets.find((s: any) =>
       normalize(s.name) === normalizedId || normalize(s.name) === normalizedName
     );
@@ -103,72 +109,156 @@ async function resolveSetId(game: string, aiSetId: string, aiSetName?: string, l
   return null;
 }
 
-async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId?: string; setId?: string } | null> {
-  try {
-    const { game, name, setId, cardNumber } = result;
-    const lang = result.language === "ja" ? "ja" : "en";
+function cleanCardNumber(raw: string): string {
+  let num = raw.trim();
+  if (num.includes("/")) num = num.split("/")[0].trim();
+  if (num.includes(" of ")) num = num.split(" of ")[0].trim();
+  num = num.replace(/^#/, "");
+  return num;
+}
 
-    if (game === "pokemon") {
-      const extractPokemonSetId = (cId: string) => {
-        const lastDash = cId.lastIndexOf("-");
-        return lastDash > 0 ? cId.substring(0, lastDash) : setId;
-      };
-      const cardId = `${setId}-${cardNumber}`;
-      const res = await fetch(`https://api.tcgdex.net/v2/${lang}/cards/${encodeURIComponent(cardId)}`);
+function extractPokemonSetId(cardId: string, fallbackSetId: string): string {
+  const lastDash = cardId.lastIndexOf("-");
+  return lastDash > 0 ? cardId.substring(0, lastDash) : fallbackSetId;
+}
+
+async function verifyPokemonCard(name: string, setId: string, rawCardNumber: string, lang: string): Promise<{ name: string; cardId?: string; setId?: string } | null> {
+  const cardNumber = cleanCardNumber(rawCardNumber);
+  const paddedNumber = cardNumber.length < 3 ? cardNumber.padStart(3, "0") : cardNumber;
+  const unpaddedNumber = cardNumber.replace(/^0+/, "") || "0";
+  const numberVariants = [...new Set([cardNumber, paddedNumber, unpaddedNumber])];
+
+  console.log(`[Pokemon Verify] name="${name}" setId="${setId}" cardNumber="${cardNumber}" variants=${JSON.stringify(numberVariants)} lang=${lang}`);
+
+  for (const num of numberVariants) {
+    const directId = `${setId}-${num}`;
+    try {
+      const res = await fetch(`https://api.tcgdex.net/v2/${lang}/cards/${encodeURIComponent(directId)}`);
       if (res.ok) {
         const card = await res.json();
-        return { name: card.name, cardId: card.id, setId: extractPokemonSetId(card.id) };
+        console.log(`[Pokemon Verify] EXACT HIT: ${directId} -> ${card.name} (${card.id})`);
+        return { name: card.name, cardId: card.id, setId: extractPokemonSetId(card.id, setId) };
       }
-      if (lang === "ja" && cardNumber.length < 3) {
-        const paddedId = `${setId}-${cardNumber.padStart(3, "0")}`;
-        const paddedRes = await fetch(`https://api.tcgdex.net/v2/ja/cards/${encodeURIComponent(paddedId)}`);
-        if (paddedRes.ok) {
-          const card = await paddedRes.json();
-          return { name: card.name, cardId: card.id, setId: extractPokemonSetId(card.id) };
-        }
-      }
-      const setRes = await fetch(`https://api.tcgdex.net/v2/${lang}/sets/${encodeURIComponent(setId)}`);
-      if (setRes.ok) {
-        const setData = await setRes.json();
-        if (setData.cards) {
-          const match = setData.cards.find((c: any) => c.localId === cardNumber);
-          if (match) return { name: match.name, cardId: match.id, setId: extractPokemonSetId(match.id) };
-          const numPadded = cardNumber.replace(/^0+/, "");
-          const matchPadded = setData.cards.find((c: any) => c.localId.replace(/^0+/, "") === numPadded);
-          if (matchPadded) return { name: matchPadded.name, cardId: matchPadded.id, setId: extractPokemonSetId(matchPadded.id) };
-          const nameMatches = setData.cards.filter((c: any) =>
-            c.name.toLowerCase() === name.toLowerCase()
-          );
-          if (nameMatches.length === 1) {
-            return { name: nameMatches[0].name, cardId: nameMatches[0].id, setId: extractPokemonSetId(nameMatches[0].id) };
+    } catch {}
+  }
+  console.log(`[Pokemon Verify] No exact match for ${setId}-${cardNumber}, searching set...`);
+
+  try {
+    const setRes = await fetch(`https://api.tcgdex.net/v2/${lang}/sets/${encodeURIComponent(setId)}`);
+    if (setRes.ok) {
+      const setData = await setRes.json();
+      if (setData.cards) {
+        for (const num of numberVariants) {
+          const match = setData.cards.find((c: any) => c.localId === num);
+          if (match) {
+            console.log(`[Pokemon Verify] SET SEARCH HIT: localId=${num} -> ${match.name} (${match.id})`);
+            return { name: match.name, cardId: match.id, setId: extractPokemonSetId(match.id, setId) };
           }
-          if (nameMatches.length > 1) {
-            const cardNum = parseInt(cardNumber, 10);
-            if (!isNaN(cardNum)) {
-              let closest = nameMatches[0];
-              let closestDist = Math.abs(parseInt(closest.localId, 10) - cardNum);
-              for (const nm of nameMatches) {
-                const dist = Math.abs(parseInt(nm.localId, 10) - cardNum);
-                if (dist < closestDist) {
-                  closest = nm;
-                  closestDist = dist;
-                }
-              }
-              return { name: closest.name, cardId: closest.id, setId: extractPokemonSetId(closest.id) };
+        }
+        const nameMatches = setData.cards.filter((c: any) =>
+          c.name.toLowerCase() === name.toLowerCase()
+        );
+        if (nameMatches.length === 1) {
+          console.log(`[Pokemon Verify] NAME MATCH in set: ${nameMatches[0].name} (${nameMatches[0].id})`);
+          return { name: nameMatches[0].name, cardId: nameMatches[0].id, setId: extractPokemonSetId(nameMatches[0].id, setId) };
+        }
+        if (nameMatches.length > 1) {
+          const cardNum = parseInt(cardNumber, 10);
+          if (!isNaN(cardNum)) {
+            let closest = nameMatches[0];
+            let closestDist = Math.abs(parseInt(closest.localId, 10) - cardNum);
+            for (const nm of nameMatches) {
+              const dist = Math.abs(parseInt(nm.localId, 10) - cardNum);
+              if (dist < closestDist) { closest = nm; closestDist = dist; }
             }
-            return { name: nameMatches[0].name, cardId: nameMatches[0].id, setId: extractPokemonSetId(nameMatches[0].id) };
+            console.log(`[Pokemon Verify] CLOSEST NAME in set: ${closest.name} (${closest.id}), dist=${closestDist}`);
+            return { name: closest.name, cardId: closest.id, setId: extractPokemonSetId(closest.id, setId) };
           }
         }
       }
-      const searchByName = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(name)}`);
-      if (searchByName.ok) {
-        const searchData = await searchByName.json();
-        if (Array.isArray(searchData) && searchData.length > 0) {
-          const byNum = searchData.find((c: any) => c.localId === cardNumber);
-          const match = byNum || searchData[0];
-          return { name: match.name, cardId: match.id, setId: extractPokemonSetId(match.id) };
+    }
+  } catch {}
+  console.log(`[Pokemon Verify] Card not found in set ${setId}, doing global search by name...`);
+
+  try {
+    const searchByName = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(name)}`);
+    if (searchByName.ok) {
+      const searchData = await searchByName.json();
+      if (Array.isArray(searchData) && searchData.length > 0) {
+        console.log(`[Pokemon Verify] Global search found ${searchData.length} results for "${name}"`);
+        for (const num of numberVariants) {
+          const byExactNum = searchData.find((c: any) => c.localId === num);
+          if (byExactNum) {
+            console.log(`[Pokemon Verify] GLOBAL NAME+NUM HIT: localId=${num} -> ${byExactNum.name} (${byExactNum.id})`);
+            return { name: byExactNum.name, cardId: byExactNum.id, setId: extractPokemonSetId(byExactNum.id, setId) };
+          }
+        }
+        const inOriginalSet = searchData.find((c: any) => c.id.startsWith(setId + "-"));
+        if (inOriginalSet) {
+          console.log(`[Pokemon Verify] GLOBAL found in original set: ${inOriginalSet.name} (${inOriginalSet.id})`);
+          return { name: inOriginalSet.name, cardId: inOriginalSet.id, setId: extractPokemonSetId(inOriginalSet.id, setId) };
+        }
+        const cardNum = parseInt(cardNumber, 10);
+        if (!isNaN(cardNum)) {
+          let closest: any = null;
+          let closestDist = Infinity;
+          for (const c of searchData) {
+            const localNum = parseInt(c.localId, 10);
+            if (!isNaN(localNum)) {
+              const dist = Math.abs(localNum - cardNum);
+              if (dist < closestDist) { closest = c; closestDist = dist; }
+            }
+          }
+          if (closest && closestDist <= 5) {
+            console.log(`[Pokemon Verify] GLOBAL closest number match: ${closest.name} (${closest.id}), dist=${closestDist}`);
+            return { name: closest.name, cardId: closest.id, setId: extractPokemonSetId(closest.id, setId) };
+          }
+        }
+        console.log(`[Pokemon Verify] GLOBAL fallback to first result: ${searchData[0].name} (${searchData[0].id})`);
+        return { name: searchData[0].name, cardId: searchData[0].id, setId: extractPokemonSetId(searchData[0].id, setId) };
+      }
+    }
+  } catch {}
+
+  try {
+    const words = name.split(/\s+/);
+    const baseName = words.length > 1 ? words.slice(0, -1).join(" ") : name;
+    if (baseName.toLowerCase() !== name.toLowerCase()) {
+      console.log(`[Pokemon Verify] Trying partial name search: "${baseName}"`);
+      const partialSearch = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(baseName)}`);
+      if (partialSearch.ok) {
+        const partialData = await partialSearch.json();
+        if (Array.isArray(partialData) && partialData.length > 0) {
+          for (const num of numberVariants) {
+            const hit = partialData.find((c: any) => c.localId === num);
+            if (hit) {
+              console.log(`[Pokemon Verify] PARTIAL NAME+NUM HIT: ${hit.name} (${hit.id})`);
+              return { name: hit.name, cardId: hit.id, setId: extractPokemonSetId(hit.id, setId) };
+            }
+          }
+          const inOriginalSet = partialData.find((c: any) => c.id.startsWith(setId + "-"));
+          if (inOriginalSet) {
+            return { name: inOriginalSet.name, cardId: inOriginalSet.id, setId: extractPokemonSetId(inOriginalSet.id, setId) };
+          }
         }
       }
+    }
+  } catch {}
+
+  console.log(`[Pokemon Verify] ALL STRATEGIES FAILED for "${name}" #${cardNumber} in ${setId}`);
+  return null;
+}
+
+async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId?: string; setId?: string } | null> {
+  try {
+    const { game, name, setId, cardNumber: rawCardNumber } = result;
+    const lang = result.language === "ja" ? "ja" : "en";
+    const cardNumber = cleanCardNumber(rawCardNumber);
+
+    console.log(`[CardVerify] game=${game} name="${name}" setId="${setId}" rawNum="${rawCardNumber}" cleanNum="${cardNumber}"`);
+
+    if (game === "pokemon") {
+      return await verifyPokemonCard(name, setId, rawCardNumber, lang);
     } else if (game === "yugioh") {
       const rarity = result.rarity?.toLowerCase() || "";
       const extractSetPrefix = (code: string) => code.split("-")[0] || code;
@@ -177,6 +267,7 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
         const data = await res.json();
         if (data?.data?.[0]) {
           const card = data.data[0];
+          console.log(`[YGO Verify] Found card: ${card.name}, ${card.card_sets?.length || 0} sets`);
           const setsInSet = card.card_sets?.filter((s: any) => s.set_code?.startsWith(setId)) || [];
           if (setsInSet.length > 1 && rarity) {
             const rarityMatch = setsInSet.find((s: any) => s.set_rarity?.toLowerCase().includes(rarity));
@@ -188,6 +279,16 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
             if (codeWithNum) return { name: card.name, cardId: codeWithNum.set_code, setId: extractSetPrefix(codeWithNum.set_code) };
           }
           if (setsInSet.length > 0) return { name: card.name, cardId: setsInSet[0].set_code, setId: extractSetPrefix(setsInSet[0].set_code) };
+          if (cardNumber) {
+            const byCardNum = card.card_sets?.find((s: any) => {
+              const suffix = s.set_code?.split("-").pop() || "";
+              return suffix === cardNumber || suffix.includes(cardNumber);
+            });
+            if (byCardNum) {
+              console.log(`[YGO Verify] Found by card number ${cardNumber}: ${byCardNum.set_code}`);
+              return { name: card.name, cardId: byCardNum.set_code, setId: extractSetPrefix(byCardNum.set_code) };
+            }
+          }
           if (card.card_sets?.[0]) {
             const fallbackCode = card.card_sets[0].set_code;
             return { name: card.name, cardId: fallbackCode, setId: extractSetPrefix(fallbackCode) };
@@ -199,20 +300,41 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
         const fuzzyData = await fuzzyRes.json();
         if (fuzzyData?.data?.[0]) {
           const card = fuzzyData.data[0];
+          console.log(`[YGO Verify] Fuzzy found: ${card.name}`);
           const setInfo = card.card_sets?.find((s: any) => s.set_code?.startsWith(setId));
           if (setInfo) return { name: card.name, cardId: setInfo.set_code, setId: extractSetPrefix(setInfo.set_code) };
+          if (card.card_sets?.[0]) {
+            const fallbackCode = card.card_sets[0].set_code;
+            return { name: card.name, cardId: fallbackCode, setId: extractSetPrefix(fallbackCode) };
+          }
         }
       }
     } else if (game === "onepiece") {
-      const cardId = `${setId}-${cardNumber.padStart(3, "0")}`;
+      const cleanNum = cardNumber.replace(/^0+/, "").padStart(3, "0");
+      const cardId = `${setId}-${cleanNum}`;
+      console.log(`[OP Verify] Trying: ${cardId}`);
       const res = await fetch(`https://optcgapi.com/api/sets/card/${cardId}/`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
           const verifiedSetId = data[0].set_id || setId;
+          console.log(`[OP Verify] HIT: ${data[0].card_name} (${data[0].card_set_id}) in set ${verifiedSetId}`);
           return { name: data[0].card_name, cardId: data[0].card_set_id, setId: verifiedSetId };
         }
       }
+      if (!setId.includes("-")) {
+        const altSetId = setId.replace(/(\D+)(\d+)/, "$1-$2");
+        const altCardId = `${altSetId}-${cleanNum}`;
+        console.log(`[OP Verify] Trying alt format: ${altCardId}`);
+        const altRes = await fetch(`https://optcgapi.com/api/sets/card/${altCardId}/`);
+        if (altRes.ok) {
+          const altData = await altRes.json();
+          if (Array.isArray(altData) && altData.length > 0) {
+            return { name: altData[0].card_name, cardId: altData[0].card_set_id, setId: altData[0].set_id || altSetId };
+          }
+        }
+      }
+      console.log(`[OP Verify] Searching by name: "${name}"`);
       const searchByName = await fetch(`https://optcgapi.com/api/cards/search/${encodeURIComponent(name)}/`);
       if (searchByName.ok) {
         const searchData = await searchByName.json();
@@ -223,36 +345,48 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
         }
       }
     } else if (game === "mtg") {
+      console.log(`[MTG Verify] Trying: ${setId}/${cardNumber}`);
       const res = await fetch(`https://api.scryfall.com/cards/${encodeURIComponent(setId)}/${encodeURIComponent(cardNumber)}`);
       if (res.ok) {
         const card = await res.json();
+        console.log(`[MTG Verify] EXACT HIT: ${card.name} (${card.set})`);
         return { name: card.name, cardId: card.id, setId: card.set || setId };
       }
       const searchRes = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${name}" set:${setId} cn:${cardNumber}`)}&unique=prints`);
       if (searchRes.ok) {
         const searchData = await searchRes.json();
         if (searchData?.data?.[0]) {
+          console.log(`[MTG Verify] SET+CN search hit: ${searchData.data[0].name}`);
           return { name: searchData.data[0].name, cardId: searchData.data[0].id, setId: searchData.data[0].set || setId };
         }
       }
       const broadSearchRes = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${name}" set:${setId}`)}&unique=prints`);
       if (broadSearchRes.ok) {
         const broadData = await broadSearchRes.json();
-        if (broadData?.data?.length === 1) {
-          return { name: broadData.data[0].name, cardId: broadData.data[0].id, setId: broadData.data[0].set || setId };
-        }
-        if (broadData?.data?.length > 1) {
+        if (broadData?.data?.length > 0) {
           const exactNum = broadData.data.find((c: any) => c.collector_number === cardNumber);
           if (exactNum) return { name: exactNum.name, cardId: exactNum.id, setId: exactNum.set || setId };
           return { name: broadData.data[0].name, cardId: broadData.data[0].id, setId: broadData.data[0].set || setId };
         }
       }
+      console.log(`[MTG Verify] Searching across all sets for "${name}"...`);
       const anySetSearch = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${name}"`)}&unique=prints&order=released&dir=desc`);
       if (anySetSearch.ok) {
         const anyData = await anySetSearch.json();
         if (anyData?.data?.length > 0) {
           const byNumber = anyData.data.find((c: any) => c.collector_number === cardNumber);
           const match = byNumber || anyData.data[0];
+          console.log(`[MTG Verify] GLOBAL hit: ${match.name} (${match.set})`);
+          return { name: match.name, cardId: match.id, setId: match.set };
+        }
+      }
+      const fuzzySearch = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`${name}`)}&unique=prints&order=released&dir=desc`);
+      if (fuzzySearch.ok) {
+        const fuzzyData = await fuzzySearch.json();
+        if (fuzzyData?.data?.length > 0) {
+          const byNumber = fuzzyData.data.find((c: any) => c.collector_number === cardNumber);
+          const match = byNumber || fuzzyData.data[0];
+          console.log(`[MTG Verify] FUZZY hit: ${match.name} (${match.set})`);
           return { name: match.name, cardId: match.id, setId: match.set };
         }
       }
@@ -400,10 +534,13 @@ CRITICAL: Read ALL visible text on the card carefully:
 VARIANT / RARITY IDENTIFICATION (VERY IMPORTANT):
 Many cards have multiple printings with DIFFERENT collector numbers. You MUST read the exact collector number printed on the card to distinguish them:
 - Pokemon: Regular cards are numbered within the main set (e.g. 1/165). Full Art, Illustration Rare, Special Art Rare, and Secret Rare cards have numbers ABOVE the official set count (e.g. 166/165, 198/165). The number after the slash is the official count. If the first number exceeds the second, it is a special variant. Read the EXACT number - do NOT substitute a lower number.
+  FULL ART CARDS ARE STILL IN THE SAME SET as the regular cards. A card numbered 198/165 is in the SAME set as cards 1-165. Do NOT change the set just because the number is high. The set is determined by the set symbol/logo, NOT the card number.
+  IMPORTANT: For full art/illustration rare/secret rare Pokemon cards, the art extends to the edges of the card, there may be no or minimal border, and the collector number at the bottom is higher than the set count. These are NOT from a different set - they are special variants within the same set.
+  IMPORTANT: Some Pokemon cards have special prefixes like "TG" (Trainer Gallery), "GG" (Galarian Gallery), "SV" (Shiny Vault). Read the FULL collector number including the prefix.
 - Pokemon rarity symbols: Circle=Common, Diamond=Uncommon, Star=Rare, Star H=Holo Rare, V/VMAX/VSTAR/ex with full art=Ultra Rare, Gold card=Secret Rare, Illustration with textured art=Special/Illustration Rare
 - Yu-Gi-Oh!: Different rarities have different visual treatments (Common=no foil, Rare=silver name, Super Rare=holo art, Ultra Rare=gold name+holo art, Secret Rare=rainbow name+holo art, Starlight Rare=embossed). Card code suffix matters (e.g. EN001 vs EN001a).
-- MTG: Different printings may have different collector numbers. Extended art, borderless, and showcase variants have higher collector numbers.
-- One Piece: Alt art cards (AA/manga art) have different card IDs from regular versions.
+- MTG: Different printings may have different collector numbers. Extended art, borderless, and showcase variants have higher collector numbers. These variants are STILL in the same set. The set is identified by the set symbol, not the card border style.
+- One Piece: Alt art cards (AA/manga art) have different card IDs from regular versions. Alt arts typically end with _p1, _p2 etc. or have different numbering schemes.
 
 GAME IDENTIFICATION:
 - Pokemon: Yellow border, HP in top right, weakness/resistance at bottom, Pokemon creature art
@@ -454,11 +591,18 @@ Return ONLY valid JSON.`,
       const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       const result = JSON.parse(cleaned);
 
+      if (result.cardNumber) {
+        result.cardNumber = cleanCardNumber(result.cardNumber);
+      }
+
+      console.log(`[AI Result] game=${result.game} name="${result.name}" setId="${result.setId}" setName="${result.setName}" cardNumber="${result.cardNumber}" rarity="${result.rarity}" lang="${result.language}"`);
+
       if (!result.error && result.game && result.setId) {
         const lang = result.language === "ja" ? "ja" : "en";
         try {
           const resolvedSetId = await resolveSetId(result.game, result.setId, result.setName, lang);
           if (resolvedSetId) {
+            console.log(`[SetResolve] ${result.setId} -> ${resolvedSetId}`);
             result.setId = resolvedSetId;
           }
         } catch (e) {
@@ -468,6 +612,7 @@ Return ONLY valid JSON.`,
         try {
           const verified = await verifyCardInDatabase(result);
           if (verified) {
+            console.log(`[Verified] name="${verified.name}" cardId="${verified.cardId}" setId="${verified.setId}"`);
             result.name = verified.name || result.name;
             if (verified.cardId) result.verifiedCardId = verified.cardId;
             if (verified.setId) {
