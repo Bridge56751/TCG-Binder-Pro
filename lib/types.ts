@@ -41,6 +41,26 @@ export interface CardIdentification {
   error?: string;
 }
 
+export interface CardDetail {
+  id: string;
+  localId: string;
+  name: string;
+  image: string | null;
+  game: GameId;
+  setId: string;
+  setName: string;
+  rarity: string | null;
+  cardType: string | null;
+  hp: number | null;
+  description: string | null;
+  artist: string | null;
+  currentPrice: number | null;
+  priceUnit: string;
+  priceLow: number | null;
+  priceHigh: number | null;
+  priceHistory: { date: string; price: number }[];
+}
+
 export interface CollectionData {
   [game: string]: {
     [setId: string]: string[];
