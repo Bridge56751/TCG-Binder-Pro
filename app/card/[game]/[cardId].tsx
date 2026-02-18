@@ -8,7 +8,6 @@ import {
   Pressable,
   ActivityIndicator,
   Dimensions,
-  Share,
   Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -91,14 +90,6 @@ export default function CardDetailScreen() {
     }
   };
 
-  const handleShare = async () => {
-    if (!card) return;
-    const message = `${card.name} - ${card.setName} #${card.localId}\nRarity: ${card.rarity || "N/A"}\nMarket Price: $${card.currentPrice?.toFixed(2) || "N/A"}\n\nTracked with CardVault`;
-    try {
-      await Share.share({ message });
-    } catch {}
-  };
-
   const isInCollection = card ? hasCard(gameId, card.setId, cardId || "") : false;
 
   const handleRemoveCard = () => {
@@ -175,9 +166,6 @@ export default function CardDetailScreen() {
             {onTrade && (
               <View style={[styles.actionDot, { backgroundColor: colors.tint }]} />
             )}
-          </Pressable>
-          <Pressable style={styles.actionButton} onPress={handleShare}>
-            <Ionicons name="share-outline" size={22} color={colors.textTertiary} />
           </Pressable>
         </View>
 
