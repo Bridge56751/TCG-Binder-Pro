@@ -286,7 +286,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.delete("/api/auth/account", async (req, res) => {
+  app.post("/api/auth/delete-account", async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ error: "Not logged in" });
     }

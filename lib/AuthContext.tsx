@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const deleteAccount = useCallback(async () => {
-    await apiRequest("DELETE", "/api/auth/account");
+    await apiRequest("POST", "/api/auth/delete-account");
     setUser(null);
   }, []);
 

@@ -30,6 +30,7 @@ export default function SettingsScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [confirmingAction, setConfirmingAction] = useState<"logout" | "delete" | null>(null);
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
@@ -72,37 +73,25 @@ export default function SettingsScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert("Log Out", "Are you sure you want to log out?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Log Out",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await logout();
-          } catch {}
-        },
-      },
-    ]);
+    setConfirmingAction("logout");
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert(
-      "Delete Account",
-      "This will permanently delete your account and all cloud data. This cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteAccount();
-            } catch {}
-          },
-        },
-      ]
-    );
+    setConfirmingAction("delete");
+  };
+
+  const executeConfirmedAction = async () => {
+    const action = confirmingAction;
+    setConfirmingAction(null);
+    if (action === "logout") {
+      try {
+        await logout();
+      } catch {}
+    } else if (action === "delete") {
+      try {
+        await deleteAccount();
+      } catch {}
+    }
   };
 
   const handleSync = async () => {
@@ -127,6 +116,7 @@ export default function SettingsScreen() {
 
   if (user) {
     return (
+      <>
       <ScrollView
         style={[styles.container, { backgroundColor: colors.background }]}
         contentContainerStyle={{ paddingBottom: bottomInset + 20 }}
@@ -232,6 +222,38 @@ export default function SettingsScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {confirmingAction && (
+        <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {confirmingAction === "logout" ? "Log Out" : "Delete Account"}
+            </Text>
+            <Text style={[styles.modalMessage, { color: colors.textSecondary }]}>
+              {confirmingAction === "logout"
+                ? "Are you sure you want to log out?"
+                : "This will permanently delete your account and all cloud data. This cannot be undone."}
+            </Text>
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: colors.surfaceAlt }]}
+                onPress={() => setConfirmingAction(null)}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.text }]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: colors.error }]}
+                onPress={executeConfirmedAction}
+              >
+                <Text style={[styles.modalButtonText, { color: "#FFFFFF" }]}>
+                  {confirmingAction === "logout" ? "Log Out" : "Delete"}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      )}
+      </>
     );
   }
 
@@ -520,5 +542,49 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "DMSans_400Regular",
     textAlign: "center",
+  },
+  modalOverlay: {
+    position: "absolute" as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999,
+  },
+  modalCard: {
+    width: "85%" as any,
+    borderRadius: 16,
+    padding: 24,
+    maxWidth: 340,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: "DMSans_700Bold",
+    marginBottom: 8,
+    textAlign: "center" as const,
+  },
+  modalMessage: {
+    fontSize: 15,
+    fontFamily: "DMSans_400Regular",
+    lineHeight: 22,
+    textAlign: "center" as const,
+    marginBottom: 24,
+  },
+  modalButtons: {
+    flexDirection: "row" as const,
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    height: 46,
+    borderRadius: 12,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontFamily: "DMSans_600SemiBold",
   },
 });
