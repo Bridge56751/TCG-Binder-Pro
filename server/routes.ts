@@ -103,7 +103,7 @@ async function resolveSetId(game: string, aiSetId: string, aiSetName?: string, l
   return null;
 }
 
-async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId?: string } | null> {
+async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId?: string; setId?: string } | null> {
   try {
     const { game, name, setId, cardNumber } = result;
     const lang = result.language === "ja" ? "ja" : "en";
@@ -158,6 +158,7 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
       }
     } else if (game === "yugioh") {
       const rarity = result.rarity?.toLowerCase() || "";
+      const extractSetPrefix = (code: string) => code.split("-")[0] || code;
       const res = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?name=${encodeURIComponent(name)}`);
       if (res.ok) {
         const data = await res.json();
@@ -166,15 +167,18 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
           const setsInSet = card.card_sets?.filter((s: any) => s.set_code?.startsWith(setId)) || [];
           if (setsInSet.length > 1 && rarity) {
             const rarityMatch = setsInSet.find((s: any) => s.set_rarity?.toLowerCase().includes(rarity));
-            if (rarityMatch) return { name: card.name, cardId: rarityMatch.set_code };
+            if (rarityMatch) return { name: card.name, cardId: rarityMatch.set_code, setId: extractSetPrefix(rarityMatch.set_code) };
             const codeWithNum = setsInSet.find((s: any) => {
               const suffix = s.set_code?.split("-").pop() || "";
               return suffix.includes(cardNumber);
             });
-            if (codeWithNum) return { name: card.name, cardId: codeWithNum.set_code };
+            if (codeWithNum) return { name: card.name, cardId: codeWithNum.set_code, setId: extractSetPrefix(codeWithNum.set_code) };
           }
-          if (setsInSet.length > 0) return { name: card.name, cardId: setsInSet[0].set_code };
-          if (card.card_sets?.[0]) return { name: card.name, cardId: card.card_sets[0].set_code };
+          if (setsInSet.length > 0) return { name: card.name, cardId: setsInSet[0].set_code, setId: extractSetPrefix(setsInSet[0].set_code) };
+          if (card.card_sets?.[0]) {
+            const fallbackCode = card.card_sets[0].set_code;
+            return { name: card.name, cardId: fallbackCode, setId: extractSetPrefix(fallbackCode) };
+          }
         }
       }
       const fuzzyRes = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(name)}`);
@@ -183,7 +187,7 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
         if (fuzzyData?.data?.[0]) {
           const card = fuzzyData.data[0];
           const setInfo = card.card_sets?.find((s: any) => s.set_code?.startsWith(setId));
-          if (setInfo) return { name: card.name, cardId: setInfo.set_code };
+          if (setInfo) return { name: card.name, cardId: setInfo.set_code, setId: extractSetPrefix(setInfo.set_code) };
         }
       }
     } else if (game === "onepiece") {
@@ -192,32 +196,51 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
-          return { name: data[0].card_name, cardId: data[0].card_set_id };
+          const verifiedSetId = data[0].set_id || setId;
+          return { name: data[0].card_name, cardId: data[0].card_set_id, setId: verifiedSetId };
+        }
+      }
+      const searchByName = await fetch(`https://optcgapi.com/api/cards/search/${encodeURIComponent(name)}/`);
+      if (searchByName.ok) {
+        const searchData = await searchByName.json();
+        if (Array.isArray(searchData) && searchData.length > 0) {
+          const exact = searchData.find((c: any) => c.card_name?.toLowerCase() === name.toLowerCase());
+          const match = exact || searchData[0];
+          return { name: match.card_name, cardId: match.card_set_id, setId: match.set_id || setId };
         }
       }
     } else if (game === "mtg") {
       const res = await fetch(`https://api.scryfall.com/cards/${encodeURIComponent(setId)}/${encodeURIComponent(cardNumber)}`);
       if (res.ok) {
         const card = await res.json();
-        return { name: card.name, cardId: card.id };
+        return { name: card.name, cardId: card.id, setId: card.set || setId };
       }
       const searchRes = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${name}" set:${setId} cn:${cardNumber}`)}&unique=prints`);
       if (searchRes.ok) {
         const searchData = await searchRes.json();
         if (searchData?.data?.[0]) {
-          return { name: searchData.data[0].name, cardId: searchData.data[0].id };
+          return { name: searchData.data[0].name, cardId: searchData.data[0].id, setId: searchData.data[0].set || setId };
         }
       }
       const broadSearchRes = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${name}" set:${setId}`)}&unique=prints`);
       if (broadSearchRes.ok) {
         const broadData = await broadSearchRes.json();
         if (broadData?.data?.length === 1) {
-          return { name: broadData.data[0].name, cardId: broadData.data[0].id };
+          return { name: broadData.data[0].name, cardId: broadData.data[0].id, setId: broadData.data[0].set || setId };
         }
         if (broadData?.data?.length > 1) {
           const exactNum = broadData.data.find((c: any) => c.collector_number === cardNumber);
-          if (exactNum) return { name: exactNum.name, cardId: exactNum.id };
-          return { name: broadData.data[0].name, cardId: broadData.data[0].id };
+          if (exactNum) return { name: exactNum.name, cardId: exactNum.id, setId: exactNum.set || setId };
+          return { name: broadData.data[0].name, cardId: broadData.data[0].id, setId: broadData.data[0].set || setId };
+        }
+      }
+      const anySetSearch = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${name}"`)}&unique=prints&order=released&dir=desc`);
+      if (anySetSearch.ok) {
+        const anyData = await anySetSearch.json();
+        if (anyData?.data?.length > 0) {
+          const byNumber = anyData.data.find((c: any) => c.collector_number === cardNumber);
+          const match = byNumber || anyData.data[0];
+          return { name: match.name, cardId: match.id, setId: match.set };
         }
       }
     }
