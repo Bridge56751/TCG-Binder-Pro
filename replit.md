@@ -2,7 +2,7 @@
 
 ## Overview
 
-CardVault is a trading card game (TCG) collection tracker built as a React Native / Expo mobile application with an Express.js backend. It supports three card games: Pokémon, Yu-Gi-Oh!, and One Piece TCG. Users can browse card sets, track which cards they own, and scan physical cards using their phone camera with AI-powered identification (OpenAI vision). The app stores collection data locally on-device via AsyncStorage, while the backend provides TCG data APIs and AI card identification.
+CardVault is a trading card game (TCG) collection tracker built as a React Native / Expo mobile application with an Express.js backend. It supports four card games: Pokémon, Yu-Gi-Oh!, One Piece TCG, and Magic: The Gathering. Users can browse card sets, track which cards they own, and scan physical cards using their phone camera with AI-powered identification (OpenAI vision). The app stores collection data locally on-device via AsyncStorage, while the backend provides TCG data APIs and AI card identification.
 
 ## User Preferences
 
@@ -80,6 +80,6 @@ migrations/             # Drizzle migration output
 
 - **PostgreSQL**: Required database, connected via `DATABASE_URL` environment variable. Used by Drizzle ORM for user data and chat storage.
 - **OpenAI API (via Replit AI Integrations)**: Powers card identification from camera images and chat/voice/image features. Requires `AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL` environment variables.
-- **External TCG APIs**: The app fetches card/set data from external TCG data APIs (endpoints like `/api/tcg/:game/sets`). The actual external data source implementation is in `server/routes.ts`.
+- **External TCG APIs**: The app fetches card/set data from external free APIs — TCGdex (Pokemon), YGOProDeck (Yu-Gi-Oh!), OPTCG API (One Piece), and Scryfall (Magic: The Gathering). No API keys needed. Endpoints under `/api/tcg/:game/sets`. Implementation in `server/routes.ts`.
 - **AsyncStorage**: On-device persistence for the card collection (no server-side collection sync).
 - **Expo Services**: Used for font loading, camera, image picker, haptics, and other native capabilities.
