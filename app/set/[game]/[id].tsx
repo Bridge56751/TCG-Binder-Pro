@@ -26,7 +26,7 @@ type SortMode = "number" | "name";
 
 export default function SetDetailScreen() {
   const insets = useSafeAreaInsets();
-  const { game, id } = useLocalSearchParams<{ game: string; id: string }>();
+  const { game, id, lang } = useLocalSearchParams<{ game: string; id: string; lang?: string }>();
   const gameId = game as GameId;
   const { hasCard, setCards, removeCard } = useCollection();
   const { colors } = useTheme();
@@ -34,8 +34,13 @@ export default function SetDetailScreen() {
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const [sortMode, setSortMode] = useState<SortMode>("number");
 
+  const langParam = lang === "ja" ? "ja" : "en";
+  const queryPath = gameId === "pokemon" && langParam === "ja"
+    ? `/api/tcg/${game}/sets/${id}/cards?lang=ja`
+    : `/api/tcg/${game}/sets/${id}/cards`;
+
   const { data: setDetail, isLoading } = useQuery<SetDetail>({
-    queryKey: [`/api/tcg/${game}/sets/${id}/cards`],
+    queryKey: [queryPath],
   });
 
   const gameInfo = GAMES.find((g) => g.id === gameId);
@@ -322,7 +327,10 @@ export default function SetDetailScreen() {
                 isCollected={collected}
                 onPress={() => {
                   if (collected) {
-                    router.push(`/card/${game}/${item.id}`);
+                    const cardRoute = langParam === "ja"
+                      ? `/card/${game}/${item.id}?lang=ja`
+                      : `/card/${game}/${item.id}`;
+                    router.push(cardRoute);
                   }
                 }}
                 onLongPress={collected ? () => {

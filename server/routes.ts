@@ -9,12 +9,13 @@ const openai = new OpenAI({
 
 const setsCache: Record<string, any[]> = {};
 
-async function fetchSetsForGame(game: string): Promise<any[]> {
-  if (setsCache[game]) return setsCache[game];
+async function fetchSetsForGame(game: string, lang: string = "en"): Promise<any[]> {
+  const cacheKey = game === "pokemon" ? `${game}_${lang}` : game;
+  if (setsCache[cacheKey]) return setsCache[cacheKey];
   let sets: any[] = [];
   try {
     if (game === "pokemon") {
-      const res = await fetch("https://api.tcgdex.net/v2/en/sets");
+      const res = await fetch(`https://api.tcgdex.net/v2/${lang}/sets`);
       sets = await res.json();
     } else if (game === "yugioh") {
       const res = await fetch("https://db.ygoprodeck.com/api/v7/cardsets.php");
@@ -29,12 +30,12 @@ async function fetchSetsForGame(game: string): Promise<any[]> {
       sets = Array.isArray(data?.data) ? data.data : [];
     }
   } catch (_) {}
-  setsCache[game] = sets;
+  setsCache[cacheKey] = sets;
   return sets;
 }
 
-async function resolveSetId(game: string, aiSetId: string, aiSetName?: string): Promise<string | null> {
-  const sets = await fetchSetsForGame(game);
+async function resolveSetId(game: string, aiSetId: string, aiSetName?: string, lang: string = "en"): Promise<string | null> {
+  const sets = await fetchSetsForGame(game, lang);
   if (!sets.length) return null;
 
   const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -103,15 +104,16 @@ async function resolveSetId(game: string, aiSetId: string, aiSetName?: string): 
 async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId?: string } | null> {
   try {
     const { game, name, setId, cardNumber } = result;
+    const lang = result.language === "ja" ? "ja" : "en";
 
     if (game === "pokemon") {
       const cardId = `${setId}-${cardNumber}`;
-      const res = await fetch(`https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(cardId)}`);
+      const res = await fetch(`https://api.tcgdex.net/v2/${lang}/cards/${encodeURIComponent(cardId)}`);
       if (res.ok) {
         const card = await res.json();
         return { name: card.name, cardId: card.id };
       }
-      const setRes = await fetch(`https://api.tcgdex.net/v2/en/sets/${encodeURIComponent(setId)}`);
+      const setRes = await fetch(`https://api.tcgdex.net/v2/${lang}/sets/${encodeURIComponent(setId)}`);
       if (setRes.ok) {
         const setData = await setRes.json();
         if (setData.cards) {
@@ -206,6 +208,10 @@ SET CODE FORMATS:
 - One Piece: Codes like "OP01", "OP02", "ST01", "ST02", etc.
 - MTG: Three-letter codes like "lea" (Alpha), "2ed" (Beta), "dmu", "bro", "one", "mom", "woe", "mkm", "otj", "blb", "dsk", "fdn", etc.
 
+LANGUAGE DETECTION:
+- Determine the language of the card text. If the card has Japanese text (katakana, hiragana, or kanji), set language to "ja". Otherwise set language to "en".
+- For Japanese Pokemon cards, the set codes are different. Common Japanese set IDs include: "SV2a" (Pokemon Card 151), "SV1a", "SV1s", "SV1v", "SV2P", "SV3", "SV3a", "SV4", "SV4a", "SV4K", "SV5a", "SV5K", "SV5M", "SV6", "SV6a", "SV7", etc.
+
 Return a JSON object:
 {
   "game": "pokemon" | "yugioh" | "onepiece" | "mtg",
@@ -214,7 +220,8 @@ Return a JSON object:
   "setId": "set code in the format described above",
   "cardNumber": "collector number only (no set prefix)",
   "rarity": "Common/Uncommon/Rare/Holo Rare/Ultra Rare/Secret Rare/etc",
-  "estimatedValue": estimated USD market value as number
+  "estimatedValue": estimated USD market value as number,
+  "language": "en" or "ja"
 }
 
 If you cannot identify it, return: {"error": "Could not identify card"}
@@ -239,8 +246,9 @@ Return ONLY valid JSON.`,
       const result = JSON.parse(cleaned);
 
       if (!result.error && result.game && result.setId) {
+        const lang = result.language === "ja" ? "ja" : "en";
         try {
-          const resolvedSetId = await resolveSetId(result.game, result.setId, result.setName);
+          const resolvedSetId = await resolveSetId(result.game, result.setId, result.setName, lang);
           if (resolvedSetId) {
             result.setId = resolvedSetId;
           }
@@ -268,9 +276,10 @@ Return ONLY valid JSON.`,
 
   // ───── POKEMON (TCGdex API) ─────
 
-  app.get("/api/tcg/pokemon/sets", async (_req, res) => {
+  app.get("/api/tcg/pokemon/sets", async (req, res) => {
     try {
-      const response = await fetch("https://api.tcgdex.net/v2/en/sets");
+      const lang = req.query.lang === "ja" ? "ja" : "en";
+      const response = await fetch(`https://api.tcgdex.net/v2/${lang}/sets`);
       const sets = await response.json();
       const formatted = sets.map((s: any) => ({
         id: s.id,
@@ -291,7 +300,8 @@ Return ONLY valid JSON.`,
   app.get("/api/tcg/pokemon/sets/:id/cards", async (req, res) => {
     try {
       const { id } = req.params;
-      const response = await fetch(`https://api.tcgdex.net/v2/en/sets/${id}`);
+      const lang = req.query.lang === "ja" ? "ja" : "en";
+      const response = await fetch(`https://api.tcgdex.net/v2/${lang}/sets/${id}`);
       const setData = await response.json();
 
       if (!setData || !setData.cards) {
@@ -571,7 +581,8 @@ Return ONLY valid JSON.`,
   app.get("/api/tcg/pokemon/card/:cardId", async (req, res) => {
     try {
       const { cardId } = req.params;
-      const response = await fetch(`https://api.tcgdex.net/v2/en/cards/${cardId}`);
+      const lang = req.query.lang === "ja" ? "ja" : "en";
+      const response = await fetch(`https://api.tcgdex.net/v2/${lang}/cards/${cardId}`);
       if (!response.ok) return res.status(404).json({ error: "Card not found" });
       const c = await response.json();
 

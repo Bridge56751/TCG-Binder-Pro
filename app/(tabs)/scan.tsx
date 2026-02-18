@@ -137,7 +137,7 @@ export default function ScanScreen() {
             onPress: () =>
               router.push({
                 pathname: "/set/[game]/[id]",
-                params: { game: scanResult.game, id: scanResult.setId },
+                params: { game: scanResult.game, id: scanResult.setId, lang: scanResult.language || "en" },
               }),
           },
         ]

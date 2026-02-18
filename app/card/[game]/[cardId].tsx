@@ -40,7 +40,7 @@ const screenWidth = Dimensions.get("window").width;
 export default function CardDetailScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
-  const { game, cardId } = useLocalSearchParams<{ game: string; cardId: string }>();
+  const { game, cardId, lang } = useLocalSearchParams<{ game: string; cardId: string; lang?: string }>();
   const gameId = game as GameId;
   const { hasCard, removeCard } = useCollection();
   const topInset = Platform.OS === "web" ? 67 : insets.top;
@@ -69,8 +69,13 @@ export default function CardDetailScreen() {
     };
   });
 
+  const cardLang = lang === "ja" ? "ja" : "en";
+  const cardQueryPath = gameId === "pokemon" && cardLang === "ja"
+    ? `/api/tcg/${game}/card/${cardId}?lang=ja`
+    : `/api/tcg/${game}/card/${cardId}`;
+
   const { data: card, isLoading } = useQuery<CardDetail>({
-    queryKey: [`/api/tcg/${game}/card/${cardId}`],
+    queryKey: [cardQueryPath],
   });
 
   const onTrade = card ? isOnTradeList(tradeList, gameId, card.id) : false;
