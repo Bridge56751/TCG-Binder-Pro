@@ -602,12 +602,17 @@ Return ONLY valid JSON.`,
       const boosterSets = await setsRes.json();
       const starterDecks = await decksRes.json();
 
+      const getOnePieceCardImage = (setId: string) => {
+        const cleanId = setId.replace("-", "");
+        return `https://optcgapi.com/media/static/Card_Images/${cleanId}-001.jpg`;
+      };
+
       const formattedBoosters = (boosterSets as any[]).map((s: any) => ({
         id: s.set_id,
         name: s.set_name,
         game: "onepiece",
         totalCards: 0,
-        logo: null,
+        logo: getOnePieceCardImage(s.set_id),
         symbol: null,
         releaseDate: null,
       }));
@@ -617,7 +622,7 @@ Return ONLY valid JSON.`,
         name: s.structure_deck_name,
         game: "onepiece",
         totalCards: 0,
-        logo: null,
+        logo: getOnePieceCardImage(s.structure_deck_id),
         symbol: null,
         releaseDate: null,
       }));
