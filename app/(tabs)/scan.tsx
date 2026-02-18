@@ -227,6 +227,12 @@ export default function ScanScreen() {
         {imageUri ? (
           <Animated.View entering={FadeIn.duration(300)} style={[dynamicStyles.previewWrapper, { backgroundColor: colors.surfaceAlt }]}>
             <Image source={{ uri: imageUri }} style={dynamicStyles.preview} contentFit="contain" />
+            <View style={dynamicStyles.cardFrameOverlay} pointerEvents="none">
+              <View style={[dynamicStyles.frameCorner, dynamicStyles.frameTL, { borderColor: colors.tint }]} />
+              <View style={[dynamicStyles.frameCorner, dynamicStyles.frameTR, { borderColor: colors.tint }]} />
+              <View style={[dynamicStyles.frameCorner, dynamicStyles.frameBL, { borderColor: colors.tint }]} />
+              <View style={[dynamicStyles.frameCorner, dynamicStyles.frameBR, { borderColor: colors.tint }]} />
+            </View>
             {isScanning && (
               <View style={dynamicStyles.scanningOverlay}>
                 <ActivityIndicator size="large" color={colors.tint} />
@@ -452,6 +458,48 @@ function getDynamicStyles(colors: any) {
     },
     preview: {
       flex: 1,
+    },
+    cardFrameOverlay: {
+      position: "absolute",
+      top: "8%",
+      bottom: "8%",
+      left: "15%",
+      right: "15%",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    frameCorner: {
+      position: "absolute",
+      width: 24,
+      height: 24,
+    },
+    frameTL: {
+      top: 0,
+      left: 0,
+      borderTopWidth: 3,
+      borderLeftWidth: 3,
+      borderTopLeftRadius: 6,
+    },
+    frameTR: {
+      top: 0,
+      right: 0,
+      borderTopWidth: 3,
+      borderRightWidth: 3,
+      borderTopRightRadius: 6,
+    },
+    frameBL: {
+      bottom: 0,
+      left: 0,
+      borderBottomWidth: 3,
+      borderLeftWidth: 3,
+      borderBottomLeftRadius: 6,
+    },
+    frameBR: {
+      bottom: 0,
+      right: 0,
+      borderBottomWidth: 3,
+      borderRightWidth: 3,
+      borderBottomRightRadius: 6,
     },
     scanningOverlay: {
       ...StyleSheet.absoluteFillObject,
