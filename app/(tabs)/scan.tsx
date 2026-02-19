@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  TextInput,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
@@ -50,6 +51,10 @@ export default function ScanScreen() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [addQuantity, setAddQuantity] = useState(1);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editCardNumber, setEditCardNumber] = useState("");
+  const [isCorrecting, setIsCorrecting] = useState(false);
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 84 + 34 : 100;
@@ -154,6 +159,47 @@ export default function ScanScreen() {
     setScanResult(null);
     setIsScanning(false);
     setAddQuantity(1);
+    setIsEditing(false);
+    setEditName("");
+    setEditCardNumber("");
+  };
+
+  const startEditing = () => {
+    if (!scanResult) return;
+    setEditName(scanResult.englishName || scanResult.name || "");
+    setEditCardNumber(scanResult.cardNumber || "");
+    setIsEditing(true);
+  };
+
+  const submitCorrection = async () => {
+    if (!scanResult) return;
+    setIsCorrecting(true);
+    try {
+      const res = await apiRequest("POST", "/api/correct-card", {
+        game: scanResult.game,
+        name: editName.trim(),
+        cardNumber: editCardNumber.trim(),
+        setId: scanResult.setId,
+        language: scanResult.language || "en",
+      });
+      const data: CardIdentification = await res.json();
+      if (data.verified) {
+        setScanResult({
+          ...scanResult,
+          ...data,
+        });
+        setIsEditing(false);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        showToast("Card found!");
+      } else {
+        Alert.alert("No match found", "We couldn't find a card matching those details. Try adjusting the name or number.");
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+    } catch (error) {
+      Alert.alert("Error", "Failed to search for the card. Please try again.");
+    } finally {
+      setIsCorrecting(false);
+    }
   };
 
   const dynamicStyles = getDynamicStyles(colors);
@@ -258,17 +304,114 @@ export default function ScanScreen() {
         const ownedQty = alreadyOwned ? cardQuantity(scanResult.game, scanResult.setId, cardId) : 0;
         return (
         <Animated.View entering={FadeInDown.duration(400).springify()} style={[dynamicStyles.resultCard, { backgroundColor: colors.surface, borderColor: isVerified ? colors.cardBorder : colors.error + "40" }]}>
-          {!isVerified && (
+          {!isVerified && !isEditing && (
             <View style={{ backgroundColor: colors.error + "12", paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, marginBottom: 12, flexDirection: "row", alignItems: "center", gap: 10 }}>
               <Ionicons name="warning" size={20} color={colors.error} />
               <View style={{ flex: 1 }}>
                 <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 14, color: colors.error, marginBottom: 2 }}>Could not verify this card</Text>
                 <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 12, color: colors.textSecondary }}>
-                  The card couldn't be matched to a known card in the database. Try rescanning with better lighting or a clearer angle.
+                  Try editing the name or number below, or rescan with better lighting.
                 </Text>
               </View>
             </View>
           )}
+
+          {isEditing ? (
+            <View style={{ gap: 12 }}>
+              <View style={{ backgroundColor: colors.tint + "10", paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Ionicons name="pencil" size={16} color={colors.tint} />
+                <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 13, color: colors.tint }}>Edit card details to find the right match</Text>
+              </View>
+              <View style={{ gap: 8 }}>
+                <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textSecondary }}>Card Name</Text>
+                <TextInput
+                  style={{
+                    fontFamily: "DMSans_400Regular",
+                    fontSize: 15,
+                    color: colors.text,
+                    backgroundColor: colors.surfaceAlt,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: colors.cardBorder,
+                  }}
+                  value={editName}
+                  onChangeText={setEditName}
+                  placeholder="Enter card name"
+                  placeholderTextColor={colors.textTertiary}
+                  autoCapitalize="words"
+                  returnKeyType="next"
+                />
+              </View>
+              <View style={{ gap: 8 }}>
+                <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textSecondary }}>Card Number</Text>
+                <TextInput
+                  style={{
+                    fontFamily: "DMSans_400Regular",
+                    fontSize: 15,
+                    color: colors.text,
+                    backgroundColor: colors.surfaceAlt,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: colors.cardBorder,
+                  }}
+                  value={editCardNumber}
+                  onChangeText={setEditCardNumber}
+                  placeholder="e.g. 198, TG05, 025"
+                  placeholderTextColor={colors.textTertiary}
+                  returnKeyType="done"
+                  onSubmitEditing={submitCorrection}
+                />
+              </View>
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <Pressable
+                  style={({ pressed }) => ({
+                    flex: 1,
+                    flexDirection: "row" as const,
+                    alignItems: "center" as const,
+                    justifyContent: "center" as const,
+                    gap: 6,
+                    paddingVertical: 12,
+                    borderRadius: 10,
+                    backgroundColor: colors.surfaceAlt,
+                    opacity: pressed ? 0.8 : 1,
+                  })}
+                  onPress={() => setIsEditing(false)}
+                >
+                  <Ionicons name="close" size={18} color={colors.textSecondary} />
+                  <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 14, color: colors.textSecondary }}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => ({
+                    flex: 2,
+                    flexDirection: "row" as const,
+                    alignItems: "center" as const,
+                    justifyContent: "center" as const,
+                    gap: 6,
+                    paddingVertical: 12,
+                    borderRadius: 10,
+                    backgroundColor: colors.tint,
+                    opacity: pressed ? 0.9 : 1,
+                  })}
+                  onPress={submitCorrection}
+                  disabled={isCorrecting || (!editName.trim() && !editCardNumber.trim())}
+                >
+                  {isCorrecting ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Ionicons name="search" size={18} color="#FFFFFF" />
+                  )}
+                  <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 14, color: "#FFFFFF" }}>
+                    {isCorrecting ? "Searching..." : "Search"}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : (
+          <View style={{ gap: 14 }}>
           <View style={dynamicStyles.resultHeader}>
             <View style={dynamicStyles.resultInfo}>
               <Text style={[dynamicStyles.resultName, { color: colors.text }]}>
@@ -357,13 +500,41 @@ export default function ScanScreen() {
               </Pressable>
             </>
           ) : (
+            <View style={{ gap: 10 }}>
+              <Pressable
+                style={({ pressed }) => [dynamicStyles.addButton, { backgroundColor: colors.tint }, pressed && { opacity: 0.9 }]}
+                onPress={startEditing}
+              >
+                <Ionicons name="pencil" size={20} color="#FFFFFF" />
+                <Text style={dynamicStyles.addButtonText}>Edit Details</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [dynamicStyles.addButton, { backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.cardBorder }, pressed && { opacity: 0.9 }]}
+                onPress={resetScan}
+              >
+                <Ionicons name="refresh" size={18} color={colors.textSecondary} />
+                <Text style={[dynamicStyles.addButtonText, { color: colors.textSecondary }]}>Rescan Card</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {isVerified && (
             <Pressable
-              style={({ pressed }) => [dynamicStyles.addButton, { backgroundColor: colors.error }, pressed && { opacity: 0.9 }]}
-              onPress={resetScan}
+              style={({ pressed }) => ({
+                flexDirection: "row" as const,
+                alignItems: "center" as const,
+                justifyContent: "center" as const,
+                gap: 6,
+                paddingVertical: 10,
+                opacity: pressed ? 0.6 : 1,
+              })}
+              onPress={startEditing}
             >
-              <Ionicons name="refresh" size={20} color="#FFFFFF" />
-              <Text style={dynamicStyles.addButtonText}>Rescan Card</Text>
+              <Ionicons name="pencil" size={14} color={colors.textTertiary} />
+              <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textTertiary }}>Wrong card? Edit details</Text>
             </Pressable>
+          )}
+          </View>
           )}
         </Animated.View>
         );
