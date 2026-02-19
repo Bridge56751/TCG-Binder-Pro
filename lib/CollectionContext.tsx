@@ -12,11 +12,19 @@ import {
   isCardCollected,
   getCardQuantity,
 } from "./collection-storage";
+import { getCachedSets, type CachedSet } from "./card-cache";
 import { apiRequest, getApiUrl } from "./query-client";
 import { useAuth } from "./AuthContext";
 import { fetch } from "expo/fetch";
 
 type SyncStatus = "idle" | "syncing" | "error" | "success";
+
+export interface ProgressToastData {
+  setName: string;
+  collected: number;
+  total: number;
+  game: GameId;
+}
 
 interface CollectionContextValue {
   collection: CollectionData;
@@ -36,6 +44,8 @@ interface CollectionContextValue {
   lastSyncTime: number | null;
   exportCollection: () => Promise<string>;
   importCollection: (jsonData: string) => Promise<{ success: boolean; error?: string }>;
+  progressToast: ProgressToastData | null;
+  clearProgressToast: () => void;
 }
 
 const CollectionContext = createContext<CollectionContextValue | null>(null);
@@ -54,6 +64,8 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
   const syncRetryRef = useRef(0);
   const pendingSyncRef = useRef<CollectionData | null>(null);
   const isSyncingRef = useRef(false);
+  const [progressToast, setProgressToast] = useState<ProgressToastData | null>(null);
+  const progressToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const performSync = useCallback(async (data: CollectionData): Promise<boolean> => {
     try {
@@ -141,11 +153,30 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     }
   }, [user, loadCollection, loadFromCloud]);
 
+  const showProgressToast = useCallback(async (game: GameId, setId: string, updatedCollection: CollectionData) => {
+    try {
+      const cachedSets = await getCachedSets(game);
+      if (!cachedSets) return;
+      const setInfo = cachedSets.find((s: CachedSet) => s.id === setId);
+      if (!setInfo || !setInfo.totalCards) return;
+      const collected = getSetCollectedCount(updatedCollection, game, setId);
+      if (progressToastTimer.current) clearTimeout(progressToastTimer.current);
+      setProgressToast({ setName: setInfo.name, collected, total: setInfo.totalCards, game });
+      progressToastTimer.current = setTimeout(() => setProgressToast(null), 3000);
+    } catch {}
+  }, []);
+
+  const clearProgressToast = useCallback(() => {
+    if (progressToastTimer.current) clearTimeout(progressToastTimer.current);
+    setProgressToast(null);
+  }, []);
+
   const addCard = useCallback(async (game: GameId, setId: string, cardId: string, quantity: number = 1) => {
     const updated = await addCardToCollection(game, setId, cardId, quantity);
     setCollection(updated);
     debouncedSync(updated);
-  }, [debouncedSync]);
+    showProgressToast(game, setId, updated);
+  }, [debouncedSync, showProgressToast]);
 
   const removeCard = useCallback(async (game: GameId, setId: string, cardId: string) => {
     const updated = await removeCardFromCollection(game, setId, cardId);
@@ -231,8 +262,8 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
   }, [debouncedSync]);
 
   const value = useMemo(
-    () => ({ collection, loading, addCard, removeCard, removeOneCard, clearSet, totalCards, setCards, hasCard, cardQuantity, refresh: loadCollection, syncCollection, loadFromCloud, syncStatus, lastSyncTime, exportCollection, importCollection }),
-    [collection, loading, addCard, removeCard, removeOneCard, clearSet, totalCards, setCards, hasCard, cardQuantity, loadCollection, syncCollection, loadFromCloud, syncStatus, lastSyncTime, exportCollection, importCollection]
+    () => ({ collection, loading, addCard, removeCard, removeOneCard, clearSet, totalCards, setCards, hasCard, cardQuantity, refresh: loadCollection, syncCollection, loadFromCloud, syncStatus, lastSyncTime, exportCollection, importCollection, progressToast, clearProgressToast }),
+    [collection, loading, addCard, removeCard, removeOneCard, clearSet, totalCards, setCards, hasCard, cardQuantity, loadCollection, syncCollection, loadFromCloud, syncStatus, lastSyncTime, exportCollection, importCollection, progressToast, clearProgressToast]
   );
 
   return <CollectionContext.Provider value={value}>{children}</CollectionContext.Provider>;
