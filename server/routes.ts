@@ -1566,10 +1566,13 @@ Return ONLY valid JSON with your corrected identification:
     try {
       const { game, id } = req.params;
       const lang = req.query.lang === "ja" ? "ja" : "en";
+      const forceRefresh = req.query.forceRefresh === "true";
       const cacheKey = `${game}:${id}:${lang}`;
-      const cached = setPriceCache.get(cacheKey);
-      if (cached && Date.now() - cached.ts < SET_PRICE_CACHE_TTL) {
-        return res.json({ prices: cached.prices });
+      if (!forceRefresh) {
+        const cached = setPriceCache.get(cacheKey);
+        if (cached && Date.now() - cached.ts < SET_PRICE_CACHE_TTL) {
+          return res.json({ prices: cached.prices });
+        }
       }
 
       const prices: Record<string, number | null> = {};
@@ -1870,7 +1873,10 @@ Return ONLY valid JSON with your corrected identification:
 
   app.post("/api/collection/value", async (req, res) => {
     try {
-      const { cards } = req.body;
+      const { cards, forceRefresh } = req.body;
+      if (forceRefresh) {
+        priceCache.clear();
+      }
       if (!Array.isArray(cards) || cards.length === 0) {
         return res.status(400).json({ error: "Cards array is required" });
       }

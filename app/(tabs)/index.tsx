@@ -35,6 +35,15 @@ function formatCurrency(value: number): string {
   return "$" + value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
+function formatTimeAgo(timestamp: number): string {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ago`;
+}
+
 export default function CollectionScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -47,6 +56,8 @@ export default function CollectionScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [reorderMode, setReorderMode] = useState(false);
   const [customOrder, setCustomOrder] = useState<string[]>([]);
+  const [pricesUpdatedAt, setPricesUpdatedAt] = useState<number | null>(null);
+  const priceRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const allCards = useMemo(() => {
     const cards: { game: string; cardId: string }[] = [];
@@ -73,7 +84,7 @@ export default function CollectionScreen() {
 
   const [isOffline, setIsOffline] = useState(false);
 
-  const fetchCollectionValue = useCallback(() => {
+  const fetchCollectionValue = useCallback((forceRefresh = false) => {
     const currentCards = allCardsRef.current;
     if (currentCards.length === 0) {
       setValueData(null);
@@ -82,12 +93,13 @@ export default function CollectionScreen() {
     }
     const fetchId = ++valueFetchRef.current;
     setValueLoading(true);
-    apiRequest("POST", "/api/collection/value", { cards: currentCards })
+    apiRequest("POST", "/api/collection/value", { cards: currentCards, forceRefresh })
       .then(async (res) => {
         if (fetchId === valueFetchRef.current) {
           const data = await res.json();
           setValueData(data);
           setIsOffline(false);
+          setPricesUpdatedAt(Date.now());
           if (data.cards) cachePrices(data.cards);
         }
       })
@@ -115,7 +127,7 @@ export default function CollectionScreen() {
     setRefreshing(true);
     const startTime = Date.now();
     
-    fetchCollectionValue();
+    fetchCollectionValue(true);
     await queryClient.invalidateQueries({ queryKey: [`/api/tcg/${selectedGame}/sets`] });
     
     const elapsed = Date.now() - startTime;
@@ -135,6 +147,15 @@ export default function CollectionScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchCollectionValue();
+      priceRefreshTimerRef.current = setInterval(() => {
+        fetchCollectionValue(true);
+      }, 15 * 60 * 1000);
+      return () => {
+        if (priceRefreshTimerRef.current) {
+          clearInterval(priceRefreshTimerRef.current);
+          priceRefreshTimerRef.current = null;
+        }
+      };
     }, [fetchCollectionValue])
   );
 
@@ -411,6 +432,12 @@ export default function CollectionScreen() {
           />
         </View>
       </View>
+
+      {pricesUpdatedAt && (
+        <Text style={[styles.pricesUpdatedText, { color: colors.textTertiary }]}>
+          Prices updated {formatTimeAgo(pricesUpdatedAt)} — pull down to refresh
+        </Text>
+      )}
 
       <View style={styles.selectorRow}>
         <GameSelector selected={selectedGame} onSelect={setSelectedGame} />
@@ -714,6 +741,13 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 20,
     marginBottom: 16,
+  },
+  pricesUpdatedText: {
+    fontSize: 11,
+    textAlign: "center" as const,
+    marginTop: -12,
+    marginBottom: 14,
+    fontFamily: "DMSans_400Regular",
   },
   valueBannerWrapper: {
     paddingHorizontal: 20,
