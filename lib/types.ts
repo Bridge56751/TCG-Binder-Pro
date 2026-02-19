@@ -20,6 +20,7 @@ export interface TCGCard {
   id: string;
   localId: string;
   name: string;
+  englishName?: string | null;
   image: string | null;
 }
 
@@ -33,7 +34,9 @@ export interface SetDetail {
 export interface CardIdentification {
   game: GameId;
   name: string;
+  englishName?: string;
   setName: string;
+  englishSetName?: string;
   setId: string;
   cardNumber: string;
   rarity: string;
@@ -47,10 +50,12 @@ export interface CardDetail {
   id: string;
   localId: string;
   name: string;
+  englishName?: string | null;
   image: string | null;
   game: GameId;
   setId: string;
   setName: string;
+  englishSetName?: string | null;
   rarity: string | null;
   cardType: string | null;
   hp: number | null;

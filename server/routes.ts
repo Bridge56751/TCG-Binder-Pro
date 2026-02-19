@@ -634,6 +634,38 @@ Return ONLY valid JSON.`,
               }
               if (setName) result.setName = setName;
             }
+            if (result.language === "ja" && result.game === "pokemon" && verified.cardId) {
+              try {
+                const enRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${verified.cardId}`);
+                if (enRes.ok) {
+                  const enCard = await enRes.json();
+                  if (enCard.name) result.englishName = enCard.name;
+                  if (enCard.set?.name) result.englishSetName = enCard.set.name;
+                }
+              } catch {}
+              if (!result.englishName) {
+                const jaToEnSetMap: Record<string, string> = {
+                  "SV2a": "sv03.5", "SV1a": "sv01", "SV1s": "sv01", "SV1v": "sv01",
+                  "SV3": "sv02", "SV3a": "sv02", "SV4": "sv03", "SV4a": "sv03",
+                  "SV4K": "sv04", "SV5a": "sv04.5", "SV5K": "sv04", "SV5M": "sv04",
+                  "SV6": "sv05", "SV6a": "sv05", "SV7": "sv06", "SV7a": "sv06",
+                  "SV8": "sv07", "SV8a": "sv07",
+                };
+                const enSetId = jaToEnSetMap[result.setId];
+                if (enSetId && result.cardNumber) {
+                  const cleanNum = cleanCardNumber(result.cardNumber);
+                  const paddedNum = cleanNum.length < 3 ? cleanNum.padStart(3, "0") : cleanNum;
+                  try {
+                    const enMappedRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${enSetId}-${paddedNum}`);
+                    if (enMappedRes.ok) {
+                      const enMappedCard = await enMappedRes.json();
+                      if (enMappedCard.name) result.englishName = enMappedCard.name;
+                      if (enMappedCard.set?.name) result.englishSetName = enMappedCard.set.name;
+                    }
+                  } catch {}
+                }
+              }
+            }
           }
         } catch (e) {
           console.error("Error verifying card:", e);
@@ -688,10 +720,49 @@ Return ONLY valid JSON.`,
         return res.status(404).json({ error: "Set not found" });
       }
 
+      let englishNameMap: Record<string, string> = {};
+      if (lang === "ja") {
+        try {
+          const enResponse = await fetch(`https://api.tcgdex.net/v2/en/sets/${id}`);
+          if (enResponse.ok) {
+            const enData = await enResponse.json();
+            if (enData?.cards) {
+              for (const c of enData.cards) {
+                englishNameMap[c.localId] = c.name;
+              }
+            }
+          }
+        } catch {}
+        if (Object.keys(englishNameMap).length === 0) {
+          const jaToEnSetMap: Record<string, string> = {
+            "SV2a": "sv03.5", "SV1a": "sv01", "SV1s": "sv01", "SV1v": "sv01",
+            "SV3": "sv02", "SV3a": "sv02", "SV4": "sv03", "SV4a": "sv03",
+            "SV4K": "sv04", "SV5a": "sv04.5", "SV5K": "sv04", "SV5M": "sv04",
+            "SV6": "sv05", "SV6a": "sv05", "SV7": "sv06", "SV7a": "sv06",
+            "SV8": "sv07", "SV8a": "sv07",
+          };
+          const enSetId = jaToEnSetMap[id];
+          if (enSetId) {
+            try {
+              const enMappedRes = await fetch(`https://api.tcgdex.net/v2/en/sets/${enSetId}`);
+              if (enMappedRes.ok) {
+                const enMappedData = await enMappedRes.json();
+                if (enMappedData?.cards) {
+                  for (const c of enMappedData.cards) {
+                    englishNameMap[c.localId] = c.name;
+                  }
+                }
+              }
+            } catch {}
+          }
+        }
+      }
+
       const cards = setData.cards.map((c: any) => ({
         id: c.id,
         localId: c.localId,
         name: c.name,
+        englishName: lang === "ja" ? (englishNameMap[c.localId] || null) : null,
         image: c.image ? `${c.image}/low.png` : null,
       }));
 
@@ -971,6 +1042,41 @@ Return ONLY valid JSON.`,
       if (!response.ok) return res.status(404).json({ error: "Card not found" });
       const c = await response.json();
 
+      let englishName: string | null = null;
+      let englishSetName: string | null = null;
+      if (lang === "ja") {
+        try {
+          const enRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${cardId}`);
+          if (enRes.ok) {
+            const enCard = await enRes.json();
+            englishName = enCard.name || null;
+            englishSetName = enCard.set?.name || null;
+          }
+        } catch {}
+        if (!englishName) {
+          const jaToEnSetMap: Record<string, string> = {
+            "SV2a": "sv03.5", "SV1a": "sv01", "SV1s": "sv01", "SV1v": "sv01",
+            "SV3": "sv02", "SV3a": "sv02", "SV4": "sv03", "SV4a": "sv03",
+            "SV4K": "sv04", "SV5a": "sv04.5", "SV5K": "sv04", "SV5M": "sv04",
+            "SV6": "sv05", "SV6a": "sv05", "SV7": "sv06", "SV7a": "sv06",
+            "SV8": "sv07", "SV8a": "sv07",
+          };
+          const jaSetId = c.set?.id || "";
+          const localId = c.localId;
+          const enSetId = jaToEnSetMap[jaSetId];
+          if (enSetId && localId) {
+            try {
+              const enMappedRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${enSetId}-${localId}`);
+              if (enMappedRes.ok) {
+                const enMappedCard = await enMappedRes.json();
+                englishName = enMappedCard.name || null;
+                englishSetName = enMappedCard.set?.name || null;
+              }
+            } catch {}
+          }
+        }
+      }
+
       const tcgPrice = c.pricing?.tcgplayer;
       const cmPrice = c.pricing?.cardmarket;
       const priceData = tcgPrice?.holofoil || tcgPrice?.normal || tcgPrice?.reverseHolofoil;
@@ -982,10 +1088,12 @@ Return ONLY valid JSON.`,
         id: c.id,
         localId: c.localId,
         name: c.name,
+        englishName,
         image: c.image ? `${c.image}/high.png` : null,
         game: "pokemon",
         setId: c.set?.id || "",
         setName: c.set?.name || "",
+        englishSetName,
         rarity: c.rarity || null,
         cardType: c.stage || (c.types ? c.types.join(", ") : null),
         hp: c.hp || null,

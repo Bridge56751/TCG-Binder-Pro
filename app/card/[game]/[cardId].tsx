@@ -202,9 +202,16 @@ export default function CardDetailScreen() {
             <Ionicons name="chevron-back" size={24} color={colors.text} />
           </Pressable>
           <View style={styles.headerInfo}>
-            <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>{card.name}</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+              {card.englishName || card.name}
+            </Text>
+            {card.englishName && card.englishName !== card.name && (
+              <Text style={[styles.headerSub, { color: colors.textTertiary }]} numberOfLines={1}>
+                {card.name}
+              </Text>
+            )}
             <Text style={[styles.headerSub, { color: colors.textSecondary }]}>
-              {card.setName} - #{card.localId}
+              {card.englishSetName || card.setName} - #{card.localId}
             </Text>
           </View>
           {isInCollection && (

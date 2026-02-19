@@ -67,7 +67,7 @@ export default function SetDetailScreen() {
     }
 
     if (sortMode === "name") {
-      filtered.sort((a, b) => a.name.localeCompare(b.name));
+      filtered.sort((a, b) => (a.englishName || a.name).localeCompare(b.englishName || b.name));
     } else {
       filtered.sort((a, b) => {
         const numA = parseInt(a.localId, 10);
@@ -323,7 +323,7 @@ export default function SetDetailScreen() {
               <CardCell
                 cardId={item.id}
                 localId={item.localId}
-                name={item.name}
+                name={item.englishName || item.name}
                 imageUrl={item.image}
                 isCollected={collected}
                 quantity={qty}

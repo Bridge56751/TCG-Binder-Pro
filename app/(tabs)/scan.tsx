@@ -259,9 +259,16 @@ export default function ScanScreen() {
         <Animated.View entering={FadeInDown.duration(400).springify()} style={[dynamicStyles.resultCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           <View style={dynamicStyles.resultHeader}>
             <View style={dynamicStyles.resultInfo}>
-              <Text style={[dynamicStyles.resultName, { color: colors.text }]}>{scanResult.name}</Text>
+              <Text style={[dynamicStyles.resultName, { color: colors.text }]}>
+                {scanResult.englishName || scanResult.name}
+              </Text>
+              {scanResult.englishName && scanResult.englishName !== scanResult.name && (
+                <Text style={[dynamicStyles.resultSet, { color: colors.textTertiary }]}>
+                  {scanResult.name}
+                </Text>
+              )}
               <Text style={[dynamicStyles.resultSet, { color: colors.textSecondary }]}>
-                {scanResult.setName} - #{scanResult.cardNumber}
+                {scanResult.englishSetName || scanResult.setName} - #{scanResult.cardNumber}
               </Text>
               <View style={dynamicStyles.resultMeta}>
                 <View style={[dynamicStyles.badge, { backgroundColor: colors[scanResult.game] + "20" }]}>
