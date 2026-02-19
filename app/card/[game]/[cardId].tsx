@@ -96,7 +96,7 @@ export default function CardDetailScreen() {
   const { colors, isDark } = useTheme();
   const { game, cardId, lang } = useLocalSearchParams<{ game: string; cardId: string; lang?: string }>();
   const gameId = game as GameId;
-  const { hasCard, removeCard, cardQuantity } = useCollection();
+  const { hasCard, removeCard, addCard, cardQuantity } = useCollection();
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
 
@@ -291,6 +291,19 @@ export default function CardDetailScreen() {
               );
             })()}
           </View>
+
+          {!isInCollection && (
+            <Pressable
+              style={[styles.addBinderBtn, { backgroundColor: colors.tint }]}
+              onPress={async () => {
+                await addCard(gameId, card.setId, cardId || "");
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              }}
+            >
+              <Ionicons name="add-circle" size={20} color="#FFFFFF" />
+              <Text style={styles.addBinderBtnText}>Add to Binder</Text>
+            </Pressable>
+          )}
 
           {card.artist && (
             <View style={styles.artistRow}>
@@ -489,6 +502,20 @@ const styles = StyleSheet.create({
   badgeText: {
     fontFamily: "DMSans_600SemiBold",
     fontSize: 12,
+  },
+  addBinderBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginTop: 8,
+  },
+  addBinderBtnText: {
+    fontFamily: "DMSans_700Bold",
+    fontSize: 15,
+    color: "#FFFFFF",
   },
   artistRow: {
     flexDirection: "row",
