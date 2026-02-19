@@ -158,3 +158,19 @@ export function isCardCollected(
   }
   return false;
 }
+
+const SET_ORDER_KEY = "cardvault_set_order";
+
+export async function getSetOrder(game: GameId): Promise<string[]> {
+  try {
+    const data = await AsyncStorage.getItem(`${SET_ORDER_KEY}_${game}`);
+    if (data) return JSON.parse(data);
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveSetOrder(game: GameId, order: string[]): Promise<void> {
+  await AsyncStorage.setItem(`${SET_ORDER_KEY}_${game}`, JSON.stringify(order));
+}

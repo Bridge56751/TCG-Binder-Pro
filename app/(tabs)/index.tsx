@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
+import * as Haptics from "expo-haptics";
 import { useFocusEffect, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
@@ -20,6 +21,7 @@ import { GameSelector } from "@/components/GameSelector";
 import { SetCard } from "@/components/SetCard";
 import { StatCard } from "@/components/StatCard";
 import { cachePrices, cacheSets, getCachedPrices, getCachedSets } from "@/lib/card-cache";
+import { getSetOrder, saveSetOrder } from "@/lib/collection-storage";
 import type { GameId, TCGSet } from "@/lib/types";
 import { GAMES } from "@/lib/types";
 
@@ -43,6 +45,8 @@ export default function CollectionScreen() {
   const [valueLoading, setValueLoading] = useState(false);
   const valueFetchRef = useRef(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [reorderMode, setReorderMode] = useState(false);
+  const [customOrder, setCustomOrder] = useState<string[]>([]);
 
   const allCards = useMemo(() => {
     const cards: { game: string; cardId: string }[] = [];
@@ -177,11 +181,36 @@ export default function CollectionScreen() {
       (s) => (collection[selectedGame]?.[s.id]?.length || 0) > 0
     ) || [];
 
-  const inProgressSets = collectedSets.filter(
+  useEffect(() => {
+    getSetOrder(selectedGame).then(setCustomOrder);
+    setReorderMode(false);
+  }, [selectedGame]);
+
+  const inProgressSetsRaw = collectedSets.filter(
     (s) =>
       s.totalCards > 0 &&
       (collection[selectedGame]?.[s.id]?.length || 0) < s.totalCards
   );
+
+  const inProgressSets = useMemo(() => {
+    if (customOrder.length === 0) return inProgressSetsRaw;
+    const orderMap = new Map(customOrder.map((id, i) => [id, i]));
+    return [...inProgressSetsRaw].sort((a, b) => {
+      const ai = orderMap.get(a.id) ?? 9999;
+      const bi = orderMap.get(b.id) ?? 9999;
+      return ai - bi;
+    });
+  }, [inProgressSetsRaw, customOrder]);
+
+  const moveSet = useCallback(async (index: number, direction: -1 | 1) => {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= inProgressSets.length) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const newOrder = inProgressSets.map(s => s.id);
+    [newOrder[index], newOrder[newIndex]] = [newOrder[newIndex], newOrder[index]];
+    setCustomOrder(newOrder);
+    await saveSetOrder(selectedGame, newOrder);
+  }, [inProgressSets, selectedGame]);
 
   const completedSets = collectedSets.filter(
     (s) =>
@@ -550,20 +579,59 @@ export default function CollectionScreen() {
                 {inProgressSets.length}
               </Text>
             </View>
+            <View style={{ flex: 1 }} />
+            {inProgressSets.length > 1 && (
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setReorderMode(prev => !prev);
+                }}
+                hitSlop={8}
+              >
+                <Ionicons
+                  name={reorderMode ? "checkmark-circle" : "reorder-three"}
+                  size={22}
+                  color={reorderMode ? colors.success : colors.textTertiary}
+                />
+              </Pressable>
+            )}
           </View>
           <Text
             style={[styles.sectionSubtitle, { color: colors.textTertiary }]}
           >
-            Sets you're actively collecting
+            {reorderMode ? "Tap arrows to reorder" : "Sets you're actively collecting"}
           </Text>
           <View style={styles.setList}>
-            {inProgressSets.map((item) => (
-              <SetCard
-                key={`${item.game}-${item.id}`}
-                set={item}
-                collectedCount={setCards(selectedGame, item.id)}
-                onPress={() => navigateToSet(item.id)}
-              />
+            {inProgressSets.map((item, idx) => (
+              <View key={`${item.game}-${item.id}`} style={styles.reorderRow}>
+                {reorderMode && (
+                  <View style={styles.reorderControls}>
+                    <Pressable
+                      onPress={() => moveSet(idx, -1)}
+                      style={[styles.reorderButton, { backgroundColor: colors.surfaceAlt, opacity: idx === 0 ? 0.3 : 1 }]}
+                      hitSlop={4}
+                      disabled={idx === 0}
+                    >
+                      <Ionicons name="chevron-up" size={18} color={colors.text} />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => moveSet(idx, 1)}
+                      style={[styles.reorderButton, { backgroundColor: colors.surfaceAlt, opacity: idx === inProgressSets.length - 1 ? 0.3 : 1 }]}
+                      hitSlop={4}
+                      disabled={idx === inProgressSets.length - 1}
+                    >
+                      <Ionicons name="chevron-down" size={18} color={colors.text} />
+                    </Pressable>
+                  </View>
+                )}
+                <View style={[{ flex: 1 }, reorderMode && { marginLeft: -8 }]}>
+                  <SetCard
+                    set={item}
+                    collectedCount={setCards(selectedGame, item.id)}
+                    onPress={() => reorderMode ? undefined : navigateToSet(item.id)}
+                  />
+                </View>
+              </View>
             ))}
           </View>
         </View>
@@ -871,5 +939,22 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_600SemiBold",
     fontSize: 15,
     color: "#FFFFFF",
+  },
+  reorderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  reorderControls: {
+    gap: 4,
+    marginLeft: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reorderButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
