@@ -991,6 +991,108 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
         }
       }
 
+      if (!result.verified && !result.error && result.game) {
+        console.log(`[Retry] First pass failed verification for "${result.name}" (${result.game}), attempting second pass...`);
+        try {
+          const retryResponse = await openai.chat.completions.create({
+            model: "gpt-5.2",
+            messages: [
+              {
+                role: "system",
+                content: `You are an expert TCG card identifier. A previous attempt to identify this card produced: name="${result.name}", game="${result.game}", setId="${result.setId}", cardNumber="${result.cardNumber}". However, this could NOT be verified in the card database.
+
+The card might be a special variant (full art, SAR, alt art, secret rare, mega, ex, GX, V, VMAX, VSTAR, etc.) where the name or number was misread.
+
+LOOK AGAIN very carefully:
+1. RE-READ THE CARD NAME at the top — look at every letter. For full art cards, the name box is small and may be at the very top edge. Include any suffix (ex, EX, GX, V, VMAX, VSTAR, etc.)
+2. RE-READ THE COLLECTOR NUMBER at the bottom — zoom in mentally on the bottom-left or bottom-right area. The number might be hard to see against the art. Read ALL digits exactly.
+3. RECONSIDER THE SET — could the set code be different? Look for any set marking near the collector number.
+4. Check if you may have confused similar-looking characters (e.g., 8 vs 6, 1 vs 7, 5 vs S)
+
+Return ONLY valid JSON with your corrected identification:
+{
+  "game": "pokemon" | "yugioh" | "onepiece" | "mtg",
+  "name": "corrected card name",
+  "setName": "set name",
+  "setId": "corrected set code",
+  "cardNumber": "corrected collector number",
+  "rarity": "rarity",
+  "estimatedValue": number,
+  "language": "en" or "ja"
+}`,
+              },
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "image_url",
+                    image_url: { url: `data:image/jpeg;base64,${image}`, detail: "high" },
+                  },
+                  { type: "text", text: `Re-examine this card. The first read got name="${result.name}" number="${result.cardNumber}" set="${result.setId}" but it could not be verified. Please look again very carefully at the name, collector number, and set code. Pay special attention to any text that might be obscured by artwork or holographic effects.` },
+                ],
+              },
+            ],
+            max_completion_tokens: 600,
+          });
+
+          const retryContent = retryResponse.choices[0]?.message?.content || "{}";
+          const retryCleaned = retryContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+          const retryResult = JSON.parse(retryCleaned);
+
+          if (retryResult.cardNumber) {
+            retryResult.cardNumber = cleanCardNumber(retryResult.cardNumber);
+          }
+
+          console.log(`[Retry AI] name="${retryResult.name}" setId="${retryResult.setId}" num="${retryResult.cardNumber}"`);
+
+          const nameChanged = retryResult.name && retryResult.name !== result.name;
+          const numChanged = retryResult.cardNumber && retryResult.cardNumber !== result.cardNumber;
+          const setChanged = retryResult.setId && retryResult.setId !== result.setId;
+
+          if (nameChanged || numChanged || setChanged) {
+            const retryMerged = { ...result, ...retryResult };
+            const lang = retryMerged.language === "ja" ? "ja" : "en";
+
+            if (retryMerged.setId) {
+              try {
+                const resolvedSetId = await resolveSetId(retryMerged.game, retryMerged.setId, retryMerged.setName, lang);
+                if (resolvedSetId) retryMerged.setId = resolvedSetId;
+              } catch {}
+            }
+
+            try {
+              const retryDeep = await deepVerifyCard(retryMerged);
+              console.log(`[Retry DeepVerify] verified=${retryDeep.verified} name="${retryDeep.name}" cardId="${retryDeep.cardId}"`);
+
+              if (retryDeep.verified) {
+                result.verified = true;
+                result.name = retryDeep.name || retryMerged.name;
+                result.setId = retryDeep.setId || retryMerged.setId;
+                result.setName = retryMerged.setName || result.setName;
+                result.cardNumber = retryMerged.cardNumber || result.cardNumber;
+                result.rarity = retryMerged.rarity || result.rarity;
+                if (retryDeep.cardId) result.verifiedCardId = retryDeep.cardId;
+
+                if (result.language === "ja" && result.game === "pokemon" && retryDeep.cardId) {
+                  try {
+                    const enRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${retryDeep.cardId}`);
+                    if (enRes.ok) {
+                      const enCard = await enRes.json();
+                      if (enCard.name) result.englishName = enCard.name;
+                      if (enCard.set?.name) result.englishSetName = enCard.set.name;
+                    }
+                  } catch {}
+                }
+              }
+            } catch (e) {
+              console.error("Retry deep verify error:", e);
+            }
+          }
+        } catch (e) {
+          console.error("Retry identification error:", e);
+        }
+      }
+
       res.json(result);
     } catch (error) {
       console.error("Error identifying card:", error);
