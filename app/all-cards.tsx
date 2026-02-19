@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useQuery } from "@tanstack/react-query";
@@ -103,7 +103,11 @@ export default function AllCardsScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { collection, removeOneCard, cardQuantity } = useCollection();
-  const [filterGame, setFilterGame] = useState<GameId | "all">("all");
+  const { game: initialGame } = useLocalSearchParams<{ game?: string }>();
+  const validGames = GAMES.map((g) => g.id as string);
+  const [filterGame, setFilterGame] = useState<GameId | "all">(
+    initialGame && validGames.includes(initialGame) ? (initialGame as GameId) : "all"
+  );
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;

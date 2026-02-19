@@ -232,7 +232,7 @@ export default function CollectionScreen() {
         </View>
       </View>
 
-      <Pressable style={styles.statsRow} onPress={() => router.push("/all-cards")}>
+      <Pressable style={styles.statsRow} onPress={() => router.push({ pathname: "/all-cards", params: { game: selectedGame } })}>
         <StatCard
           icon="layers"
           label="Cards"
