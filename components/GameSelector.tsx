@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { ScrollView, Pressable, Text, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useTheme } from "@/lib/ThemeContext";
+import { useCollection } from "@/lib/CollectionContext";
 import type { GameId } from "@/lib/types";
 import { GAMES } from "@/lib/types";
 import * as Haptics from "expo-haptics";
@@ -20,13 +21,15 @@ const GAME_ICONS: Record<GameId, keyof typeof MaterialCommunityIcons.glyphMap> =
 
 export function GameSelector({ selected, onSelect }: GameSelectorProps) {
   const { colors } = useTheme();
+  const { enabledGames } = useCollection();
+  const filteredGames = useMemo(() => GAMES.filter(g => enabledGames.includes(g.id)), [enabledGames]);
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.container}
     >
-      {GAMES.map((game) => {
+      {filteredGames.map((game) => {
         const isSelected = selected === game.id;
         return (
           <Pressable

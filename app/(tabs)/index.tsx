@@ -48,7 +48,7 @@ export default function CollectionScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const [selectedGame, setSelectedGame] = useState<GameId>("pokemon");
-  const { totalCards, setCards, collection } = useCollection();
+  const { totalCards, setCards, collection, enabledGames } = useCollection();
 
   const [valueData, setValueData] = useState<ValueResponse | null>(null);
   const [valueLoading, setValueLoading] = useState(false);
@@ -59,9 +59,16 @@ export default function CollectionScreen() {
   const [pricesUpdatedAt, setPricesUpdatedAt] = useState<number | null>(null);
   const priceRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  useEffect(() => {
+    if (!enabledGames.includes(selectedGame) && enabledGames.length > 0) {
+      setSelectedGame(enabledGames[0]);
+    }
+  }, [enabledGames, selectedGame]);
+
   const allCards = useMemo(() => {
     const cards: { game: string; cardId: string }[] = [];
     for (const game of Object.keys(collection)) {
+      if (!enabledGames.includes(game as GameId)) continue;
       const gameSets = collection[game];
       if (!gameSets) continue;
       for (const setId of Object.keys(gameSets)) {
@@ -73,7 +80,7 @@ export default function CollectionScreen() {
       }
     }
     return cards;
-  }, [collection]);
+  }, [collection, enabledGames]);
 
   const allCardsRef = useRef(allCards);
   allCardsRef.current = allCards;

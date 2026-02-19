@@ -9,21 +9,31 @@ import {
   Platform,
   Alert,
   Linking,
+  Switch,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useTheme } from "@/lib/ThemeContext";
 import { useAuth } from "@/lib/AuthContext";
 import { useCollection } from "@/lib/CollectionContext";
+import { GAMES } from "@/lib/types";
+import type { GameId } from "@/lib/types";
 import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system";
 import * as DocumentPicker from "expo-document-picker";
+
+const GAME_ICONS: Record<GameId, keyof typeof MaterialCommunityIcons.glyphMap> = {
+  pokemon: "pokeball",
+  yugioh: "cards",
+  onepiece: "sail-boat",
+  mtg: "magic-staff",
+};
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { colors, toggle, isDark } = useTheme();
   const { user, logout, deleteAccount } = useAuth();
-  const { totalCards, syncCollection, syncStatus, lastSyncTime, exportCollection, importCollection } = useCollection();
+  const { totalCards, syncCollection, syncStatus, lastSyncTime, exportCollection, importCollection, enabledGames, toggleGame } = useCollection();
 
   const [submitting, setSubmitting] = useState(false);
   const [confirmingAction, setConfirmingAction] = useState<"logout" | "delete" | null>(null);
@@ -307,6 +317,46 @@ export default function SettingsScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+            CARD GAMES
+          </Text>
+          <Text style={[styles.sectionHint, { color: colors.textTertiary }]}>
+            Choose which games to show in your collection
+          </Text>
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+            {GAMES.map((game, index) => {
+              const isEnabled = enabledGames.includes(game.id);
+              const isLast = enabledGames.length <= 1 && isEnabled;
+              return (
+                <React.Fragment key={game.id}>
+                  {index > 0 && <View style={[styles.separator, { backgroundColor: colors.cardBorder }]} />}
+                  <View style={styles.menuItem}>
+                    <View style={[styles.menuIcon, { backgroundColor: game.color + "18" }]}>
+                      <MaterialCommunityIcons name={GAME_ICONS[game.id]} size={20} color={game.color} />
+                    </View>
+                    <View style={styles.menuContent}>
+                      <Text style={[styles.menuLabel, { color: colors.text }]}>{game.name}</Text>
+                    </View>
+                    <Switch
+                      value={isEnabled}
+                      onValueChange={() => {
+                        if (isLast) {
+                          Alert.alert("Can't Disable", "You need at least one game enabled.");
+                        } else {
+                          toggleGame(game.id);
+                        }
+                      }}
+                      trackColor={{ false: colors.surfaceAlt, true: game.color + "80" }}
+                      thumbColor={isEnabled ? game.color : colors.textTertiary}
+                    />
+                  </View>
+                </React.Fragment>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
             SUPPORT
           </Text>
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
@@ -489,6 +539,12 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_600SemiBold",
     letterSpacing: 0.8,
     marginBottom: 8,
+    marginLeft: 4,
+  },
+  sectionHint: {
+    fontSize: 13,
+    fontFamily: "DMSans_400Regular",
+    marginBottom: 10,
     marginLeft: 4,
   },
   card: {

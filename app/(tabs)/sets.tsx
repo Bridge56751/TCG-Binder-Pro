@@ -41,7 +41,13 @@ export default function SetsScreen() {
   const [searchMode, setSearchMode] = useState<SearchMode>("sets");
   const [cardResults, setCardResults] = useState<CardSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const { setCards } = useCollection();
+  const { setCards, enabledGames } = useCollection();
+
+  useEffect(() => {
+    if (!enabledGames.includes(selectedGame) && enabledGames.length > 0) {
+      setSelectedGame(enabledGames[0]);
+    }
+  }, [enabledGames, selectedGame]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setsQueryPath = selectedGame === "pokemon" && cardLang === "ja"
