@@ -19,7 +19,7 @@ import { apiRequest, queryClient } from "@/lib/query-client";
 import { GameSelector } from "@/components/GameSelector";
 import { SetCard } from "@/components/SetCard";
 import { StatCard } from "@/components/StatCard";
-import { cachePrices, cacheSets } from "@/lib/card-cache";
+import { cachePrices, cacheSets, getCachedPrices, getCachedSets } from "@/lib/card-cache";
 import type { GameId, TCGSet } from "@/lib/types";
 import { GAMES } from "@/lib/types";
 
@@ -67,6 +67,8 @@ export default function CollectionScreen() {
     return allCards.map(c => `${c.game}:${c.cardId}`).sort().join(",");
   }, [allCards]);
 
+  const [isOffline, setIsOffline] = useState(false);
+
   const fetchCollectionValue = useCallback(() => {
     const currentCards = allCardsRef.current;
     if (currentCards.length === 0) {
@@ -81,11 +83,24 @@ export default function CollectionScreen() {
         if (fetchId === valueFetchRef.current) {
           const data = await res.json();
           setValueData(data);
+          setIsOffline(false);
           if (data.cards) cachePrices(data.cards);
         }
       })
-      .catch(() => {
-        if (fetchId === valueFetchRef.current) setValueData(null);
+      .catch(async () => {
+        if (fetchId === valueFetchRef.current) {
+          setIsOffline(true);
+          const cached = await getCachedPrices();
+          const cachedCards = Object.entries(cached).map(([cardId, info]) => ({
+            cardId, name: info.name, price: info.price,
+          }));
+          if (cachedCards.length > 0) {
+            const total = cachedCards.reduce((sum, c) => sum + (c.price || 0), 0);
+            setValueData({ totalValue: total, cards: cachedCards, dailyChange: 0 });
+          } else {
+            setValueData(null);
+          }
+        }
       })
       .finally(() => {
         if (fetchId === valueFetchRef.current) setValueLoading(false);
@@ -119,7 +134,9 @@ export default function CollectionScreen() {
     }, [fetchCollectionValue])
   );
 
-  const { data: sets, isLoading } = useQuery<TCGSet[]>({
+  const [cachedSetsFallback, setCachedSetsFallback] = useState<TCGSet[]>([]);
+
+  const { data: sets, isLoading, isError: setsError } = useQuery<TCGSet[]>({
     queryKey: [`/api/tcg/${selectedGame}/sets`],
   });
 
@@ -128,8 +145,14 @@ export default function CollectionScreen() {
       cacheSets(selectedGame, sets.map(s => ({
         id: s.id, name: s.name, game: s.game || selectedGame, totalCards: s.totalCards, logo: s.logo
       })));
+    } else if (setsError || (!sets && !isLoading)) {
+      getCachedSets(selectedGame).then(cached => {
+        if (cached) setCachedSetsFallback(cached.map(s => ({ id: s.id, name: s.name, game: s.game, totalCards: s.totalCards, logo: s.logo })));
+      });
     }
-  }, [sets, selectedGame]);
+  }, [sets, selectedGame, setsError, isLoading]);
+
+  const effectiveSets = sets || (cachedSetsFallback.length > 0 ? cachedSetsFallback : undefined);
 
   const { data: japaneseSets } = useQuery<TCGSet[]>({
     queryKey: [`/api/tcg/pokemon/sets?lang=ja`],
@@ -142,12 +165,12 @@ export default function CollectionScreen() {
   }, [japaneseSets]);
 
   const combinedSets = useMemo(() => {
-    if (selectedGame !== "pokemon" || !japaneseSets) return sets || [];
-    const enSets = sets || [];
+    if (selectedGame !== "pokemon" || !japaneseSets) return effectiveSets || [];
+    const enSets = effectiveSets || [];
     const enIds = new Set(enSets.map((s) => s.id));
     const jaOnly = japaneseSets.filter((s) => !enIds.has(s.id));
     return [...enSets, ...jaOnly];
-  }, [sets, japaneseSets, selectedGame]);
+  }, [effectiveSets, japaneseSets, selectedGame]);
 
   const collectedSets =
     combinedSets.filter(
@@ -210,7 +233,7 @@ export default function CollectionScreen() {
     GAMES.find((g) => g.id === selectedGame)?.color || colors.tint;
 
   const navigateToSet = (setId: string) => {
-    const isJa = selectedGame === "pokemon" && japaneseSetIds.has(setId) && !(sets || []).find((s) => s.id === setId);
+    const isJa = selectedGame === "pokemon" && japaneseSetIds.has(setId) && !(effectiveSets || []).find((s) => s.id === setId);
     router.push({
       pathname: "/set/[game]/[id]",
       params: { game: selectedGame, id: setId, lang: isJa ? "ja" : "en" },
@@ -261,6 +284,15 @@ export default function CollectionScreen() {
           </View>
         </View>
       </View>
+
+      {isOffline && (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 20, marginBottom: 12, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.textTertiary + "18" }}>
+          <Ionicons name="cloud-offline-outline" size={16} color={colors.textSecondary} />
+          <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textSecondary, flex: 1 }}>
+            Offline mode - showing cached data
+          </Text>
+        </View>
+      )}
 
       <Pressable style={styles.statsRow} onPress={() => router.push({ pathname: "/all-cards", params: { game: selectedGame } })}>
         <StatCard
