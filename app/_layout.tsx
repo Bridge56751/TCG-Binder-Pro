@@ -12,6 +12,7 @@ import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import { ThemeProvider, useTheme } from "@/lib/ThemeContext";
 import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold } from "@expo-google-fonts/dm-sans";
 import { StatusBar } from "expo-status-bar";
+import { CollectionProgressToast } from "@/components/CollectionProgressToast";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -52,38 +53,41 @@ function RootLayoutNav() {
   }
 
   return (
-    <Stack screenOptions={{ headerBackTitle: "Back" }}>
-      <Stack.Screen name="auth" options={{ headerShown: false }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="set/[game]/[id]"
-        options={{
-          headerShown: false,
-          presentation: "card",
-        }}
-      />
-      <Stack.Screen
-        name="card/[game]/[cardId]"
-        options={{
-          headerShown: false,
-          presentation: "modal",
-        }}
-      />
-      <Stack.Screen
-        name="all-cards"
-        options={{
-          headerShown: false,
-          presentation: "card",
-        }}
-      />
-      <Stack.Screen
-        name="stats"
-        options={{
-          headerShown: false,
-          presentation: "card",
-        }}
-      />
-    </Stack>
+    <>
+      <CollectionProgressToast />
+      <Stack screenOptions={{ headerBackTitle: "Back" }}>
+        <Stack.Screen name="auth" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="set/[game]/[id]"
+          options={{
+            headerShown: false,
+            presentation: "card",
+          }}
+        />
+        <Stack.Screen
+          name="card/[game]/[cardId]"
+          options={{
+            headerShown: false,
+            presentation: "modal",
+          }}
+        />
+        <Stack.Screen
+          name="all-cards"
+          options={{
+            headerShown: false,
+            presentation: "card",
+          }}
+        />
+        <Stack.Screen
+          name="stats"
+          options={{
+            headerShown: false,
+            presentation: "card",
+          }}
+        />
+      </Stack>
+    </>
   );
 }
 
