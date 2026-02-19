@@ -130,6 +130,12 @@ function namesMatch(aiName: string, dbName: string): boolean {
   const b = normalize(dbName);
   if (a === b) return true;
   if (a.includes(b) || b.includes(a)) return true;
+
+  const stripSuffix = (s: string) => s.toLowerCase().replace(/\s*(ex|gx|v|vmax|vstar|mega|m\s).*$/i, "").trim();
+  const aBase = normalize(stripSuffix(aiName));
+  const bBase = normalize(stripSuffix(dbName));
+  if (aBase.length > 2 && bBase.length > 2 && (aBase === bBase || aBase.includes(bBase) || bBase.includes(aBase))) return true;
+
   const aWords = aiName.toLowerCase().split(/[\s\-]+/).filter(w => w.length > 2);
   const bWords = dbName.toLowerCase().split(/[\s\-]+/).filter(w => w.length > 2);
   if (aWords.length > 0 && bWords.length > 0) {
@@ -147,6 +153,7 @@ async function verifyPokemonCard(name: string, setId: string, rawCardNumber: str
 
   console.log(`[Pokemon Verify] name="${name}" setId="${setId}" cardNumber="${cardNumber}" variants=${JSON.stringify(numberVariants)} lang=${lang}`);
 
+  let numberOnlyFallback: { name: string; cardId?: string; setId?: string } | null = null;
   for (const num of numberVariants) {
     const directId = `${setId}-${num}`;
     try {
@@ -157,7 +164,10 @@ async function verifyPokemonCard(name: string, setId: string, rawCardNumber: str
           console.log(`[Pokemon Verify] EXACT HIT (name matches): ${directId} -> ${card.name} (${card.id})`);
           return { name: card.name, cardId: card.id, setId: extractPokemonSetId(card.id, setId) };
         } else {
-          console.log(`[Pokemon Verify] Number ${directId} exists but name mismatch: AI="${name}" DB="${card.name}" - skipping`);
+          console.log(`[Pokemon Verify] Number ${directId} exists but name mismatch: AI="${name}" DB="${card.name}" - saving as fallback`);
+          if (!numberOnlyFallback) {
+            numberOnlyFallback = { name: card.name, cardId: card.id, setId: extractPokemonSetId(card.id, setId) };
+          }
         }
       }
     } catch {}
@@ -239,6 +249,11 @@ async function verifyPokemonCard(name: string, setId: string, rawCardNumber: str
       }
     }
   } catch {}
+
+  if (numberOnlyFallback) {
+    console.log(`[Pokemon Verify] Using number-only fallback: ${numberOnlyFallback.cardId} (name was misread)`);
+    return numberOnlyFallback;
+  }
 
   console.log(`[Pokemon Verify] ALL STRATEGIES FAILED for "${name}" #${cardNumber} in ${setId}`);
   return null;
