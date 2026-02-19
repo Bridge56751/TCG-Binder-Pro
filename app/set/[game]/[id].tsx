@@ -43,6 +43,7 @@ export default function SetDetailScreen() {
   const [cardPrices, setCardPrices] = useState<Record<string, number | null>>({});
   const [pricesLoading, setPricesLoading] = useState(false);
   const pricesFetched = React.useRef(false);
+  const [addCardModal, setAddCardModal] = useState<{ id: string; name: string; localId: string } | null>(null);
 
   const langParam = lang === "ja" ? "ja" : "en";
   const queryPath = gameId === "pokemon" && langParam === "ja"
@@ -457,10 +458,14 @@ export default function SetDetailScreen() {
                 quantity={qty}
                 price={itemPrice}
                 onPress={() => {
-                  const cardRoute = langParam === "ja"
-                    ? `/card/${game}/${item.id}?lang=ja`
-                    : `/card/${game}/${item.id}`;
-                  router.push(cardRoute);
+                  if (!collected) {
+                    setAddCardModal({ id: item.id, name: item.englishName || item.name, localId: item.localId });
+                  } else {
+                    const cardRoute = langParam === "ja"
+                      ? `/card/${game}/${item.id}?lang=ja`
+                      : `/card/${game}/${item.id}`;
+                    router.push(cardRoute);
+                  }
                 }}
                 onLongPress={collected ? () => {
                   Alert.alert(
@@ -579,6 +584,54 @@ export default function SetDetailScreen() {
             }
           />
         </View>
+      </Modal>
+
+      <Modal
+        visible={addCardModal !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAddCardModal(null)}
+      >
+        <Pressable style={styles.addModalOverlay} onPress={() => setAddCardModal(null)}>
+          <Pressable style={[styles.addModalContent, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onPress={() => {}}>
+            <Text style={[styles.addModalTitle, { color: colors.text }]} numberOfLines={2}>
+              {addCardModal?.name}
+            </Text>
+            <Text style={[styles.addModalSubtitle, { color: colors.textTertiary }]}>
+              #{addCardModal?.localId}
+            </Text>
+            <View style={styles.addModalButtons}>
+              <Pressable
+                style={[styles.addModalBtn, { backgroundColor: colors.tint }]}
+                onPress={() => {
+                  if (addCardModal) {
+                    addCard(gameId, id || "", addCardModal.id);
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  }
+                  setAddCardModal(null);
+                }}
+              >
+                <Ionicons name="add-circle" size={18} color="#FFFFFF" />
+                <Text style={styles.addModalBtnText}>Add to Binder</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.addModalBtn, { backgroundColor: colors.surfaceAlt }]}
+                onPress={() => {
+                  if (addCardModal) {
+                    const cardRoute = langParam === "ja"
+                      ? `/card/${game}/${addCardModal.id}?lang=ja`
+                      : `/card/${game}/${addCardModal.id}`;
+                    router.push(cardRoute);
+                  }
+                  setAddCardModal(null);
+                }}
+              >
+                <Ionicons name="eye-outline" size={18} color={colors.text} />
+                <Text style={[styles.addModalBtnTextAlt, { color: colors.text }]}>View Details</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );
@@ -742,5 +795,52 @@ const styles = StyleSheet.create({
   quickAddEmptyText: {
     fontFamily: "DMSans_400Regular",
     fontSize: 14,
+  },
+  addModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 40,
+  },
+  addModalContent: {
+    width: "100%",
+    maxWidth: 300,
+    borderRadius: 20,
+    padding: 24,
+    alignItems: "center",
+    borderWidth: 1,
+    gap: 6,
+  },
+  addModalTitle: {
+    fontFamily: "DMSans_700Bold",
+    fontSize: 18,
+    textAlign: "center",
+  },
+  addModalSubtitle: {
+    fontFamily: "DMSans_400Regular",
+    fontSize: 14,
+    marginBottom: 16,
+  },
+  addModalButtons: {
+    width: "100%",
+    gap: 10,
+  },
+  addModalBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  addModalBtnText: {
+    fontFamily: "DMSans_700Bold",
+    fontSize: 15,
+    color: "#FFFFFF",
+  },
+  addModalBtnTextAlt: {
+    fontFamily: "DMSans_600SemiBold",
+    fontSize: 15,
   },
 });
