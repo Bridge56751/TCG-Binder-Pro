@@ -57,6 +57,44 @@ export async function removeCardFromCollection(
   return JSON.parse(JSON.stringify(collection));
 }
 
+export async function clearSetFromCollection(
+  game: GameId,
+  setId: string
+): Promise<CollectionData> {
+  const collection = await getCollection();
+  if (collection[game]?.[setId]) {
+    delete collection[game][setId];
+    if (Object.keys(collection[game]).length === 0) delete collection[game];
+  }
+  await saveCollection(collection);
+  return JSON.parse(JSON.stringify(collection));
+}
+
+export async function removeOneCardFromCollection(
+  game: GameId,
+  setId: string,
+  cardId: string
+): Promise<CollectionData> {
+  const collection = await getCollection();
+  if (collection[game]?.[setId]) {
+    const cardIdLower = cardId.toLowerCase();
+    const stripZeros = (s: string) => s.replace(/^0+/, "") || "0";
+    const idx = collection[game][setId].findIndex((id) => {
+      if (id === cardId || id.toLowerCase() === cardIdLower) return true;
+      const storedNum = id.toLowerCase().split("-").pop() || "";
+      const cardNum = cardIdLower.split("-").pop() || "";
+      return storedNum && cardNum && stripZeros(storedNum) === stripZeros(cardNum) && id.toLowerCase().startsWith(setId.toLowerCase());
+    });
+    if (idx !== -1) {
+      collection[game][setId].splice(idx, 1);
+      if (collection[game][setId].length === 0) delete collection[game][setId];
+      if (Object.keys(collection[game]).length === 0) delete collection[game];
+    }
+  }
+  await saveCollection(collection);
+  return JSON.parse(JSON.stringify(collection));
+}
+
 export function getCollectedCount(collection: CollectionData, game?: GameId): number {
   let count = 0;
   const games = game ? [game] : Object.keys(collection);
