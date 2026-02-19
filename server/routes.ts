@@ -1077,12 +1077,48 @@ Return ONLY valid JSON.`,
         }
       }
 
-      const tcgPrice = c.pricing?.tcgplayer;
-      const cmPrice = c.pricing?.cardmarket;
-      const priceData = tcgPrice?.holofoil || tcgPrice?.normal || tcgPrice?.reverseHolofoil;
-      const currentPrice = priceData?.marketPrice ?? priceData?.midPrice ?? cmPrice?.trend ?? null;
-      const priceLow = priceData?.lowPrice ?? cmPrice?.low ?? null;
-      const priceHigh = priceData?.highPrice ?? null;
+      let tcgPrice = c.pricing?.tcgplayer;
+      let cmPrice = c.pricing?.cardmarket;
+      let priceData = tcgPrice?.holofoil || tcgPrice?.normal || tcgPrice?.reverseHolofoil;
+      let currentPrice = priceData?.marketPrice ?? priceData?.midPrice ?? cmPrice?.trend ?? null;
+      let priceLow = priceData?.lowPrice ?? cmPrice?.low ?? null;
+      let priceHigh = priceData?.highPrice ?? null;
+
+      if (currentPrice == null && lang === "ja") {
+        try {
+          const enCardId = cardId;
+          const enPriceRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${enCardId}`);
+          let enPriceCard: any = null;
+          if (enPriceRes.ok) {
+            enPriceCard = await enPriceRes.json();
+          }
+          if (!enPriceCard?.pricing) {
+            const jaToEnSetMap: Record<string, string> = {
+              "SV2a": "sv03.5", "SV1a": "sv01", "SV1s": "sv01", "SV1v": "sv01",
+              "SV3": "sv02", "SV3a": "sv02", "SV4": "sv03", "SV4a": "sv03",
+              "SV4K": "sv04", "SV5a": "sv04.5", "SV5K": "sv04", "SV5M": "sv04",
+              "SV6": "sv05", "SV6a": "sv05", "SV7": "sv06", "SV7a": "sv06",
+              "SV8": "sv07", "SV8a": "sv07",
+            };
+            const jaSetId = c.set?.id || "";
+            const enSetId = jaToEnSetMap[jaSetId];
+            if (enSetId && c.localId) {
+              const enMappedRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${enSetId}-${c.localId}`);
+              if (enMappedRes.ok) {
+                enPriceCard = await enMappedRes.json();
+              }
+            }
+          }
+          if (enPriceCard?.pricing) {
+            tcgPrice = enPriceCard.pricing.tcgplayer;
+            cmPrice = enPriceCard.pricing.cardmarket;
+            priceData = tcgPrice?.holofoil || tcgPrice?.normal || tcgPrice?.reverseHolofoil;
+            currentPrice = priceData?.marketPrice ?? priceData?.midPrice ?? cmPrice?.trend ?? null;
+            priceLow = priceData?.lowPrice ?? cmPrice?.low ?? null;
+            priceHigh = priceData?.highPrice ?? null;
+          }
+        } catch {}
+      }
 
       res.json({
         id: c.id,
@@ -1232,34 +1268,54 @@ Return ONLY valid JSON.`,
         return res.status(400).json({ error: "Cards array is required" });
       }
 
+      const jaToEnSetMap: Record<string, string> = {
+        "SV2a": "sv03.5", "SV1a": "sv01", "SV1s": "sv01", "SV1v": "sv01",
+        "SV3": "sv02", "SV3a": "sv02", "SV4": "sv03", "SV4a": "sv03",
+        "SV4K": "sv04", "SV5a": "sv04.5", "SV5K": "sv04", "SV5M": "sv04",
+        "SV6": "sv05", "SV6a": "sv05", "SV7": "sv06", "SV7a": "sv06",
+        "SV8": "sv07", "SV8a": "sv07",
+      };
+
+      function extractPokemonPrice(c: any): number | null {
+        const tcgPrice = c.pricing?.tcgplayer;
+        const cmPrice = c.pricing?.cardmarket;
+        const priceData = tcgPrice?.holofoil || tcgPrice?.normal || tcgPrice?.reverseHolofoil;
+        return priceData?.marketPrice ?? priceData?.midPrice ?? cmPrice?.trend ?? null;
+      }
+
       async function fetchCardPrice(card: { game: string; cardId: string }): Promise<{ cardId: string; name: string; price: number | null }> {
         if (card.game === "pokemon") {
           const response = await fetch(`https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(card.cardId)}`);
           if (response.ok) {
             const c = await response.json();
-            const tcgPrice = c.pricing?.tcgplayer;
-            const cmPrice = c.pricing?.cardmarket;
-            const priceData = tcgPrice?.holofoil || tcgPrice?.normal || tcgPrice?.reverseHolofoil;
-            const price = priceData?.marketPrice ?? priceData?.midPrice ?? cmPrice?.trend ?? null;
-            return { cardId: card.cardId, name: c.name || card.cardId, price };
+            const price = extractPokemonPrice(c);
+            if (price != null) return { cardId: card.cardId, name: c.name || card.cardId, price };
           }
           const parts = card.cardId.split("-");
           if (parts.length >= 2) {
             const setCode = parts.slice(0, -1).join("-");
+            const localId = parts[parts.length - 1];
+            const enSetId = jaToEnSetMap[setCode];
+            if (enSetId) {
+              try {
+                const enRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${enSetId}-${localId}`);
+                if (enRes.ok) {
+                  const c = await enRes.json();
+                  const price = extractPokemonPrice(c);
+                  if (price != null) return { cardId: card.cardId, name: c.name || card.cardId, price };
+                }
+              } catch (_) {}
+            }
             try {
               const setRes = await fetch(`https://api.tcgdex.net/v2/en/sets/${encodeURIComponent(setCode)}`);
               if (setRes.ok) {
                 const setData = await setRes.json();
-                const localId = parts[parts.length - 1];
                 const match = setData.cards?.find((c: any) => c.localId === localId);
                 if (match) {
                   const cardRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(match.id)}`);
                   if (cardRes.ok) {
                     const c = await cardRes.json();
-                    const tcgPrice = c.pricing?.tcgplayer;
-                    const cmPrice = c.pricing?.cardmarket;
-                    const priceData = tcgPrice?.holofoil || tcgPrice?.normal || tcgPrice?.reverseHolofoil;
-                    const price = priceData?.marketPrice ?? priceData?.midPrice ?? cmPrice?.trend ?? null;
+                    const price = extractPokemonPrice(c);
                     return { cardId: card.cardId, name: c.name || card.cardId, price };
                   }
                 }
