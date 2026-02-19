@@ -40,6 +40,15 @@ export default function SetDetailScreen() {
   const [quickAddVisible, setQuickAddVisible] = useState(false);
   const [quickAddSearch, setQuickAddSearch] = useState("");
 
+  const langParam = lang === "ja" ? "ja" : "en";
+  const queryPath = gameId === "pokemon" && langParam === "ja"
+    ? `/api/tcg/${game}/sets/${id}/cards?lang=ja`
+    : `/api/tcg/${game}/sets/${id}/cards`;
+
+  const { data: setDetail, isLoading } = useQuery<SetDetail>({
+    queryKey: [queryPath],
+  });
+
   const handleResetSet = useCallback(() => {
     Alert.alert(
       "Reset Set",
@@ -97,15 +106,6 @@ export default function SetDetailScreen() {
         c.localId.toLowerCase().includes(q)
     );
   }, [setDetail?.cards, quickAddSearch]);
-
-  const langParam = lang === "ja" ? "ja" : "en";
-  const queryPath = gameId === "pokemon" && langParam === "ja"
-    ? `/api/tcg/${game}/sets/${id}/cards?lang=ja`
-    : `/api/tcg/${game}/sets/${id}/cards`;
-
-  const { data: setDetail, isLoading } = useQuery<SetDetail>({
-    queryKey: [queryPath],
-  });
 
   const gameInfo = GAMES.find((g) => g.id === gameId);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
