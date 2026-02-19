@@ -16,6 +16,7 @@ Preferred communication style: Simple, everyday language.
 - **Navigation structure**: Tab-based layout with four tabs (Collection, Scan, Sets, Settings) plus modal/card presentation screens for set details and card details
 - **State management**: React Context (`CollectionProvider`, `AuthProvider`) for collection and auth state, TanStack React Query for server data fetching and caching
 - **Local storage**: `@react-native-async-storage/async-storage` stores the user's card collection as a JSON structure keyed by game → set → card IDs. Cloud sync available for logged-in users via `/api/collection/sync`.
+- **Offline mode**: Card metadata (names, images, prices, set info) cached locally via `lib/card-cache.ts` using AsyncStorage. Card images cached on disk via expo-image `cachePolicy="disk"`. When API calls fail, the app falls back to cached data for prices, sets, and card names. An "Offline mode" banner appears when the API is unreachable.
 - **Authentication**: `AuthContext` manages user sessions (login/register/logout). Settings tab provides login/register UI and account management.
 - **Styling**: Plain React Native `StyleSheet` with a custom color system in `constants/colors.ts`. Uses DM Sans font family loaded via `@expo-google-fonts/dm-sans`.
 - **Key libraries**: expo-image for optimized image rendering, expo-haptics for tactile feedback, expo-camera/expo-image-picker for card scanning, react-native-reanimated for animations, react-native-chart-kit for card detail charts
