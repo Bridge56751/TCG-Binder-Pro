@@ -16,6 +16,8 @@ import { apiRequest, getApiUrl } from "./query-client";
 import { useAuth } from "./AuthContext";
 import { fetch } from "expo/fetch";
 
+type SyncStatus = "idle" | "syncing" | "error" | "success";
+
 interface CollectionContextValue {
   collection: CollectionData;
   loading: boolean;
@@ -30,30 +32,79 @@ interface CollectionContextValue {
   refresh: () => Promise<void>;
   syncCollection: () => Promise<void>;
   loadFromCloud: () => Promise<void>;
+  syncStatus: SyncStatus;
+  lastSyncTime: number | null;
+  exportCollection: () => Promise<string>;
+  importCollection: (jsonData: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const CollectionContext = createContext<CollectionContextValue | null>(null);
 
+const MAX_SYNC_RETRIES = 3;
+const SYNC_RETRY_DELAY = 2000;
+
 export function CollectionProvider({ children }: { children: ReactNode }) {
   const [collection, setCollection] = useState<CollectionData>({});
   const [loading, setLoading] = useState(true);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
+  const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
   const { user } = useAuth();
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevUserRef = useRef<string | null>(null);
+  const syncRetryRef = useRef(0);
+  const pendingSyncRef = useRef<CollectionData | null>(null);
+  const isSyncingRef = useRef(false);
 
-  const syncToServer = useCallback(async (data: CollectionData) => {
+  const performSync = useCallback(async (data: CollectionData): Promise<boolean> => {
     try {
+      setSyncStatus("syncing");
       await apiRequest("POST", "/api/collection/sync", { collection: data });
-    } catch {}
+      setSyncStatus("success");
+      setLastSyncTime(Date.now());
+      syncRetryRef.current = 0;
+      setTimeout(() => setSyncStatus((prev) => prev === "success" ? "idle" : prev), 3000);
+      return true;
+    } catch {
+      return false;
+    }
   }, []);
+
+  const processSync = useCallback(async (data: CollectionData) => {
+    if (isSyncingRef.current) {
+      pendingSyncRef.current = data;
+      return;
+    }
+    isSyncingRef.current = true;
+
+    let success = await performSync(data);
+
+    if (!success) {
+      for (let attempt = 1; attempt <= MAX_SYNC_RETRIES; attempt++) {
+        await new Promise((r) => setTimeout(r, SYNC_RETRY_DELAY * attempt));
+        success = await performSync(pendingSyncRef.current || data);
+        if (success) break;
+      }
+      if (!success) {
+        setSyncStatus("error");
+      }
+    }
+
+    isSyncingRef.current = false;
+
+    if (pendingSyncRef.current) {
+      const pending = pendingSyncRef.current;
+      pendingSyncRef.current = null;
+      processSync(pending);
+    }
+  }, [performSync]);
 
   const debouncedSync = useCallback((data: CollectionData) => {
     if (!user) return;
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
     syncTimeoutRef.current = setTimeout(() => {
-      syncToServer(data);
+      processSync(data);
     }, 1500);
-  }, [user, syncToServer]);
+  }, [user, processSync]);
 
   const loadCollection = useCallback(async () => {
     const data = await getCollection();
@@ -137,11 +188,51 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
   const syncCollection = useCallback(async () => {
     const currentData = await getCollection();
     await apiRequest("POST", "/api/collection/sync", { collection: currentData });
+    setLastSyncTime(Date.now());
+    setSyncStatus("success");
+    setTimeout(() => setSyncStatus((prev) => prev === "success" ? "idle" : prev), 3000);
   }, []);
 
+  const exportCollection = useCallback(async () => {
+    const data = await getCollection();
+    return JSON.stringify({
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      collection: data,
+    }, null, 2);
+  }, []);
+
+  const importCollection = useCallback(async (jsonData: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const parsed = JSON.parse(jsonData);
+      let collectionData: CollectionData;
+
+      if (parsed.version && parsed.collection) {
+        collectionData = parsed.collection;
+      } else if (typeof parsed === "object" && !Array.isArray(parsed)) {
+        collectionData = parsed;
+      } else {
+        return { success: false, error: "Invalid backup format" };
+      }
+
+      for (const game of Object.keys(collectionData)) {
+        if (typeof collectionData[game] !== "object") {
+          return { success: false, error: "Invalid collection structure" };
+        }
+      }
+
+      await saveCollection(collectionData);
+      setCollection(collectionData);
+      debouncedSync(collectionData);
+      return { success: true };
+    } catch {
+      return { success: false, error: "Could not parse backup file" };
+    }
+  }, [debouncedSync]);
+
   const value = useMemo(
-    () => ({ collection, loading, addCard, removeCard, removeOneCard, clearSet, totalCards, setCards, hasCard, cardQuantity, refresh: loadCollection, syncCollection, loadFromCloud }),
-    [collection, loading, addCard, removeCard, removeOneCard, clearSet, totalCards, setCards, hasCard, cardQuantity, loadCollection, syncCollection, loadFromCloud]
+    () => ({ collection, loading, addCard, removeCard, removeOneCard, clearSet, totalCards, setCards, hasCard, cardQuantity, refresh: loadCollection, syncCollection, loadFromCloud, syncStatus, lastSyncTime, exportCollection, importCollection }),
+    [collection, loading, addCard, removeCard, removeOneCard, clearSet, totalCards, setCards, hasCard, cardQuantity, loadCollection, syncCollection, loadFromCloud, syncStatus, lastSyncTime, exportCollection, importCollection]
   );
 
   return <CollectionContext.Provider value={value}>{children}</CollectionContext.Provider>;

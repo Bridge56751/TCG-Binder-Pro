@@ -15,15 +15,126 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/lib/ThemeContext";
 import { useAuth } from "@/lib/AuthContext";
 import { useCollection } from "@/lib/CollectionContext";
+import * as Sharing from "expo-sharing";
+import * as FileSystem from "expo-file-system";
+import * as DocumentPicker from "expo-document-picker";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { colors, toggle, isDark } = useTheme();
   const { user, logout, deleteAccount } = useAuth();
-  const { totalCards, syncCollection } = useCollection();
+  const { totalCards, syncCollection, syncStatus, lastSyncTime, exportCollection, importCollection } = useCollection();
 
   const [submitting, setSubmitting] = useState(false);
   const [confirmingAction, setConfirmingAction] = useState<"logout" | "delete" | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+
+  const formatTimeAgo = (timestamp: number) => {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 60) return "just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const jsonData = await exportCollection();
+      const fileName = `cardvault-backup-${new Date().toISOString().split("T")[0]}.json`;
+
+      if (Platform.OS === "web") {
+        const blob = new Blob([jsonData], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+        Alert.alert("Exported", "Backup file has been downloaded.");
+      } else {
+        const fileUri = FileSystem.documentDirectory + fileName;
+        await FileSystem.writeAsStringAsync(fileUri, jsonData);
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(fileUri, {
+            mimeType: "application/json",
+            dialogTitle: "Export CardVault Backup",
+          });
+        } else {
+          Alert.alert("Exported", "Backup saved to app storage.");
+        }
+      }
+    } catch {
+      Alert.alert("Error", "Failed to export backup.");
+    }
+    setExporting(false);
+  };
+
+  const handleImport = async () => {
+    Alert.alert(
+      "Restore from Backup",
+      "This will replace your current collection with the backup data. Are you sure?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Restore",
+          style: "destructive",
+          onPress: async () => {
+            setImporting(true);
+            try {
+              if (Platform.OS === "web") {
+                const input = document.createElement("input");
+                input.type = "file";
+                input.accept = ".json";
+                input.onchange = async (e: any) => {
+                  const file = e.target?.files?.[0];
+                  if (!file) { setImporting(false); return; }
+                  const reader = new FileReader();
+                  reader.onload = async (ev) => {
+                    const text = ev.target?.result as string;
+                    const result = await importCollection(text);
+                    if (result.success) {
+                      Alert.alert("Restored", "Your collection has been restored from backup.");
+                    } else {
+                      Alert.alert("Error", result.error || "Failed to restore backup.");
+                    }
+                    setImporting(false);
+                  };
+                  reader.readAsText(file);
+                };
+                input.click();
+              } else {
+                const result = await DocumentPicker.getDocumentAsync({
+                  type: "application/json",
+                  copyToCacheDirectory: true,
+                });
+                if (result.canceled || !result.assets?.[0]) {
+                  setImporting(false);
+                  return;
+                }
+                const fileUri = result.assets[0].uri;
+                const text = await FileSystem.readAsStringAsync(fileUri);
+                const importResult = await importCollection(text);
+                if (importResult.success) {
+                  Alert.alert("Restored", "Your collection has been restored from backup.");
+                } else {
+                  Alert.alert("Error", importResult.error || "Failed to restore backup.");
+                }
+                setImporting(false);
+              }
+            } catch {
+              Alert.alert("Error", "Failed to read backup file.");
+              setImporting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
@@ -101,10 +212,69 @@ export default function SettingsScreen() {
                   Save to Cloud
                 </Text>
                 <Text style={[styles.menuHint, { color: colors.textSecondary }]}>
-                  Back up your collection
+                  {syncStatus === "syncing"
+                    ? "Syncing..."
+                    : syncStatus === "error"
+                    ? "Sync failed - tap to retry"
+                    : syncStatus === "success"
+                    ? "Just synced"
+                    : lastSyncTime
+                    ? `Last synced ${formatTimeAgo(lastSyncTime)}`
+                    : "Back up your collection"}
                 </Text>
               </View>
               {submitting ? (
+                <ActivityIndicator size="small" color={colors.tint} />
+              ) : syncStatus === "syncing" ? (
+                <ActivityIndicator size="small" color={colors.success} />
+              ) : syncStatus === "error" ? (
+                <Ionicons name="alert-circle" size={18} color={colors.error} />
+              ) : syncStatus === "success" ? (
+                <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+              ) : (
+                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+              )}
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+            DATA MANAGEMENT
+          </Text>
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+            <Pressable style={styles.menuItem} onPress={handleExport} disabled={exporting}>
+              <View style={[styles.menuIcon, { backgroundColor: colors.tint + "18" }]}>
+                <Ionicons name="download-outline" size={20} color={colors.tint} />
+              </View>
+              <View style={styles.menuContent}>
+                <Text style={[styles.menuLabel, { color: colors.text }]}>
+                  Export Backup
+                </Text>
+                <Text style={[styles.menuHint, { color: colors.textSecondary }]}>
+                  Save collection as a file
+                </Text>
+              </View>
+              {exporting ? (
+                <ActivityIndicator size="small" color={colors.tint} />
+              ) : (
+                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+              )}
+            </Pressable>
+            <View style={[styles.separator, { backgroundColor: colors.cardBorder }]} />
+            <Pressable style={styles.menuItem} onPress={handleImport} disabled={importing}>
+              <View style={[styles.menuIcon, { backgroundColor: colors.tint + "18" }]}>
+                <Ionicons name="push-outline" size={20} color={colors.tint} />
+              </View>
+              <View style={styles.menuContent}>
+                <Text style={[styles.menuLabel, { color: colors.text }]}>
+                  Restore from Backup
+                </Text>
+                <Text style={[styles.menuHint, { color: colors.textSecondary }]}>
+                  Import a previously exported file
+                </Text>
+              </View>
+              {importing ? (
                 <ActivityIndicator size="small" color={colors.tint} />
               ) : (
                 <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
