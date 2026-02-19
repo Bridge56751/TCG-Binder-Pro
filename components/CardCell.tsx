@@ -17,7 +17,7 @@ interface CardCellProps {
   onLongPress?: () => void;
 }
 
-export function CardCell({ cardId, localId, name, imageUrl, isCollected, quantity, price, selected, onPress, onLongPress }: CardCellProps) {
+export const CardCell = React.memo(function CardCell({ cardId, localId, name, imageUrl, isCollected, quantity, price, selected, onPress, onLongPress }: CardCellProps) {
   const { colors } = useTheme();
   return (
     <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={400} style={styles.container}>
@@ -76,7 +76,7 @@ export function CardCell({ cardId, localId, name, imageUrl, isCollected, quantit
       </Text>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {

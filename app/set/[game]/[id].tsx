@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
   StyleSheet,
   Text,
@@ -35,7 +35,7 @@ export default function SetDetailScreen() {
   const insets = useSafeAreaInsets();
   const { game, id, lang } = useLocalSearchParams<{ game: string; id: string; lang?: string }>();
   const gameId = game as GameId;
-  const { hasCard, setCards, removeCard, removeOneCard, addCard, cardQuantity } = useCollection();
+  const { collection, hasCard, setCards, removeCard, removeOneCard, addCard, cardQuantity } = useCollection();
   const { colors } = useTheme();
 
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
@@ -50,6 +50,7 @@ export default function SetDetailScreen() {
   const [offlineData, setOfflineData] = useState<SetDetail | null>(null);
   const [isOffline, setIsOffline] = useState(false);
   const pricesFetched = React.useRef(false);
+  const isAddingRef = useRef(false);
 
   const queryPath = `/api/tcg/${game}/sets/${id}/cards`;
 
@@ -155,8 +156,16 @@ export default function SetDetailScreen() {
 
   const handleQuickAdd = useCallback(
     async (cardId: string) => {
-      await addCard(gameId, id || "", cardId);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (isAddingRef.current) return;
+      isAddingRef.current = true;
+      try {
+        await addCard(gameId, id || "", cardId);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } finally {
+        setTimeout(() => {
+          isAddingRef.current = false;
+        }, 300);
+      }
     },
     [addCard, gameId, id]
   );
@@ -241,16 +250,30 @@ export default function SetDetailScreen() {
   const totalCards = activeData?.totalCards || 0;
   const progress = totalCards > 0 ? collectedCount / totalCards : 0;
 
+  const setCollectionMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    const gameData = collection[gameId];
+    if (gameData) {
+      const setData = gameData[id || ""];
+      if (Array.isArray(setData)) {
+        for (const cardId of setData) {
+          map[cardId] = (map[cardId] || 0) + 1;
+        }
+      }
+    }
+    return map;
+  }, [collection, gameId, id]);
+
   const filteredAndSortedCards = useMemo(() => {
     const allCards = activeData?.cards || [];
 
     let filtered: TCGCard[];
     switch (filterMode) {
       case "collected":
-        filtered = allCards.filter((card) => hasCard(gameId, id || "", card.id));
+        filtered = allCards.filter((card) => (setCollectionMap[card.id] || 0) > 0);
         break;
       case "missing":
-        filtered = allCards.filter((card) => !hasCard(gameId, id || "", card.id));
+        filtered = allCards.filter((card) => !(setCollectionMap[card.id] || 0));
         break;
       default:
         filtered = [...allCards];
@@ -276,7 +299,7 @@ export default function SetDetailScreen() {
     }
 
     return filtered;
-  }, [activeData?.cards, filterMode, sortMode, gameId, id, hasCard, cardPrices]);
+  }, [activeData?.cards, filterMode, sortMode, setCollectionMap, cardPrices]);
 
   const dynamicStyles = useMemo(
     () =>
@@ -550,8 +573,8 @@ export default function SetDetailScreen() {
         ListHeaderComponent={renderHeader}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.tint} colors={[colors.tint]} />}
         renderItem={({ item }) => {
-          const collected = hasCard(gameId, id || "", item.id);
-          const qty = collected ? cardQuantity(gameId, id || "", item.id) : 0;
+          const qty = setCollectionMap[item.id] || 0;
+          const collected = qty > 0;
           const itemPrice = sortMode === "value" ? (cardPrices[item.id] ?? (item as any).price ?? null) : undefined;
           const isSelected = selectedCards.has(item.id);
           return (
@@ -644,8 +667,7 @@ export default function SetDetailScreen() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 40 }}
             renderItem={({ item }) => {
-              const collected = hasCard(gameId, id || "", item.id);
-              const qty = collected ? cardQuantity(gameId, id || "", item.id) : 0;
+              const qty = setCollectionMap[item.id] || 0;
               return (
                 <View style={[styles.quickAddRow, { borderBottomColor: colors.cardBorder }]}>
                   <View style={styles.quickAddInfo}>
