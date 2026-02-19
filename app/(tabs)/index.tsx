@@ -346,9 +346,12 @@ export default function CollectionScreen() {
       </View>
 
       <View style={styles.statsDashboard}>
-        <Text style={[styles.dashboardTitle, { color: colors.text }]}>
-          Collection Stats
-        </Text>
+        <Pressable style={styles.dashboardTitleRow} onPress={() => router.push("/stats")}>
+          <Text style={[styles.dashboardTitle, { color: colors.text }]}>
+            Collection Stats
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+        </Pressable>
         <View style={styles.dashboardGrid}>
           <View
             style={[
@@ -674,6 +677,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 20,
     gap: 12,
+  },
+  dashboardTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   dashboardTitle: {
     fontFamily: "DMSans_700Bold",
