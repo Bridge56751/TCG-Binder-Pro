@@ -178,7 +178,7 @@ async function verifyPokemonCard(name: string, setId: string, rawCardNumber: str
       }
     }
   } catch {}
-  console.log(`[Pokemon Verify] Card not found in set ${setId}, doing global search by name...`);
+  console.log(`[Pokemon Verify] Card not found in set ${setId}, doing global search by name+number...`);
 
   try {
     const searchByName = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(name)}`);
@@ -198,24 +198,6 @@ async function verifyPokemonCard(name: string, setId: string, rawCardNumber: str
           console.log(`[Pokemon Verify] GLOBAL found in original set: ${inOriginalSet.name} (${inOriginalSet.id})`);
           return { name: inOriginalSet.name, cardId: inOriginalSet.id, setId: extractPokemonSetId(inOriginalSet.id, setId) };
         }
-        const cardNum = parseInt(cardNumber, 10);
-        if (!isNaN(cardNum)) {
-          let closest: any = null;
-          let closestDist = Infinity;
-          for (const c of searchData) {
-            const localNum = parseInt(c.localId, 10);
-            if (!isNaN(localNum)) {
-              const dist = Math.abs(localNum - cardNum);
-              if (dist < closestDist) { closest = c; closestDist = dist; }
-            }
-          }
-          if (closest && closestDist <= 5) {
-            console.log(`[Pokemon Verify] GLOBAL closest number match: ${closest.name} (${closest.id}), dist=${closestDist}`);
-            return { name: closest.name, cardId: closest.id, setId: extractPokemonSetId(closest.id, setId) };
-          }
-        }
-        console.log(`[Pokemon Verify] GLOBAL fallback to first result: ${searchData[0].name} (${searchData[0].id})`);
-        return { name: searchData[0].name, cardId: searchData[0].id, setId: extractPokemonSetId(searchData[0].id, setId) };
       }
     }
   } catch {}
@@ -609,10 +591,12 @@ Return ONLY valid JSON.`,
           console.error("Error resolving set ID:", e);
         }
 
+        result.verified = false;
         try {
           const verified = await verifyCardInDatabase(result);
           if (verified) {
             console.log(`[Verified] name="${verified.name}" cardId="${verified.cardId}" setId="${verified.setId}"`);
+            result.verified = true;
             result.name = verified.name || result.name;
             if (verified.cardId) result.verifiedCardId = verified.cardId;
             if (verified.setId) {

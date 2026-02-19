@@ -252,11 +252,23 @@ export default function ScanScreen() {
       </View>
 
       {scanResult && (() => {
+        const isVerified = scanResult.verified === true;
         const cardId = scanResult.verifiedCardId || `${scanResult.setId}-${scanResult.cardNumber}`;
-        const alreadyOwned = hasCard(scanResult.game, scanResult.setId, cardId);
+        const alreadyOwned = isVerified && hasCard(scanResult.game, scanResult.setId, cardId);
         const ownedQty = alreadyOwned ? cardQuantity(scanResult.game, scanResult.setId, cardId) : 0;
         return (
-        <Animated.View entering={FadeInDown.duration(400).springify()} style={[dynamicStyles.resultCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+        <Animated.View entering={FadeInDown.duration(400).springify()} style={[dynamicStyles.resultCard, { backgroundColor: colors.surface, borderColor: isVerified ? colors.cardBorder : colors.error + "40" }]}>
+          {!isVerified && (
+            <View style={{ backgroundColor: colors.error + "12", paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, marginBottom: 12, flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <Ionicons name="warning" size={20} color={colors.error} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 14, color: colors.error, marginBottom: 2 }}>Could not verify this card</Text>
+                <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 12, color: colors.textSecondary }}>
+                  The card couldn't be matched to a known card in the database. Try rescanning with better lighting or a clearer angle.
+                </Text>
+              </View>
+            </View>
+          )}
           <View style={dynamicStyles.resultHeader}>
             <View style={dynamicStyles.resultInfo}>
               <Text style={[dynamicStyles.resultName, { color: colors.text }]}>
@@ -281,14 +293,22 @@ export default function ScanScreen() {
                     {scanResult.rarity}
                   </Text>
                 </View>
+                {isVerified && (
+                  <View style={[dynamicStyles.badge, { backgroundColor: colors.success + "18" }]}>
+                    <Ionicons name="checkmark-circle" size={12} color={colors.success} />
+                    <Text style={[dynamicStyles.badgeText, { color: colors.success }]}>Verified</Text>
+                  </View>
+                )}
               </View>
             </View>
-            <View style={dynamicStyles.priceTag}>
-              <Text style={[dynamicStyles.priceLabel, { color: colors.textTertiary }]}>Value</Text>
-              <Text style={[dynamicStyles.priceValue, { color: colors.success }]}>
-                ${scanResult.estimatedValue?.toFixed(2) || "0.00"}
-              </Text>
-            </View>
+            {isVerified && (
+              <View style={dynamicStyles.priceTag}>
+                <Text style={[dynamicStyles.priceLabel, { color: colors.textTertiary }]}>Value</Text>
+                <Text style={[dynamicStyles.priceValue, { color: colors.success }]}>
+                  ${scanResult.estimatedValue?.toFixed(2) || "0.00"}
+                </Text>
+              </View>
+            )}
           </View>
 
           {alreadyOwned && (
@@ -300,40 +320,51 @@ export default function ScanScreen() {
             </View>
           )}
 
-          <View style={dynamicStyles.quantityRow}>
-            <Text style={[dynamicStyles.quantityLabel, { color: colors.textSecondary }]}>
-              {alreadyOwned ? "Add more" : "Quantity"}
-            </Text>
-            <View style={dynamicStyles.quantityStepper}>
+          {isVerified ? (
+            <>
+              <View style={dynamicStyles.quantityRow}>
+                <Text style={[dynamicStyles.quantityLabel, { color: colors.textSecondary }]}>
+                  {alreadyOwned ? "Add more" : "Quantity"}
+                </Text>
+                <View style={dynamicStyles.quantityStepper}>
+                  <Pressable
+                    style={[dynamicStyles.stepperButton, { backgroundColor: colors.surfaceAlt }]}
+                    onPress={() => setAddQuantity((q) => Math.max(1, q - 1))}
+                  >
+                    <Ionicons name="remove" size={18} color={addQuantity <= 1 ? colors.textTertiary : colors.text} />
+                  </Pressable>
+                  <Text style={[dynamicStyles.quantityValue, { color: colors.text }]}>{addQuantity}</Text>
+                  <Pressable
+                    style={[dynamicStyles.stepperButton, { backgroundColor: colors.surfaceAlt }]}
+                    onPress={() => setAddQuantity((q) => Math.min(99, q + 1))}
+                  >
+                    <Ionicons name="add" size={18} color={colors.text} />
+                  </Pressable>
+                </View>
+              </View>
               <Pressable
-                style={[dynamicStyles.stepperButton, { backgroundColor: colors.surfaceAlt }]}
-                onPress={() => setAddQuantity((q) => Math.max(1, q - 1))}
+                style={({ pressed }) => [dynamicStyles.addButton, { backgroundColor: colors.tint }, pressed && { opacity: 0.9 }]}
+                onPress={handleAddToCollection}
               >
-                <Ionicons name="remove" size={18} color={addQuantity <= 1 ? colors.textTertiary : colors.text} />
+                <Ionicons name={alreadyOwned ? "duplicate" : "add-circle"} size={20} color="#FFFFFF" />
+                <Text style={dynamicStyles.addButtonText}>
+                  {alreadyOwned
+                    ? `Add ${addQuantity} More`
+                    : addQuantity > 1
+                      ? `Add ${addQuantity} to Collection`
+                      : "Add to Collection"}
+                </Text>
               </Pressable>
-              <Text style={[dynamicStyles.quantityValue, { color: colors.text }]}>{addQuantity}</Text>
-              <Pressable
-                style={[dynamicStyles.stepperButton, { backgroundColor: colors.surfaceAlt }]}
-                onPress={() => setAddQuantity((q) => Math.min(99, q + 1))}
-              >
-                <Ionicons name="add" size={18} color={colors.text} />
-              </Pressable>
-            </View>
-          </View>
-
-          <Pressable
-            style={({ pressed }) => [dynamicStyles.addButton, { backgroundColor: colors.tint }, pressed && { opacity: 0.9 }]}
-            onPress={handleAddToCollection}
-          >
-            <Ionicons name={alreadyOwned ? "duplicate" : "add-circle"} size={20} color="#FFFFFF" />
-            <Text style={dynamicStyles.addButtonText}>
-              {alreadyOwned
-                ? `Add ${addQuantity} More`
-                : addQuantity > 1
-                  ? `Add ${addQuantity} to Collection`
-                  : "Add to Collection"}
-            </Text>
-          </Pressable>
+            </>
+          ) : (
+            <Pressable
+              style={({ pressed }) => [dynamicStyles.addButton, { backgroundColor: colors.error }, pressed && { opacity: 0.9 }]}
+              onPress={resetScan}
+            >
+              <Ionicons name="refresh" size={20} color="#FFFFFF" />
+              <Text style={dynamicStyles.addButtonText}>Rescan Card</Text>
+            </Pressable>
+          )}
         </Animated.View>
         );
       })()}
