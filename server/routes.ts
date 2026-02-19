@@ -926,6 +926,14 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
 
       console.log(`[AI Result] game=${result.game} name="${result.name}" setId="${result.setId}" setName="${result.setName}" cardNumber="${result.cardNumber}" rarity="${result.rarity}" lang="${result.language}"`);
 
+      if (!result.error && result.language && result.language !== "en") {
+        return res.json({
+          error: `${result.language === "ja" ? "Japanese" : "Non-English"} card support coming soon! We detected a ${result.language === "ja" ? "Japanese" : result.language} ${result.game ? result.game.charAt(0).toUpperCase() + result.game.slice(1) : ""} card. Currently only English cards are supported.`,
+          languageNotSupported: true,
+          detectedLanguage: result.language,
+        });
+      }
+
       if (!result.error && result.game) {
         const lang = result.language === "ja" ? "ja" : "en";
 

@@ -36,7 +36,6 @@ export default function SetsScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const [selectedGame, setSelectedGame] = useState<GameId>("pokemon");
-  const [cardLang, setCardLang] = useState<"en" | "ja">("en");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchMode, setSearchMode] = useState<SearchMode>("sets");
   const [cardResults, setCardResults] = useState<CardSearchResult[]>([]);
@@ -50,9 +49,7 @@ export default function SetsScreen() {
   }, [enabledGames, selectedGame]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const setsQueryPath = selectedGame === "pokemon" && cardLang === "ja"
-    ? `/api/tcg/pokemon/sets?lang=ja`
-    : `/api/tcg/${selectedGame}/sets`;
+  const setsQueryPath = `/api/tcg/${selectedGame}/sets`;
 
   const { data: sets, isLoading } = useQuery<TCGSet[]>({
     queryKey: [setsQueryPath],
@@ -315,55 +312,6 @@ export default function SetsScreen() {
         }}
       />
 
-      {selectedGame === "pokemon" && (
-        <View
-          style={{
-            flexDirection: "row",
-            marginHorizontal: 20,
-            marginBottom: 4,
-            gap: 8,
-          }}
-        >
-          <Pressable
-            onPress={() => setCardLang("en")}
-            style={{
-              paddingHorizontal: 14,
-              paddingVertical: 6,
-              borderRadius: 16,
-              backgroundColor: cardLang === "en" ? colors.tint : colors.surfaceAlt,
-            }}
-          >
-            <Text
-              style={{
-                fontFamily: "DMSans_600SemiBold",
-                fontSize: 13,
-                color: cardLang === "en" ? "#FFFFFF" : colors.textSecondary,
-              }}
-            >
-              English
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setCardLang("ja")}
-            style={{
-              paddingHorizontal: 14,
-              paddingVertical: 6,
-              borderRadius: 16,
-              backgroundColor: cardLang === "ja" ? colors.tint : colors.surfaceAlt,
-            }}
-          >
-            <Text
-              style={{
-                fontFamily: "DMSans_600SemiBold",
-                fontSize: 13,
-                color: cardLang === "ja" ? "#FFFFFF" : colors.textSecondary,
-              }}
-            >
-              Japanese
-            </Text>
-          </Pressable>
-        </View>
-      )}
 
       <View
         style={{
@@ -552,7 +500,7 @@ export default function SetsScreen() {
             onPress={() =>
               router.push({
                 pathname: "/set/[game]/[id]",
-                params: { game: selectedGame, id: item.id, lang: selectedGame === "pokemon" ? cardLang : "en" },
+                params: { game: selectedGame, id: item.id, lang: "en" },
               })
             }
           />
