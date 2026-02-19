@@ -11,6 +11,7 @@ import {
   Modal,
   TextInput,
   ScrollView,
+  RefreshControl,
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,7 +21,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { CardCell } from "@/components/CardCell";
 import { useCollection } from "@/lib/CollectionContext";
 import { useTheme } from "@/lib/ThemeContext";
-import { getApiUrl } from "@/lib/query-client";
+import { getApiUrl, queryClient } from "@/lib/query-client";
 import type { GameId, SetDetail, TCGCard } from "@/lib/types";
 import { GAMES } from "@/lib/types";
 
@@ -42,6 +43,7 @@ export default function SetDetailScreen() {
   const [quickAddSearch, setQuickAddSearch] = useState("");
   const [cardPrices, setCardPrices] = useState<Record<string, number | null>>({});
   const [pricesLoading, setPricesLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const pricesFetched = React.useRef(false);
 
   const langParam = lang === "ja" ? "ja" : "en";
@@ -99,6 +101,23 @@ export default function SetDetailScreen() {
     },
     [removeOneCard, gameId, id]
   );
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    const startTime = Date.now();
+    
+    await queryClient.invalidateQueries({ queryKey: [queryPath] });
+    pricesFetched.current = false;
+    
+    const elapsed = Date.now() - startTime;
+    const remainingDelay = Math.max(1000 - elapsed, 0);
+    
+    if (remainingDelay > 0) {
+      await new Promise(resolve => setTimeout(resolve, remainingDelay));
+    }
+    
+    setRefreshing(false);
+  }, [queryPath]);
 
   const quickAddFilteredCards = useMemo(() => {
     const allCards = setDetail?.cards || [];
@@ -442,6 +461,7 @@ export default function SetDetailScreen() {
         keyExtractor={(item) => item.id}
         numColumns={NUM_COLUMNS}
         ListHeaderComponent={renderHeader}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.tint} colors={[colors.tint]} />}
         renderItem={({ item }) => {
           const collected = hasCard(gameId, id || "", item.id);
           const qty = collected ? cardQuantity(gameId, id || "", item.id) : 0;

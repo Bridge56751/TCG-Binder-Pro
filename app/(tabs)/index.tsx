@@ -7,6 +7,7 @@ import {
   Platform,
   Pressable,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { useFocusEffect, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,7 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/lib/ThemeContext";
 import { useCollection } from "@/lib/CollectionContext";
-import { apiRequest } from "@/lib/query-client";
+import { apiRequest, queryClient } from "@/lib/query-client";
 import { GameSelector } from "@/components/GameSelector";
 import { SetCard } from "@/components/SetCard";
 import { StatCard } from "@/components/StatCard";
@@ -40,6 +41,7 @@ export default function CollectionScreen() {
   const [valueData, setValueData] = useState<ValueResponse | null>(null);
   const [valueLoading, setValueLoading] = useState(false);
   const valueFetchRef = useRef(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   const allCards = useMemo(() => {
     const cards: { game: string; cardId: string }[] = [];
@@ -87,6 +89,23 @@ export default function CollectionScreen() {
         if (fetchId === valueFetchRef.current) setValueLoading(false);
       });
   }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    const startTime = Date.now();
+    
+    fetchCollectionValue();
+    await queryClient.invalidateQueries({ queryKey: [`/api/tcg/${selectedGame}/sets`] });
+    
+    const elapsed = Date.now() - startTime;
+    const remainingDelay = Math.max(1000 - elapsed, 0);
+    
+    if (remainingDelay > 0) {
+      await new Promise(resolve => setTimeout(resolve, remainingDelay));
+    }
+    
+    setRefreshing(false);
+  }, [selectedGame, fetchCollectionValue]);
 
   useEffect(() => {
     fetchCollectionValue();
@@ -218,6 +237,7 @@ export default function CollectionScreen() {
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={{ paddingBottom: bottomInset }}
       showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.tint} colors={[colors.tint]} />}
     >
       <View style={[styles.topBar, { paddingTop: topInset + 8 }]}>
         <View style={styles.topBarRow}>
