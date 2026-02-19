@@ -492,6 +492,271 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  async function nameSearchPokemon(name: string, lang: string): Promise<{ name: string; cardId: string; setId: string; localId: string } | null> {
+    const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+    try {
+      const res = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(name)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) return data;
+      }
+    } catch {}
+    const words = name.split(/\s+/);
+    if (words.length > 1) {
+      for (let drop = 1; drop <= Math.min(2, words.length - 1); drop++) {
+        const partial = words.slice(0, words.length - drop).join(" ");
+        try {
+          const res = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(partial)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0) {
+              const filtered = data.filter((c: any) => normalize(c.name).includes(normalize(name)) || normalize(name).includes(normalize(c.name)));
+              if (filtered.length > 0) return filtered;
+              return data;
+            }
+          }
+        } catch {}
+      }
+    }
+    return null;
+  }
+
+  async function nameSearchYugioh(name: string): Promise<any | null> {
+    try {
+      const res = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?name=${encodeURIComponent(name)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.data?.[0]) return data.data[0];
+      }
+    } catch {}
+    try {
+      const res = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(name)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.data?.length > 0) {
+          const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+          const exact = data.data.find((c: any) => normalize(c.name) === normalize(name));
+          return exact || data.data[0];
+        }
+      }
+    } catch {}
+    return null;
+  }
+
+  async function nameSearchMTG(name: string, setHint?: string): Promise<any | null> {
+    try {
+      let query = `!"${name}"`;
+      if (setHint) query += ` set:${setHint}`;
+      const res = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&unique=prints`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.data?.length > 0) return data.data;
+      }
+    } catch {}
+    try {
+      const res = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(name)}&unique=prints`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.data?.length > 0) {
+          const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+          const exact = data.data.filter((c: any) => normalize(c.name) === normalize(name));
+          return exact.length > 0 ? exact : data.data;
+        }
+      }
+    } catch {}
+    return null;
+  }
+
+  async function nameSearchOnePiece(name: string): Promise<any | null> {
+    try {
+      const res = await fetch(`https://optcgapi.com/api/cards/search/${encodeURIComponent(name)}/`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) return data;
+      }
+    } catch {}
+    return null;
+  }
+
+  async function deepVerifyCard(aiResult: any): Promise<{ name: string; cardId?: string; setId?: string; verified: boolean }> {
+    const { game, name, setId, cardNumber: rawCardNumber } = aiResult;
+    const lang = aiResult.language === "ja" ? "ja" : "en";
+    const cardNumber = cleanCardNumber(rawCardNumber || "");
+
+    console.log(`[DeepVerify] game=${game} name="${name}" setId="${setId}" num="${cardNumber}" lang=${lang}`);
+
+    if (game === "pokemon") {
+      const directResult = await verifyPokemonCard(name, setId, rawCardNumber || "", lang);
+      if (directResult) {
+        console.log(`[DeepVerify] Pokemon direct verify HIT: ${directResult.cardId}`);
+        return { ...directResult, verified: true };
+      }
+
+      const nameResults = await nameSearchPokemon(name, lang);
+      if (nameResults && Array.isArray(nameResults)) {
+        console.log(`[DeepVerify] Pokemon name search found ${nameResults.length} results for "${name}"`);
+        if (cardNumber) {
+          const paddedNumber = cardNumber.length < 3 ? cardNumber.padStart(3, "0") : cardNumber;
+          const unpaddedNumber = cardNumber.replace(/^0+/, "") || "0";
+          const numberVariants = [...new Set([cardNumber, paddedNumber, unpaddedNumber])];
+          for (const num of numberVariants) {
+            const match = nameResults.find((c: any) => c.localId === num);
+            if (match) {
+              console.log(`[DeepVerify] Pokemon NAME+NUM match: ${match.name} (${match.id})`);
+              return { name: match.name, cardId: match.id, setId: extractPokemonSetId(match.id, setId), verified: true };
+            }
+          }
+          const inSet = nameResults.find((c: any) => c.id?.startsWith(setId + "-"));
+          if (inSet) {
+            console.log(`[DeepVerify] Pokemon NAME+SET match: ${inSet.name} (${inSet.id})`);
+            return { name: inSet.name, cardId: inSet.id, setId: extractPokemonSetId(inSet.id, setId), verified: true };
+          }
+        }
+        if (nameResults.length === 1) {
+          console.log(`[DeepVerify] Pokemon single name match: ${nameResults[0].name} (${nameResults[0].id})`);
+          return { name: nameResults[0].name, cardId: nameResults[0].id, setId: extractPokemonSetId(nameResults[0].id, setId), verified: true };
+        }
+      }
+
+      const allSets = await fetchSetsForGame("pokemon", lang);
+      const relatedSets = allSets.filter((s: any) => {
+        if (s.id === setId) return false;
+        const sId = (s.id || "").toLowerCase();
+        const targetId = setId.toLowerCase();
+        if (sId.startsWith("sv") && targetId.startsWith("sv")) return true;
+        if (sId.startsWith("swsh") && targetId.startsWith("swsh")) return true;
+        if (sId.startsWith("sm") && targetId.startsWith("sm")) return true;
+        return false;
+      }).slice(0, 8);
+
+      for (const alt of relatedSets) {
+        const altResult = await verifyPokemonCard(name, alt.id, rawCardNumber || "", lang);
+        if (altResult) {
+          console.log(`[DeepVerify] Pokemon found in related set ${alt.id}: ${altResult.cardId}`);
+          return { ...altResult, verified: true };
+        }
+      }
+
+      console.log(`[DeepVerify] Pokemon ALL strategies failed for "${name}"`);
+      return { name, verified: false };
+
+    } else if (game === "yugioh") {
+      const rarity = aiResult.rarity?.toLowerCase() || "";
+      const extractSetPrefix = (code: string) => code.split("-")[0] || code;
+
+      const card = await nameSearchYugioh(name);
+      if (card) {
+        console.log(`[DeepVerify] YGO found: ${card.name}, ${card.card_sets?.length || 0} sets`);
+        const setsInSet = card.card_sets?.filter((s: any) => s.set_code?.startsWith(setId)) || [];
+        if (setsInSet.length > 1 && rarity) {
+          const rarityMatch = setsInSet.find((s: any) => s.set_rarity?.toLowerCase().includes(rarity));
+          if (rarityMatch) return { name: card.name, cardId: rarityMatch.set_code, setId: extractSetPrefix(rarityMatch.set_code), verified: true };
+        }
+        if (setsInSet.length > 0) {
+          if (cardNumber) {
+            const codeWithNum = setsInSet.find((s: any) => {
+              const suffix = s.set_code?.split("-").pop() || "";
+              return suffix.includes(cardNumber);
+            });
+            if (codeWithNum) return { name: card.name, cardId: codeWithNum.set_code, setId: extractSetPrefix(codeWithNum.set_code), verified: true };
+          }
+          return { name: card.name, cardId: setsInSet[0].set_code, setId: extractSetPrefix(setsInSet[0].set_code), verified: true };
+        }
+        if (cardNumber) {
+          const byCardNum = card.card_sets?.find((s: any) => {
+            const suffix = s.set_code?.split("-").pop() || "";
+            return suffix === cardNumber || suffix.includes(cardNumber);
+          });
+          if (byCardNum) return { name: card.name, cardId: byCardNum.set_code, setId: extractSetPrefix(byCardNum.set_code), verified: true };
+        }
+        if (card.card_sets?.[0]) {
+          return { name: card.name, cardId: card.card_sets[0].set_code, setId: extractSetPrefix(card.card_sets[0].set_code), verified: true };
+        }
+        return { name: card.name, verified: true };
+      }
+      console.log(`[DeepVerify] YGO not found for "${name}"`);
+      return { name, verified: false };
+
+    } else if (game === "onepiece") {
+      const cleanNum = cardNumber.replace(/^0+/, "").padStart(3, "0");
+      const cardId = `${setId}-${cleanNum}`;
+      try {
+        const res = await fetch(`https://optcgapi.com/api/sets/card/${cardId}/`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            console.log(`[DeepVerify] OP exact HIT: ${data[0].card_name} (${data[0].card_set_id})`);
+            return { name: data[0].card_name, cardId: data[0].card_set_id, setId: data[0].set_id || setId, verified: true };
+          }
+        }
+      } catch {}
+
+      if (!setId.includes("-")) {
+        const altSetId = setId.replace(/(\D+)(\d+)/, "$1-$2");
+        const altCardId = `${altSetId}-${cleanNum}`;
+        try {
+          const altRes = await fetch(`https://optcgapi.com/api/sets/card/${altCardId}/`);
+          if (altRes.ok) {
+            const altData = await altRes.json();
+            if (Array.isArray(altData) && altData.length > 0) {
+              return { name: altData[0].card_name, cardId: altData[0].card_set_id, setId: altData[0].set_id || altSetId, verified: true };
+            }
+          }
+        } catch {}
+      }
+
+      const nameResults = await nameSearchOnePiece(name);
+      if (nameResults) {
+        const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const exact = nameResults.find((c: any) => normalize(c.card_name) === normalize(name));
+        const match = exact || nameResults[0];
+        console.log(`[DeepVerify] OP name search HIT: ${match.card_name} (${match.card_set_id})`);
+        return { name: match.card_name, cardId: match.card_set_id, setId: match.set_id || setId, verified: true };
+      }
+      console.log(`[DeepVerify] OP not found for "${name}"`);
+      return { name, verified: false };
+
+    } else if (game === "mtg") {
+      try {
+        const res = await fetch(`https://api.scryfall.com/cards/${encodeURIComponent(setId)}/${encodeURIComponent(cardNumber)}`);
+        if (res.ok) {
+          const card = await res.json();
+          console.log(`[DeepVerify] MTG exact HIT: ${card.name} (${card.set}/${card.collector_number})`);
+          return { name: card.name, cardId: `${card.set}-${card.collector_number}`, setId: card.set, verified: true };
+        }
+      } catch {}
+
+      const nameResults = await nameSearchMTG(name, setId);
+      if (nameResults && Array.isArray(nameResults)) {
+        console.log(`[DeepVerify] MTG name search found ${nameResults.length} prints for "${name}"`);
+        const inSet = nameResults.find((c: any) => c.set === setId);
+        if (inSet) {
+          return { name: inSet.name, cardId: `${inSet.set}-${inSet.collector_number}`, setId: inSet.set, verified: true };
+        }
+        if (cardNumber) {
+          const byNum = nameResults.find((c: any) => c.collector_number === cardNumber);
+          if (byNum) {
+            return { name: byNum.name, cardId: `${byNum.set}-${byNum.collector_number}`, setId: byNum.set, verified: true };
+          }
+        }
+        const card = nameResults[0];
+        return { name: card.name, cardId: `${card.set}-${card.collector_number}`, setId: card.set, verified: true };
+      }
+
+      const nameResultsNoSet = await nameSearchMTG(name);
+      if (nameResultsNoSet && Array.isArray(nameResultsNoSet)) {
+        const card = nameResultsNoSet[0];
+        console.log(`[DeepVerify] MTG broad name search HIT: ${card.name} (${card.set})`);
+        return { name: card.name, cardId: `${card.set}-${card.collector_number}`, setId: card.set, verified: true };
+      }
+
+      console.log(`[DeepVerify] MTG not found for "${name}"`);
+      return { name, verified: false };
+    }
+
+    return { name, verified: false };
+  }
+
   app.post("/api/identify-card", async (req, res) => {
     try {
       const { image } = req.body;
@@ -504,56 +769,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         messages: [
           {
             role: "system",
-            content: `You are an expert trading card game identifier with encyclopedic knowledge. Carefully examine the card image and identify it with high precision.
+            content: `You are a trading card identifier. Look at the card image and read the text printed on it.
 
-CRITICAL: Read ALL visible text on the card carefully:
-1. Card NAME - printed prominently at the top
-2. SET SYMBOL / SET CODE - look for the expansion symbol, set logo, or printed set code
-3. CARD NUMBER - usually at the bottom (e.g. "25/102", "SV049", "OP01-001"). READ THIS EXACTLY. This is the most important identifier.
-4. RARITY - indicated by symbol color (gold=rare, silver=uncommon, black=common for Pokemon/MTG) or text
-5. COLLECTOR INFO - any additional identifiers printed on the card
+STEP 1 - IDENTIFY THE GAME:
+- Pokemon: Yellow border, HP value, weakness/resistance at bottom
+- Yu-Gi-Oh!: ATK/DEF values, star/level indicators, colored card frames
+- One Piece TCG: DON!! cost, power/counter values, OP set codes
+- Magic: The Gathering: Mana symbols, type line, set symbol on type line
 
-VARIANT / RARITY IDENTIFICATION (VERY IMPORTANT):
-Many cards have multiple printings with DIFFERENT collector numbers. You MUST read the exact collector number printed on the card to distinguish them:
-- Pokemon: Regular cards are numbered within the main set (e.g. 1/165). Full Art, Illustration Rare, Special Art Rare, and Secret Rare cards have numbers ABOVE the official set count (e.g. 166/165, 198/165). The number after the slash is the official count. If the first number exceeds the second, it is a special variant. Read the EXACT number - do NOT substitute a lower number.
-  FULL ART CARDS ARE STILL IN THE SAME SET as the regular cards. A card numbered 198/165 is in the SAME set as cards 1-165. Do NOT change the set just because the number is high. The set is determined by the set symbol/logo, NOT the card number.
-  IMPORTANT: For full art/illustration rare/secret rare Pokemon cards, the art extends to the edges of the card, there may be no or minimal border, and the collector number at the bottom is higher than the set count. These are NOT from a different set - they are special variants within the same set.
-  IMPORTANT: Some Pokemon cards have special prefixes like "TG" (Trainer Gallery), "GG" (Galarian Gallery), "SV" (Shiny Vault). Read the FULL collector number including the prefix.
-- Pokemon rarity symbols: Circle=Common, Diamond=Uncommon, Star=Rare, Star H=Holo Rare, V/VMAX/VSTAR/ex with full art=Ultra Rare, Gold card=Secret Rare, Illustration with textured art=Special/Illustration Rare
-- Yu-Gi-Oh!: Different rarities have different visual treatments (Common=no foil, Rare=silver name, Super Rare=holo art, Ultra Rare=gold name+holo art, Secret Rare=rainbow name+holo art, Starlight Rare=embossed). Card code suffix matters (e.g. EN001 vs EN001a).
-- MTG: Different printings may have different collector numbers. Extended art, borderless, and showcase variants have higher collector numbers. These variants are STILL in the same set. The set is identified by the set symbol, not the card border style.
-- One Piece: Alt art cards (AA/manga art) have different card IDs from regular versions. Alt arts typically end with _p1, _p2 etc. or have different numbering schemes.
+STEP 2 - READ THE CARD NAME:
+The name is the MOST IMPORTANT field. Read it exactly as printed at the top of the card. For Japanese cards, read the Japanese name exactly.
 
-GAME IDENTIFICATION:
-- Pokemon: Yellow border, HP in top right, weakness/resistance at bottom, Pokemon creature art
-- Yu-Gi-Oh!: Card frame colors (normal=yellow/tan, effect=orange, fusion=purple, synchro=white, xyz=black, link=blue), ATK/DEF at bottom, star/level indicators
-- One Piece TCG: Card with power/counter values, DON!! cost, OP set codes
-- Magic: The Gathering: Mana symbols in top right, type line below art, power/toughness in bottom right box, set symbol on right side of type line
+STEP 3 - READ THE COLLECTOR NUMBER:
+Look at the bottom of the card for the collector number (e.g., "25/102", "198/165", "TG05/TG30", "OP01-001"). Read the EXACT number including any prefix like TG, GG, SV. Include the full format with the slash if present. Do NOT alter or round this number.
 
-SET CODE FORMATS:
-- Pokemon: Look for set symbol and number. Common TCGdex codes include: "base1", "base2", "gym1", "neo1", "ex1"-"ex16", "dp1"-"dp7", "bw1"-"bw11", "xy1"-"xy12", "sm1"-"sm12", "swsh1"-"swsh12", "sv01"-"sv07", "sv03.5" (Pokemon 151), "sv04.5" (Paldean Fates), "sv05.5", "sv06.5" (Prismatic Evolutions). Sub-sets use decimal notation like "sv03.5". If unsure of the exact code, return the full set name in setName and your best guess for setId.
-- Yu-Gi-Oh!: Alphanumeric codes like "LOB", "MRD", "SDK", "PSV", "LON", "DUEA", "ROTD", etc.
-- One Piece: Codes like "OP01", "OP02", "ST01", "ST02", etc.
-- MTG: Three-letter codes like "lea" (Alpha), "2ed" (Beta), "dmu", "bro", "one", "mom", "woe", "mkm", "otj", "blb", "dsk", "fdn", etc.
+STEP 4 - IDENTIFY THE SET:
+Read any set code or expansion symbol. Give your best guess at the set name AND set code. For Pokemon, common codes: sv01-sv07, sv03.5, sv04.5, sv06.5, swsh1-swsh12, sm1-sm12, base1, etc. For Japanese Pokemon: SV2a, SV1a, SV3, SV4a, etc.
 
-LANGUAGE DETECTION:
-- Determine the language of the card text. If the card has Japanese text (katakana, hiragana, or kanji), set language to "ja". Otherwise set language to "en".
-- For Japanese Pokemon cards, the set codes are different. Common Japanese set IDs include: "SV2a" (Pokemon Card 151), "SV1a", "SV1s", "SV1v", "SV2P", "SV3", "SV3a", "SV4", "SV4a", "SV4K", "SV5a", "SV5K", "SV5M", "SV6", "SV6a", "SV7", etc.
+STEP 5 - LANGUAGE:
+If the card text is in Japanese (katakana/hiragana/kanji), set language to "ja". Otherwise "en".
 
-Return a JSON object:
+Return ONLY valid JSON:
 {
   "game": "pokemon" | "yugioh" | "onepiece" | "mtg",
-  "name": "exact card name as printed",
-  "setName": "full expansion/set name",
-  "setId": "set code in the format described above",
-  "cardNumber": "collector number only (no set prefix)",
-  "rarity": "Common/Uncommon/Rare/Holo Rare/Ultra Rare/Secret Rare/etc",
-  "estimatedValue": estimated USD market value as number,
+  "name": "exact card name as printed on the card",
+  "setName": "full set/expansion name",
+  "setId": "set code",
+  "cardNumber": "exact collector number as printed (e.g. 198/165, TG05, 25)",
+  "rarity": "rarity level",
+  "estimatedValue": estimated USD value as number,
   "language": "en" or "ja"
 }
 
-If you cannot identify it, return: {"error": "Could not identify card"}
-Return ONLY valid JSON.`,
+If you cannot identify it at all, return: {"error": "Could not identify card"}`,
           },
           {
             role: "user",
@@ -562,11 +810,11 @@ Return ONLY valid JSON.`,
                 type: "image_url",
                 image_url: { url: `data:image/jpeg;base64,${image}`, detail: "high" },
               },
-              { type: "text", text: "Identify this trading card. Read all text carefully, especially the card name, set symbol, card number, and any collector information printed on the card. Pay special attention to the exact collector number - if this is a full art, holo, illustration rare, or secret rare variant, the number will be higher than the main set count. Read the EXACT number printed, do not round down or substitute." },
+              { type: "text", text: "What trading card is this? Read the card name at the top and the collector number at the bottom carefully. Tell me exactly what you see printed on the card." },
             ],
           },
         ],
-        max_completion_tokens: 1024,
+        max_completion_tokens: 512,
       });
 
       const content = response.choices[0]?.message?.content || "{}";
@@ -579,80 +827,83 @@ Return ONLY valid JSON.`,
 
       console.log(`[AI Result] game=${result.game} name="${result.name}" setId="${result.setId}" setName="${result.setName}" cardNumber="${result.cardNumber}" rarity="${result.rarity}" lang="${result.language}"`);
 
-      if (!result.error && result.game && result.setId) {
+      if (!result.error && result.game) {
         const lang = result.language === "ja" ? "ja" : "en";
-        try {
-          const resolvedSetId = await resolveSetId(result.game, result.setId, result.setName, lang);
-          if (resolvedSetId) {
-            console.log(`[SetResolve] ${result.setId} -> ${resolvedSetId}`);
-            result.setId = resolvedSetId;
+
+        if (result.setId) {
+          try {
+            const resolvedSetId = await resolveSetId(result.game, result.setId, result.setName, lang);
+            if (resolvedSetId) {
+              console.log(`[SetResolve] ${result.setId} -> ${resolvedSetId}`);
+              result.setId = resolvedSetId;
+            }
+          } catch (e) {
+            console.error("Error resolving set ID:", e);
           }
-        } catch (e) {
-          console.error("Error resolving set ID:", e);
         }
 
         result.verified = false;
         try {
-          const verified = await verifyCardInDatabase(result);
-          if (verified) {
-            console.log(`[Verified] name="${verified.name}" cardId="${verified.cardId}" setId="${verified.setId}"`);
-            result.verified = true;
-            result.name = verified.name || result.name;
-            if (verified.cardId) result.verifiedCardId = verified.cardId;
-            if (verified.setId) {
-              result.setId = verified.setId;
-              const sets = await fetchSetsForGame(result.game, result.language === "ja" ? "ja" : "en");
-              let setName: string | null = null;
-              if (result.game === "pokemon") {
-                const s = sets.find((s: any) => s.id === verified.setId);
-                if (s) setName = s.name;
-              } else if (result.game === "yugioh") {
-                const s = sets.find((s: any) => s.set_code === verified.setId);
-                if (s) setName = s.set_name;
-              } else if (result.game === "onepiece") {
-                const s = sets.find((s: any) => s.id === verified.setId || s.set_id === verified.setId);
-                if (s) setName = s.name || s.set_name;
-              } else if (result.game === "mtg") {
-                const s = sets.find((s: any) => s.code === verified.setId);
-                if (s) setName = s.name;
-              }
-              if (setName) result.setName = setName;
+          const deepResult = await deepVerifyCard(result);
+          console.log(`[DeepVerify Result] verified=${deepResult.verified} name="${deepResult.name}" cardId="${deepResult.cardId}" setId="${deepResult.setId}"`);
+
+          result.verified = deepResult.verified;
+          result.name = deepResult.name || result.name;
+          if (deepResult.cardId) result.verifiedCardId = deepResult.cardId;
+          if (deepResult.setId && deepResult.verified) {
+            result.setId = deepResult.setId;
+            const sets = await fetchSetsForGame(result.game, lang);
+            let setName: string | null = null;
+            if (result.game === "pokemon") {
+              const s = sets.find((s: any) => s.id === deepResult.setId);
+              if (s) setName = s.name;
+            } else if (result.game === "yugioh") {
+              const s = sets.find((s: any) => s.set_code === deepResult.setId);
+              if (s) setName = s.set_name;
+            } else if (result.game === "onepiece") {
+              const s = sets.find((s: any) => s.id === deepResult.setId || s.set_id === deepResult.setId);
+              if (s) setName = s.name || s.set_name;
+            } else if (result.game === "mtg") {
+              const s = sets.find((s: any) => s.code === deepResult.setId);
+              if (s) setName = s.name;
             }
-            if (result.language === "ja" && result.game === "pokemon" && verified.cardId) {
-              try {
-                const enRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${verified.cardId}`);
-                if (enRes.ok) {
-                  const enCard = await enRes.json();
-                  if (enCard.name) result.englishName = enCard.name;
-                  if (enCard.set?.name) result.englishSetName = enCard.set.name;
-                }
-              } catch {}
-              if (!result.englishName) {
-                const jaToEnSetMap: Record<string, string> = {
-                  "SV2a": "sv03.5", "SV1a": "sv01", "SV1s": "sv01", "SV1v": "sv01",
-                  "SV3": "sv02", "SV3a": "sv02", "SV4": "sv03", "SV4a": "sv03",
-                  "SV4K": "sv04", "SV5a": "sv04.5", "SV5K": "sv04", "SV5M": "sv04",
-                  "SV6": "sv05", "SV6a": "sv05", "SV7": "sv06", "SV7a": "sv06",
-                  "SV8": "sv07", "SV8a": "sv07",
-                };
-                const enSetId = jaToEnSetMap[result.setId];
-                if (enSetId && result.cardNumber) {
-                  const cleanNum = cleanCardNumber(result.cardNumber);
-                  const paddedNum = cleanNum.length < 3 ? cleanNum.padStart(3, "0") : cleanNum;
-                  try {
-                    const enMappedRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${enSetId}-${paddedNum}`);
-                    if (enMappedRes.ok) {
-                      const enMappedCard = await enMappedRes.json();
-                      if (enMappedCard.name) result.englishName = enMappedCard.name;
-                      if (enMappedCard.set?.name) result.englishSetName = enMappedCard.set.name;
-                    }
-                  } catch {}
-                }
+            if (setName) result.setName = setName;
+          }
+
+          if (result.language === "ja" && result.game === "pokemon" && deepResult.verified && deepResult.cardId) {
+            try {
+              const enRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${deepResult.cardId}`);
+              if (enRes.ok) {
+                const enCard = await enRes.json();
+                if (enCard.name) result.englishName = enCard.name;
+                if (enCard.set?.name) result.englishSetName = enCard.set.name;
+              }
+            } catch {}
+            if (!result.englishName) {
+              const jaToEnSetMap: Record<string, string> = {
+                "SV2a": "sv03.5", "SV1a": "sv01", "SV1s": "sv01", "SV1v": "sv01",
+                "SV3": "sv02", "SV3a": "sv02", "SV4": "sv03", "SV4a": "sv03",
+                "SV4K": "sv04", "SV5a": "sv04.5", "SV5K": "sv04", "SV5M": "sv04",
+                "SV6": "sv05", "SV6a": "sv05", "SV7": "sv06", "SV7a": "sv06",
+                "SV8": "sv07", "SV8a": "sv07",
+              };
+              const enSetId = jaToEnSetMap[deepResult.setId || result.setId];
+              if (enSetId && result.cardNumber) {
+                const cleanNum = cleanCardNumber(result.cardNumber);
+                const paddedNum = cleanNum.length < 3 ? cleanNum.padStart(3, "0") : cleanNum;
+                try {
+                  const enMappedRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${enSetId}-${paddedNum}`);
+                  if (enMappedRes.ok) {
+                    const enMappedCard = await enMappedRes.json();
+                    if (enMappedCard.name) result.englishName = enMappedCard.name;
+                    if (enMappedCard.set?.name) result.englishSetName = enMappedCard.set.name;
+                  }
+                } catch {}
               }
             }
           }
         } catch (e) {
-          console.error("Error verifying card:", e);
+          console.error("Error in deep verify:", e);
         }
       }
 
