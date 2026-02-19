@@ -35,7 +35,7 @@ export default function SetDetailScreen() {
   const insets = useSafeAreaInsets();
   const { game, id, lang } = useLocalSearchParams<{ game: string; id: string; lang?: string }>();
   const gameId = game as GameId;
-  const { hasCard, setCards, removeCard, removeOneCard, clearSet, addCard, cardQuantity } = useCollection();
+  const { hasCard, setCards, removeCard, removeOneCard, addCard, cardQuantity } = useCollection();
   const { colors } = useTheme();
 
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
@@ -45,6 +45,8 @@ export default function SetDetailScreen() {
   const [cardPrices, setCardPrices] = useState<Record<string, number | null>>({});
   const [pricesLoading, setPricesLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [trashMode, setTrashMode] = useState(false);
+  const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set());
   const pricesFetched = React.useRef(false);
 
   const langParam = lang === "ja" ? "ja" : "en";
@@ -74,23 +76,52 @@ export default function SetDetailScreen() {
     }
   }, [setDetail, game, id]);
 
-  const handleResetSet = useCallback(() => {
+  const toggleTrashMode = useCallback(() => {
+    if (trashMode) {
+      setTrashMode(false);
+      setSelectedCards(new Set());
+    } else {
+      setTrashMode(true);
+      setSelectedCards(new Set());
+    }
+  }, [trashMode]);
+
+  const toggleCardSelection = useCallback((cardId: string) => {
+    setSelectedCards(prev => {
+      const next = new Set(prev);
+      if (next.has(cardId)) {
+        next.delete(cardId);
+      } else {
+        next.add(cardId);
+      }
+      return next;
+    });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
+  const handleDeleteSelected = useCallback(() => {
+    const count = selectedCards.size;
+    if (count === 0) return;
     Alert.alert(
-      "Reset Set",
-      `Remove all cards from "${setDetail?.name || id}"? This cannot be undone.`,
+      "Remove Cards",
+      `Remove ${count} card${count > 1 ? "s" : ""} from your collection? This cannot be undone.`,
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Reset",
+          text: "Remove",
           style: "destructive",
           onPress: async () => {
-            await clearSet(gameId, id || "");
+            for (const cardId of selectedCards) {
+              await removeCard(gameId, id || "", cardId);
+            }
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            setSelectedCards(new Set());
+            setTrashMode(false);
           },
         },
       ]
     );
-  }, [clearSet, gameId, id, setDetail?.name]);
+  }, [selectedCards, removeCard, gameId, id]);
 
   const handleQuickAdd = useCallback(
     async (cardId: string) => {
@@ -399,10 +430,10 @@ export default function SetDetailScreen() {
           </Pressable>
           {collectedCount > 0 && (
             <Pressable
-              style={[styles.actionBtn, { backgroundColor: colors.error + "15" }]}
-              onPress={handleResetSet}
+              style={[styles.actionBtn, { backgroundColor: trashMode ? colors.error : colors.error + "15" }]}
+              onPress={toggleTrashMode}
             >
-              <Ionicons name="refresh-outline" size={18} color={colors.error} />
+              <Ionicons name="trash-outline" size={18} color={trashMode ? "#FFFFFF" : colors.error} />
             </Pressable>
           )}
         </View>
@@ -485,6 +516,7 @@ export default function SetDetailScreen() {
           const collected = hasCard(gameId, id || "", item.id);
           const qty = collected ? cardQuantity(gameId, id || "", item.id) : 0;
           const itemPrice = sortMode === "value" ? (cardPrices[item.id] ?? (item as any).price ?? null) : undefined;
+          const isSelected = selectedCards.has(item.id);
           return (
             <View style={styles.cellWrapper}>
               <CardCell
@@ -495,13 +527,18 @@ export default function SetDetailScreen() {
                 isCollected={collected}
                 quantity={qty}
                 price={itemPrice}
+                selected={isSelected}
                 onPress={() => {
+                  if (trashMode && collected) {
+                    toggleCardSelection(item.id);
+                    return;
+                  }
                   const cardRoute = langParam === "ja"
                     ? `/card/${game}/${item.id}?lang=ja`
                     : `/card/${game}/${item.id}`;
                   router.push(cardRoute);
                 }}
-                onLongPress={collected ? () => {
+                onLongPress={collected && !trashMode ? () => {
                   Alert.alert(
                     "Remove Card",
                     `Remove one copy of "${item.englishName || item.name}"? (${qty} in collection)`,
@@ -533,7 +570,7 @@ export default function SetDetailScreen() {
         columnWrapperStyle={styles.row}
         contentContainerStyle={[
           styles.gridContent,
-          { paddingBottom: bottomInset + 20 },
+          { paddingBottom: bottomInset + (trashMode ? 90 : 20) },
         ]}
         showsVerticalScrollIndicator={false}
       />
@@ -619,6 +656,26 @@ export default function SetDetailScreen() {
           />
         </View>
       </Modal>
+
+      {trashMode && (
+        <View style={[styles.trashBar, { backgroundColor: colors.surface, borderTopColor: colors.cardBorder, paddingBottom: bottomInset + 12 }]}>
+          <Pressable style={styles.trashBarCancel} onPress={toggleTrashMode}>
+            <Ionicons name="close" size={22} color={colors.textSecondary} />
+          </Pressable>
+          <Text style={[styles.trashBarText, { color: colors.text }]}>
+            {selectedCards.size > 0
+              ? `${selectedCards.size} card${selectedCards.size > 1 ? "s" : ""} selected`
+              : "Tap cards to select"}
+          </Text>
+          <Pressable
+            style={[styles.trashBarDelete, { backgroundColor: selectedCards.size > 0 ? colors.error : colors.error + "40" }]}
+            onPress={handleDeleteSelected}
+            disabled={selectedCards.size === 0}
+          >
+            <Ionicons name="trash" size={18} color="#FFFFFF" />
+          </Pressable>
+        </View>
+      )}
 
     </View>
   );
@@ -782,5 +839,37 @@ const styles = StyleSheet.create({
   quickAddEmptyText: {
     fontFamily: "DMSans_400Regular",
     fontSize: 14,
+  },
+  trashBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    gap: 12,
+  },
+  trashBarCancel: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  trashBarText: {
+    flex: 1,
+    fontFamily: "DMSans_600SemiBold",
+    fontSize: 15,
+    textAlign: "center",
+  },
+  trashBarDelete: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
