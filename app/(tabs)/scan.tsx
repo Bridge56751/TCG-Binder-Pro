@@ -8,9 +8,11 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Dimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
+import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -30,6 +32,9 @@ import Animated, {
   SlideOutUp,
 } from "react-native-reanimated";
 
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const CAMERA_HEIGHT = Math.min(SCREEN_WIDTH * 1.15, 480);
+
 function gameLabel(game: GameId): string {
   if (game === "pokemon") return "Pokemon";
   if (game === "yugioh") return "Yu-Gi-Oh!";
@@ -40,6 +45,8 @@ function gameLabel(game: GameId): string {
 export default function ScanScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+  const [permission, requestPermission] = useCameraPermissions();
+  const cameraRef = useRef<CameraView>(null);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<CardIdentification | null>(null);
@@ -50,6 +57,9 @@ export default function ScanScreen() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [addQuantity, setAddQuantity] = useState(1);
+  const [facing, setFacing] = useState<"back" | "front">("back");
+  const [flashEnabled, setFlashEnabled] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 84 + 34 : 100;
@@ -62,21 +72,24 @@ export default function ScanScreen() {
     }, 2000);
   }, []);
 
-  const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission needed", "Camera access is required to scan cards");
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ["images"],
-      quality: 0.8,
-      base64: true,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
-      setScanResult(null);
-      identifyCard(result.assets[0].base64!);
+  const capturePhoto = async () => {
+    if (!cameraRef.current || isCapturing) return;
+    setIsCapturing(true);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      const photo = await cameraRef.current.takePictureAsync({
+        base64: true,
+        quality: 0.8,
+      });
+      if (photo) {
+        setImageUri(photo.uri);
+        setScanResult(null);
+        identifyCard(photo.base64!);
+      }
+    } catch (error) {
+      Alert.alert("Error", "Failed to capture photo. Please try again.");
+    } finally {
+      setIsCapturing(false);
     }
   };
 
@@ -128,12 +141,12 @@ export default function ScanScreen() {
 
     if (batchMode) {
       setBatchCount((c) => c + addQuantity);
-      showToast(`${qtyLabel}${scanResult.name} added!`);
+      showToast(`${qtyLabel}${scanResult.englishName || scanResult.name} added!`);
       resetScan();
     } else {
       Alert.alert(
         "Added!",
-        `${qtyLabel}${scanResult.name} has been added to your collection.`,
+        `${qtyLabel}${scanResult.englishName || scanResult.name} has been added to your collection.`,
         [
           { text: "Scan Another", onPress: resetScan },
           {
@@ -158,6 +171,146 @@ export default function ScanScreen() {
 
   const dynamicStyles = getDynamicStyles(colors);
 
+  const renderCameraView = () => {
+    if (imageUri) {
+      return (
+        <View style={dynamicStyles.cameraContainer}>
+          <Animated.View entering={FadeIn.duration(300)} style={dynamicStyles.previewWrapper}>
+            <Image source={{ uri: imageUri }} style={dynamicStyles.preview} contentFit="contain" />
+            {isScanning && (
+              <View style={dynamicStyles.scanningOverlay}>
+                <View style={dynamicStyles.scanningPill}>
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <Text style={dynamicStyles.scanningText}>Identifying card...</Text>
+                </View>
+              </View>
+            )}
+            <Pressable style={dynamicStyles.clearButton} onPress={resetScan}>
+              <Ionicons name="close" size={20} color="#FFFFFF" />
+            </Pressable>
+          </Animated.View>
+        </View>
+      );
+    }
+
+    if (Platform.OS === "web") {
+      return (
+        <View style={dynamicStyles.cameraContainer}>
+          <View style={[dynamicStyles.webFallback, { backgroundColor: colors.surfaceAlt }]}>
+            <MaterialCommunityIcons name="camera-off" size={40} color={colors.textTertiary} />
+            <Text style={[dynamicStyles.webFallbackText, { color: colors.textSecondary }]}>
+              Live camera not available on web
+            </Text>
+            <Text style={[dynamicStyles.webFallbackHint, { color: colors.textTertiary }]}>
+              Use the buttons below to take a photo or pick from gallery
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    if (!permission) {
+      return (
+        <View style={dynamicStyles.cameraContainer}>
+          <View style={[dynamicStyles.webFallback, { backgroundColor: colors.surfaceAlt }]}>
+            <ActivityIndicator size="large" color={colors.tint} />
+          </View>
+        </View>
+      );
+    }
+
+    if (!permission.granted) {
+      return (
+        <View style={dynamicStyles.cameraContainer}>
+          <View style={[dynamicStyles.webFallback, { backgroundColor: colors.surfaceAlt }]}>
+            <Ionicons name="camera" size={40} color={colors.textTertiary} />
+            <Text style={[dynamicStyles.webFallbackText, { color: colors.textSecondary }]}>
+              Camera access needed
+            </Text>
+            {permission.status === "denied" && !permission.canAskAgain ? (
+              <Text style={[dynamicStyles.webFallbackHint, { color: colors.textTertiary }]}>
+                Please enable camera access in your device settings
+              </Text>
+            ) : (
+              <Pressable
+                style={[dynamicStyles.permissionButton, { backgroundColor: colors.tint }]}
+                onPress={requestPermission}
+              >
+                <Text style={dynamicStyles.permissionButtonText}>Enable Camera</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={dynamicStyles.cameraContainer}>
+        <CameraView
+          ref={cameraRef}
+          style={dynamicStyles.camera}
+          facing={facing}
+          flash={flashEnabled ? "on" : "off"}
+        >
+          <View style={dynamicStyles.cameraOverlay}>
+            <View style={dynamicStyles.cardFrame}>
+              <View style={[dynamicStyles.frameCorner, dynamicStyles.frameTL]} />
+              <View style={[dynamicStyles.frameCorner, dynamicStyles.frameTR]} />
+              <View style={[dynamicStyles.frameCorner, dynamicStyles.frameBL]} />
+              <View style={[dynamicStyles.frameCorner, dynamicStyles.frameBR]} />
+            </View>
+            <Text style={dynamicStyles.frameHint}>Align card within frame</Text>
+          </View>
+
+          <View style={dynamicStyles.cameraTopBar}>
+            <Pressable
+              style={dynamicStyles.cameraControlButton}
+              onPress={() => setFlashEnabled((f) => !f)}
+            >
+              <Ionicons
+                name={flashEnabled ? "flash" : "flash-off"}
+                size={22}
+                color="#FFFFFF"
+              />
+            </Pressable>
+            <Pressable
+              style={dynamicStyles.cameraControlButton}
+              onPress={() => setFacing((f) => (f === "back" ? "front" : "back"))}
+            >
+              <Ionicons name="camera-reverse" size={22} color="#FFFFFF" />
+            </Pressable>
+          </View>
+
+          <View style={dynamicStyles.cameraBottomBar}>
+            <Pressable style={dynamicStyles.galleryButton} onPress={pickImage}>
+              <Ionicons name="images" size={24} color="#FFFFFF" />
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                dynamicStyles.shutterButton,
+                pressed && { transform: [{ scale: 0.92 }] },
+                isCapturing && { opacity: 0.6 },
+              ]}
+              onPress={capturePhoto}
+              disabled={isCapturing}
+            >
+              <View style={dynamicStyles.shutterInner} />
+            </Pressable>
+            <View style={dynamicStyles.galleryButton}>
+              {batchMode && batchCount > 0 ? (
+                <View style={[dynamicStyles.batchFloatingCounter, { backgroundColor: colors.success }]}>
+                  <Text style={dynamicStyles.batchFloatingText}>{batchCount}</Text>
+                </View>
+              ) : (
+                <View style={{ width: 44 }} />
+              )}
+            </View>
+          </View>
+        </CameraView>
+      </View>
+    );
+  };
+
   return (
     <ScrollView
       style={[dynamicStyles.container, { paddingTop: topInset }]}
@@ -178,8 +331,10 @@ export default function ScanScreen() {
       <View style={dynamicStyles.header}>
         <View style={dynamicStyles.headerRow}>
           <View style={{ flex: 1 }}>
-            <Text style={dynamicStyles.title}>Scan Card</Text>
-            <Text style={dynamicStyles.subtitle}>Take a photo or pick from your library</Text>
+            <Text style={[dynamicStyles.title, { color: colors.text }]}>Scan Card</Text>
+            <Text style={[dynamicStyles.subtitle, { color: colors.textSecondary }]}>
+              Point your camera at a card
+            </Text>
           </View>
           <View style={dynamicStyles.batchToggleArea}>
             {batchMode && batchCount > 0 && (
@@ -219,37 +374,50 @@ export default function ScanScreen() {
         </View>
       </View>
 
-      <View style={dynamicStyles.scanArea}>
-        {imageUri ? (
-          <Animated.View entering={FadeIn.duration(300)} style={[dynamicStyles.previewWrapper, { backgroundColor: colors.surfaceAlt }]}>
-            <Image source={{ uri: imageUri }} style={dynamicStyles.preview} contentFit="contain" />
-            {isScanning && (
-              <View style={dynamicStyles.scanningOverlay}>
-                <ActivityIndicator size="large" color={colors.tint} />
-                <Text style={[dynamicStyles.scanningText, { color: colors.text }]}>Identifying card...</Text>
-              </View>
-            )}
-            <Pressable style={dynamicStyles.clearButton} onPress={resetScan}>
-              <Ionicons name="close" size={20} color="#FFFFFF" />
-            </Pressable>
-          </Animated.View>
-        ) : (
-          <View style={[dynamicStyles.placeholder, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardBorder }]}>
-            <View style={dynamicStyles.crosshairContainer}>
-              <View style={[dynamicStyles.corner, dynamicStyles.topLeft, { borderColor: colors.tint }]} />
-              <View style={[dynamicStyles.corner, dynamicStyles.topRight, { borderColor: colors.tint }]} />
-              <View style={[dynamicStyles.corner, dynamicStyles.bottomLeft, { borderColor: colors.tint }]} />
-              <View style={[dynamicStyles.corner, dynamicStyles.bottomRight, { borderColor: colors.tint }]} />
-              <MaterialCommunityIcons
-                name="cards-outline"
-                size={48}
-                color={colors.textTertiary}
-              />
-              <Text style={[dynamicStyles.placeholderText, { color: colors.textTertiary }]}>Position card within frame</Text>
-            </View>
-          </View>
-        )}
-      </View>
+      {renderCameraView()}
+
+      {Platform.OS === "web" && !imageUri && (
+        <View style={dynamicStyles.webActions}>
+          <Pressable
+            style={({ pressed }) => [
+              dynamicStyles.webActionButton,
+              { backgroundColor: colors.tint },
+              pressed && { opacity: 0.9 },
+            ]}
+            onPress={async () => {
+              const { status } = await ImagePicker.requestCameraPermissionsAsync();
+              if (status !== "granted") {
+                Alert.alert("Permission needed", "Camera access is required to scan cards");
+                return;
+              }
+              const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ["images"],
+                quality: 0.8,
+                base64: true,
+              });
+              if (!result.canceled && result.assets[0]) {
+                setImageUri(result.assets[0].uri);
+                setScanResult(null);
+                identifyCard(result.assets[0].base64!);
+              }
+            }}
+          >
+            <Ionicons name="camera" size={22} color="#FFFFFF" />
+            <Text style={dynamicStyles.webActionText}>Take Photo</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              dynamicStyles.webActionButton,
+              { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.cardBorder },
+              pressed && { opacity: 0.9 },
+            ]}
+            onPress={pickImage}
+          >
+            <Ionicons name="images" size={22} color={colors.tint} />
+            <Text style={[dynamicStyles.webActionText, { color: colors.tint }]}>Gallery</Text>
+          </Pressable>
+        </View>
+      )}
 
       {scanResult && (() => {
         const isVerified = scanResult.verified === true;
@@ -264,7 +432,7 @@ export default function ScanScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 14, color: colors.error, marginBottom: 2 }}>Could not verify this card</Text>
                 <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 12, color: colors.textSecondary }}>
-                  The card couldn't be matched to a known card in the database. Try rescanning with better lighting or a clearer angle.
+                  Try rescanning with better lighting or a clearer angle.
                 </Text>
               </View>
             </View>
@@ -368,24 +536,6 @@ export default function ScanScreen() {
         </Animated.View>
         );
       })()}
-
-      <View style={dynamicStyles.actions}>
-        <Pressable
-          style={({ pressed }) => [dynamicStyles.actionButton, dynamicStyles.primaryAction, { backgroundColor: colors.tint }, pressed && { opacity: 0.9 }]}
-          onPress={takePhoto}
-        >
-          <Ionicons name="camera" size={24} color="#FFFFFF" />
-          <Text style={dynamicStyles.primaryActionText}>Take Photo</Text>
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [dynamicStyles.actionButton, dynamicStyles.secondaryAction, { backgroundColor: colors.surface, borderColor: colors.cardBorder }, pressed && { opacity: 0.9 }]}
-          onPress={pickImage}
-        >
-          <Ionicons name="images" size={22} color={colors.tint} />
-          <Text style={[dynamicStyles.secondaryActionText, { color: colors.tint }]}>Library</Text>
-        </Pressable>
-      </View>
-
     </ScrollView>
   );
 }
@@ -416,7 +566,7 @@ function getDynamicStyles(colors: any) {
     },
     header: {
       paddingHorizontal: 20,
-      paddingVertical: 12,
+      paddingVertical: 8,
     },
     headerRow: {
       flexDirection: "row",
@@ -426,12 +576,10 @@ function getDynamicStyles(colors: any) {
     title: {
       fontFamily: "DMSans_700Bold",
       fontSize: 28,
-      color: colors.text,
     },
     subtitle: {
       fontFamily: "DMSans_400Regular",
       fontSize: 14,
-      color: colors.textSecondary,
       marginTop: 2,
     },
     batchToggleArea: {
@@ -462,83 +610,157 @@ function getDynamicStyles(colors: any) {
       fontFamily: "DMSans_600SemiBold",
       fontSize: 13,
     },
-    scanArea: {
-      height: 320,
-      marginHorizontal: 20,
-      marginVertical: 12,
+    cameraContainer: {
+      marginHorizontal: 12,
+      marginVertical: 8,
+      height: CAMERA_HEIGHT,
       borderRadius: 20,
       overflow: "hidden",
     },
-    placeholder: {
+    camera: {
       flex: 1,
-      borderRadius: 20,
-      borderWidth: 2,
-      borderStyle: "dashed",
+    },
+    cameraOverlay: {
+      ...StyleSheet.absoluteFillObject,
       alignItems: "center",
       justifyContent: "center",
     },
-    crosshairContainer: {
-      width: 200,
-      height: 280,
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 12,
+    cardFrame: {
+      width: SCREEN_WIDTH * 0.6,
+      height: SCREEN_WIDTH * 0.6 * 1.4,
+      maxHeight: CAMERA_HEIGHT * 0.7,
+      position: "relative",
     },
-    corner: {
+    frameCorner: {
       position: "absolute",
-      width: 30,
-      height: 30,
+      width: 28,
+      height: 28,
+      borderColor: "#FFFFFF",
     },
-    topLeft: {
+    frameTL: {
       top: 0,
       left: 0,
       borderTopWidth: 3,
       borderLeftWidth: 3,
       borderTopLeftRadius: 8,
     },
-    topRight: {
+    frameTR: {
       top: 0,
       right: 0,
       borderTopWidth: 3,
       borderRightWidth: 3,
       borderTopRightRadius: 8,
     },
-    bottomLeft: {
+    frameBL: {
       bottom: 0,
       left: 0,
       borderBottomWidth: 3,
       borderLeftWidth: 3,
       borderBottomLeftRadius: 8,
     },
-    bottomRight: {
+    frameBR: {
       bottom: 0,
       right: 0,
       borderBottomWidth: 3,
       borderRightWidth: 3,
       borderBottomRightRadius: 8,
     },
-    placeholderText: {
-      fontFamily: "DMSans_400Regular",
+    frameHint: {
+      fontFamily: "DMSans_500Medium",
       fontSize: 13,
+      color: "rgba(255,255,255,0.8)",
+      marginTop: 12,
+      textShadowColor: "rgba(0,0,0,0.5)",
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 4,
+    },
+    cameraTopBar: {
+      position: "absolute",
+      top: 12,
+      right: 12,
+      flexDirection: "row",
+      gap: 10,
+    },
+    cameraControlButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: "rgba(0,0,0,0.4)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    cameraBottomBar: {
+      position: "absolute",
+      bottom: 16,
+      left: 0,
+      right: 0,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 32,
+    },
+    galleryButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: "rgba(0,0,0,0.4)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    shutterButton: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      backgroundColor: "rgba(255,255,255,0.3)",
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 3,
+      borderColor: "#FFFFFF",
+    },
+    shutterInner: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: "#FFFFFF",
+    },
+    batchFloatingCounter: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    batchFloatingText: {
+      fontFamily: "DMSans_700Bold",
+      fontSize: 16,
+      color: "#FFFFFF",
     },
     previewWrapper: {
       flex: 1,
-      borderRadius: 20,
-      overflow: "hidden",
+      backgroundColor: colors.surfaceAlt,
     },
     preview: {
       flex: 1,
     },
     scanningOverlay: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: "rgba(250, 247, 242, 0.85)",
+      backgroundColor: "rgba(0,0,0,0.5)",
       alignItems: "center",
       justifyContent: "center",
-      gap: 12,
+    },
+    scanningPill: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      backgroundColor: "rgba(0,0,0,0.7)",
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderRadius: 24,
     },
     scanningText: {
       fontFamily: "DMSans_500Medium",
       fontSize: 15,
+      color: "#FFFFFF",
     },
     clearButton: {
       position: "absolute",
@@ -551,8 +773,57 @@ function getDynamicStyles(colors: any) {
       alignItems: "center",
       justifyContent: "center",
     },
+    webFallback: {
+      flex: 1,
+      borderRadius: 20,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 12,
+    },
+    webFallbackText: {
+      fontFamily: "DMSans_600SemiBold",
+      fontSize: 16,
+    },
+    webFallbackHint: {
+      fontFamily: "DMSans_400Regular",
+      fontSize: 13,
+      textAlign: "center" as const,
+      paddingHorizontal: 40,
+    },
+    permissionButton: {
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 12,
+      marginTop: 4,
+    },
+    permissionButtonText: {
+      fontFamily: "DMSans_600SemiBold",
+      fontSize: 15,
+      color: "#FFFFFF",
+    },
+    webActions: {
+      flexDirection: "row",
+      gap: 12,
+      paddingHorizontal: 20,
+      paddingTop: 12,
+    },
+    webActionButton: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      paddingVertical: 14,
+      borderRadius: 14,
+    },
+    webActionText: {
+      fontFamily: "DMSans_600SemiBold",
+      fontSize: 15,
+      color: "#FFFFFF",
+    },
     resultCard: {
       marginHorizontal: 20,
+      marginTop: 12,
       borderRadius: 16,
       padding: 16,
       gap: 14,
@@ -578,8 +849,12 @@ function getDynamicStyles(colors: any) {
       flexDirection: "row",
       gap: 6,
       marginTop: 4,
+      flexWrap: "wrap",
     },
     badge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
       paddingHorizontal: 8,
       paddingVertical: 3,
       borderRadius: 6,
@@ -652,36 +927,6 @@ function getDynamicStyles(colors: any) {
       fontFamily: "DMSans_600SemiBold",
       fontSize: 15,
       color: "#FFFFFF",
-    },
-    actions: {
-      flexDirection: "row",
-      gap: 12,
-      paddingHorizontal: 20,
-      paddingTop: 12,
-    },
-    actionButton: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8,
-      paddingVertical: 14,
-      borderRadius: 14,
-    },
-    primaryAction: {
-      flex: 2,
-    },
-    primaryActionText: {
-      fontFamily: "DMSans_600SemiBold",
-      fontSize: 15,
-      color: "#FFFFFF",
-    },
-    secondaryAction: {
-      flex: 1,
-      borderWidth: 1,
-    },
-    secondaryActionText: {
-      fontFamily: "DMSans_600SemiBold",
-      fontSize: 15,
     },
   });
 }
