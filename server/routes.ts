@@ -114,12 +114,29 @@ function cleanCardNumber(raw: string): string {
   if (num.includes("/")) num = num.split("/")[0].trim();
   if (num.includes(" of ")) num = num.split(" of ")[0].trim();
   num = num.replace(/^#/, "");
+  const opPrefix = num.match(/^(OP|ST|EB|PRB)\d{1,2}-(.+)$/i);
+  if (opPrefix) num = opPrefix[2];
   return num;
 }
 
 function extractPokemonSetId(cardId: string, fallbackSetId: string): string {
   const lastDash = cardId.lastIndexOf("-");
   return lastDash > 0 ? cardId.substring(0, lastDash) : fallbackSetId;
+}
+
+function namesMatch(aiName: string, dbName: string): boolean {
+  const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const a = normalize(aiName);
+  const b = normalize(dbName);
+  if (a === b) return true;
+  if (a.includes(b) || b.includes(a)) return true;
+  const aWords = aiName.toLowerCase().split(/[\s\-]+/).filter(w => w.length > 2);
+  const bWords = dbName.toLowerCase().split(/[\s\-]+/).filter(w => w.length > 2);
+  if (aWords.length > 0 && bWords.length > 0) {
+    const overlap = aWords.filter(w => bWords.some(bw => bw.includes(w) || w.includes(bw)));
+    if (overlap.length >= Math.min(aWords.length, bWords.length) * 0.5) return true;
+  }
+  return false;
 }
 
 async function verifyPokemonCard(name: string, setId: string, rawCardNumber: string, lang: string): Promise<{ name: string; cardId?: string; setId?: string } | null> {
@@ -136,28 +153,23 @@ async function verifyPokemonCard(name: string, setId: string, rawCardNumber: str
       const res = await fetch(`https://api.tcgdex.net/v2/${lang}/cards/${encodeURIComponent(directId)}`);
       if (res.ok) {
         const card = await res.json();
-        console.log(`[Pokemon Verify] EXACT HIT: ${directId} -> ${card.name} (${card.id})`);
-        return { name: card.name, cardId: card.id, setId: extractPokemonSetId(card.id, setId) };
+        if (namesMatch(name, card.name)) {
+          console.log(`[Pokemon Verify] EXACT HIT (name matches): ${directId} -> ${card.name} (${card.id})`);
+          return { name: card.name, cardId: card.id, setId: extractPokemonSetId(card.id, setId) };
+        } else {
+          console.log(`[Pokemon Verify] Number ${directId} exists but name mismatch: AI="${name}" DB="${card.name}" - skipping`);
+        }
       }
     } catch {}
   }
-  console.log(`[Pokemon Verify] No exact match for ${setId}-${cardNumber}, searching set...`);
 
+  console.log(`[Pokemon Verify] No name+number match, searching by name in set ${setId}...`);
   try {
     const setRes = await fetch(`https://api.tcgdex.net/v2/${lang}/sets/${encodeURIComponent(setId)}`);
     if (setRes.ok) {
       const setData = await setRes.json();
       if (setData.cards) {
-        for (const num of numberVariants) {
-          const match = setData.cards.find((c: any) => c.localId === num);
-          if (match) {
-            console.log(`[Pokemon Verify] SET SEARCH HIT: localId=${num} -> ${match.name} (${match.id})`);
-            return { name: match.name, cardId: match.id, setId: extractPokemonSetId(match.id, setId) };
-          }
-        }
-        const nameMatches = setData.cards.filter((c: any) =>
-          c.name.toLowerCase() === name.toLowerCase()
-        );
+        const nameMatches = setData.cards.filter((c: any) => namesMatch(name, c.name));
         if (nameMatches.length === 1) {
           console.log(`[Pokemon Verify] NAME MATCH in set: ${nameMatches[0].name} (${nameMatches[0].id})`);
           return { name: nameMatches[0].name, cardId: nameMatches[0].id, setId: extractPokemonSetId(nameMatches[0].id, setId) };
@@ -174,30 +186,33 @@ async function verifyPokemonCard(name: string, setId: string, rawCardNumber: str
             console.log(`[Pokemon Verify] CLOSEST NAME in set: ${closest.name} (${closest.id}), dist=${closestDist}`);
             return { name: closest.name, cardId: closest.id, setId: extractPokemonSetId(closest.id, setId) };
           }
+          return { name: nameMatches[0].name, cardId: nameMatches[0].id, setId: extractPokemonSetId(nameMatches[0].id, setId) };
         }
       }
     }
   } catch {}
-  console.log(`[Pokemon Verify] Card not found in set ${setId}, doing global search by name+number...`);
 
+  console.log(`[Pokemon Verify] Not found in set ${setId}, doing global name search...`);
   try {
     const searchByName = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(name)}`);
     if (searchByName.ok) {
       const searchData = await searchByName.json();
       if (Array.isArray(searchData) && searchData.length > 0) {
         console.log(`[Pokemon Verify] Global search found ${searchData.length} results for "${name}"`);
-        for (const num of numberVariants) {
-          const byExactNum = searchData.find((c: any) => c.localId === num);
-          if (byExactNum) {
-            console.log(`[Pokemon Verify] GLOBAL NAME+NUM HIT: localId=${num} -> ${byExactNum.name} (${byExactNum.id})`);
-            return { name: byExactNum.name, cardId: byExactNum.id, setId: extractPokemonSetId(byExactNum.id, setId) };
-          }
-        }
         const inOriginalSet = searchData.find((c: any) => c.id.startsWith(setId + "-"));
         if (inOriginalSet) {
           console.log(`[Pokemon Verify] GLOBAL found in original set: ${inOriginalSet.name} (${inOriginalSet.id})`);
           return { name: inOriginalSet.name, cardId: inOriginalSet.id, setId: extractPokemonSetId(inOriginalSet.id, setId) };
         }
+        for (const num of numberVariants) {
+          const byNum = searchData.find((c: any) => c.localId === num);
+          if (byNum) {
+            console.log(`[Pokemon Verify] GLOBAL NAME+NUM HIT: ${byNum.name} (${byNum.id})`);
+            return { name: byNum.name, cardId: byNum.id, setId: extractPokemonSetId(byNum.id, setId) };
+          }
+        }
+        console.log(`[Pokemon Verify] Returning first global result: ${searchData[0].name} (${searchData[0].id})`);
+        return { name: searchData[0].name, cardId: searchData[0].id, setId: extractPokemonSetId(searchData[0].id, setId) };
       }
     }
   } catch {}
@@ -211,17 +226,15 @@ async function verifyPokemonCard(name: string, setId: string, rawCardNumber: str
       if (partialSearch.ok) {
         const partialData = await partialSearch.json();
         if (Array.isArray(partialData) && partialData.length > 0) {
-          for (const num of numberVariants) {
-            const hit = partialData.find((c: any) => c.localId === num);
-            if (hit) {
-              console.log(`[Pokemon Verify] PARTIAL NAME+NUM HIT: ${hit.name} (${hit.id})`);
-              return { name: hit.name, cardId: hit.id, setId: extractPokemonSetId(hit.id, setId) };
-            }
+          const matching = partialData.filter((c: any) => namesMatch(name, c.name));
+          if (matching.length > 0) {
+            const inSet = matching.find((c: any) => c.id.startsWith(setId + "-"));
+            if (inSet) return { name: inSet.name, cardId: inSet.id, setId: extractPokemonSetId(inSet.id, setId) };
+            return { name: matching[0].name, cardId: matching[0].id, setId: extractPokemonSetId(matching[0].id, setId) };
           }
-          const inOriginalSet = partialData.find((c: any) => c.id.startsWith(setId + "-"));
-          if (inOriginalSet) {
-            return { name: inOriginalSet.name, cardId: inOriginalSet.id, setId: extractPokemonSetId(inOriginalSet.id, setId) };
-          }
+          const inSet = partialData.find((c: any) => c.id.startsWith(setId + "-"));
+          if (inSet) return { name: inSet.name, cardId: inSet.id, setId: extractPokemonSetId(inSet.id, setId) };
+          return { name: partialData[0].name, cardId: partialData[0].id, setId: extractPokemonSetId(partialData[0].id, setId) };
         }
       }
     }
@@ -567,14 +580,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return null;
   }
 
-  async function nameSearchOnePiece(name: string): Promise<any | null> {
-    try {
-      const res = await fetch(`https://optcgapi.com/api/cards/search/${encodeURIComponent(name)}/`);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) return data;
-      }
-    } catch {}
+  async function nameSearchOnePiece(name: string, setId?: string): Promise<any[] | null> {
+    const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const normalizedName = normalize(name);
+
+    if (setId) {
+      const setIdWithDash = setId.includes("-") ? setId : setId.replace(/(\D+)(\d+)/, "$1-$2");
+      try {
+        const res = await fetch(`https://optcgapi.com/api/sets/${setIdWithDash}/`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            const matches = data.filter((c: any) => {
+              const cardName = normalize(c.card_name || "");
+              return cardName === normalizedName || cardName.includes(normalizedName) || normalizedName.includes(cardName);
+            });
+            if (matches.length > 0) return matches;
+          }
+        }
+      } catch {}
+    }
+
+    const allSets = await fetchSetsForGame("onepiece");
+    for (const set of allSets.slice(0, 15)) {
+      try {
+        const res = await fetch(`https://optcgapi.com/api/sets/${set.id}/`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            const matches = data.filter((c: any) => {
+              const cardName = normalize(c.card_name || "");
+              return cardName === normalizedName || cardName.includes(normalizedName) || normalizedName.includes(cardName);
+            });
+            if (matches.length > 0) return matches;
+          }
+        }
+      } catch {}
+    }
     return null;
   }
 
@@ -679,40 +721,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     } else if (game === "onepiece") {
       const cleanNum = cardNumber.replace(/^0+/, "").padStart(3, "0");
-      const cardId = `${setId}-${cleanNum}`;
-      try {
-        const res = await fetch(`https://optcgapi.com/api/sets/card/${cardId}/`);
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            console.log(`[DeepVerify] OP exact HIT: ${data[0].card_name} (${data[0].card_set_id})`);
-            return { name: data[0].card_name, cardId: data[0].card_set_id, setId: data[0].set_id || setId, verified: true };
-          }
-        }
-      } catch {}
+      const normalizeSetId = (sid: string) => sid.replace("-", "");
+      const setIdNoDash = normalizeSetId(setId);
+      const setIdWithDash = setId.includes("-") ? setId : setId.replace(/(\D+)(\d+)/, "$1-$2");
+      const cardIdFormats = [
+        `${setIdNoDash}-${cleanNum}`,
+        `${setIdWithDash}-${cleanNum}`,
+        `${setId}-${cleanNum}`,
+      ];
+      const tried = new Set<string>();
 
-      if (!setId.includes("-")) {
-        const altSetId = setId.replace(/(\D+)(\d+)/, "$1-$2");
-        const altCardId = `${altSetId}-${cleanNum}`;
+      for (const cid of cardIdFormats) {
+        if (tried.has(cid)) continue;
+        tried.add(cid);
         try {
-          const altRes = await fetch(`https://optcgapi.com/api/sets/card/${altCardId}/`);
-          if (altRes.ok) {
-            const altData = await altRes.json();
-            if (Array.isArray(altData) && altData.length > 0) {
-              return { name: altData[0].card_name, cardId: altData[0].card_set_id, setId: altData[0].set_id || altSetId, verified: true };
+          const res = await fetch(`https://optcgapi.com/api/sets/card/${cid}/`);
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0) {
+              const card = data[0];
+              if (namesMatch(name, card.card_name)) {
+                console.log(`[DeepVerify] OP exact HIT (name matches): ${card.card_name} (${card.card_set_id})`);
+                return { name: card.card_name, cardId: card.card_set_id, setId: card.set_id || setId, verified: true };
+              } else {
+                console.log(`[DeepVerify] OP number hit but name mismatch: AI="${name}" DB="${card.card_name}"`);
+              }
             }
           }
         } catch {}
       }
 
-      const nameResults = await nameSearchOnePiece(name);
+      const nameResults = await nameSearchOnePiece(name, setId);
       if (nameResults) {
         const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
         const exact = nameResults.find((c: any) => normalize(c.card_name) === normalize(name));
-        const match = exact || nameResults[0];
+        const inSet = nameResults.find((c: any) => normalizeSetId(c.set_id || "") === setIdNoDash || (c.card_set_id || "").startsWith(setIdNoDash));
+        const match = exact || inSet || nameResults[0];
         console.log(`[DeepVerify] OP name search HIT: ${match.card_name} (${match.card_set_id})`);
         return { name: match.card_name, cardId: match.card_set_id, setId: match.set_id || setId, verified: true };
       }
+
       console.log(`[DeepVerify] OP not found for "${name}"`);
       return { name, verified: false };
 
@@ -721,8 +769,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const res = await fetch(`https://api.scryfall.com/cards/${encodeURIComponent(setId)}/${encodeURIComponent(cardNumber)}`);
         if (res.ok) {
           const card = await res.json();
-          console.log(`[DeepVerify] MTG exact HIT: ${card.name} (${card.set}/${card.collector_number})`);
-          return { name: card.name, cardId: `${card.set}-${card.collector_number}`, setId: card.set, verified: true };
+          if (namesMatch(name, card.name)) {
+            console.log(`[DeepVerify] MTG exact HIT (name matches): ${card.name} (${card.set}/${card.collector_number})`);
+            return { name: card.name, cardId: `${card.set}-${card.collector_number}`, setId: card.set, verified: true };
+          } else {
+            console.log(`[DeepVerify] MTG number hit but name mismatch: AI="${name}" DB="${card.name}"`);
+          }
         }
       } catch {}
 
