@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   StyleSheet,
   Text,
@@ -8,7 +8,11 @@ import {
   Pressable,
   ActivityIndicator,
   Alert,
+  Modal,
+  TextInput,
+  ScrollView,
 } from "react-native";
+import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -28,11 +32,71 @@ export default function SetDetailScreen() {
   const insets = useSafeAreaInsets();
   const { game, id, lang } = useLocalSearchParams<{ game: string; id: string; lang?: string }>();
   const gameId = game as GameId;
-  const { hasCard, setCards, removeCard, cardQuantity } = useCollection();
+  const { hasCard, setCards, removeCard, removeOneCard, clearSet, addCard, cardQuantity } = useCollection();
   const { colors } = useTheme();
 
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const [sortMode, setSortMode] = useState<SortMode>("number");
+  const [quickAddVisible, setQuickAddVisible] = useState(false);
+  const [quickAddSearch, setQuickAddSearch] = useState("");
+
+  const handleResetSet = useCallback(() => {
+    Alert.alert(
+      "Reset Set",
+      `Remove all cards from "${setDetail?.name || id}"? This cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reset",
+          style: "destructive",
+          onPress: async () => {
+            await clearSet(gameId, id || "");
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          },
+        },
+      ]
+    );
+  }, [clearSet, gameId, id, setDetail?.name]);
+
+  const handleQuickAdd = useCallback(
+    async (cardId: string) => {
+      await addCard(gameId, id || "", cardId);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+    [addCard, gameId, id]
+  );
+
+  const handleQuickRemove = useCallback(
+    async (cardId: string, cardName: string) => {
+      Alert.alert(
+        "Remove Card",
+        `Remove one copy of "${cardName}"?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Remove",
+            style: "destructive",
+            onPress: async () => {
+              await removeOneCard(gameId, id || "", cardId);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            },
+          },
+        ]
+      );
+    },
+    [removeOneCard, gameId, id]
+  );
+
+  const quickAddFilteredCards = useMemo(() => {
+    const allCards = setDetail?.cards || [];
+    if (!quickAddSearch.trim()) return allCards;
+    const q = quickAddSearch.toLowerCase();
+    return allCards.filter(
+      (c) =>
+        (c.englishName || c.name).toLowerCase().includes(q) ||
+        c.localId.toLowerCase().includes(q)
+    );
+  }, [setDetail?.cards, quickAddSearch]);
 
   const langParam = lang === "ja" ? "ja" : "en";
   const queryPath = gameId === "pokemon" && langParam === "ja"
@@ -252,9 +316,25 @@ export default function SetDetailScreen() {
       </View>
 
       <View style={styles.binderHeader}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={dynamicStyles.binderTitle}>Binder View</Text>
           <Text style={dynamicStyles.binderSubtitle}>Scan cards to fill in your collection</Text>
+        </View>
+        <View style={styles.binderActions}>
+          <Pressable
+            style={[styles.actionBtn, { backgroundColor: colors.tint + "15" }]}
+            onPress={() => { setQuickAddSearch(""); setQuickAddVisible(true); }}
+          >
+            <Ionicons name="add-circle-outline" size={18} color={colors.tint} />
+          </Pressable>
+          {collectedCount > 0 && (
+            <Pressable
+              style={[styles.actionBtn, { backgroundColor: (colors.danger || "#E53E3E") + "15" }]}
+              onPress={handleResetSet}
+            >
+              <Ionicons name="refresh-outline" size={18} color={colors.danger || "#E53E3E"} />
+            </Pressable>
+          )}
         </View>
       </View>
 
@@ -336,14 +416,25 @@ export default function SetDetailScreen() {
                 onLongPress={collected ? () => {
                   Alert.alert(
                     "Remove Card",
-                    `Remove ${item.name} from your collection?`,
+                    `Remove one copy of "${item.englishName || item.name}"? (${qty} in collection)`,
                     [
                       { text: "Cancel", style: "cancel" },
                       {
-                        text: "Remove",
+                        text: "Remove One",
                         style: "destructive",
-                        onPress: () => removeCard(gameId, id || "", item.id),
+                        onPress: () => {
+                          removeOneCard(gameId, id || "", item.id);
+                          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        },
                       },
+                      ...(qty > 1 ? [{
+                        text: "Remove All",
+                        style: "destructive" as const,
+                        onPress: () => {
+                          removeCard(gameId, id || "", item.id);
+                          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        },
+                      }] : []),
                     ]
                   );
                 } : undefined}
@@ -358,6 +449,88 @@ export default function SetDetailScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       />
+
+      <Modal
+        visible={quickAddVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setQuickAddVisible(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={styles.modalHeader}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Quick Add</Text>
+            <Pressable onPress={() => setQuickAddVisible(false)}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </Pressable>
+          </View>
+          <View style={[styles.searchBar, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardBorder }]}>
+            <Ionicons name="search" size={18} color={colors.textTertiary} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.text }]}
+              placeholder="Search by name or number..."
+              placeholderTextColor={colors.textTertiary}
+              value={quickAddSearch}
+              onChangeText={setQuickAddSearch}
+              autoFocus
+            />
+            {quickAddSearch.length > 0 && (
+              <Pressable onPress={() => setQuickAddSearch("")}>
+                <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
+              </Pressable>
+            )}
+          </View>
+          <FlatList
+            data={quickAddFilteredCards}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 40 }}
+            renderItem={({ item }) => {
+              const collected = hasCard(gameId, id || "", item.id);
+              const qty = collected ? cardQuantity(gameId, id || "", item.id) : 0;
+              return (
+                <View style={[styles.quickAddRow, { borderBottomColor: colors.cardBorder }]}>
+                  <View style={styles.quickAddInfo}>
+                    <Text style={[styles.quickAddNumber, { color: colors.textTertiary }]}>
+                      #{item.localId}
+                    </Text>
+                    <Text style={[styles.quickAddName, { color: colors.text }]} numberOfLines={1}>
+                      {item.englishName || item.name}
+                    </Text>
+                    {qty > 0 && (
+                      <View style={[styles.qtyBadge, { backgroundColor: colors.tint + "20" }]}>
+                        <Text style={[styles.qtyBadgeText, { color: colors.tint }]}>x{qty}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.quickAddActions}>
+                    {qty > 0 && (
+                      <Pressable
+                        style={[styles.quickAddBtn, { backgroundColor: (colors.danger || "#E53E3E") + "15" }]}
+                        onPress={() => handleQuickRemove(item.id, item.englishName || item.name)}
+                      >
+                        <Ionicons name="remove" size={20} color={colors.danger || "#E53E3E"} />
+                      </Pressable>
+                    )}
+                    <Pressable
+                      style={[styles.quickAddBtn, { backgroundColor: colors.tint + "15" }]}
+                      onPress={() => handleQuickAdd(item.id)}
+                    >
+                      <Ionicons name="add" size={20} color={colors.tint} />
+                    </Pressable>
+                  </View>
+                </View>
+              );
+            }}
+            ListEmptyComponent={
+              <View style={styles.quickAddEmpty}>
+                <Text style={[styles.quickAddEmptyText, { color: colors.textTertiary }]}>
+                  No cards found
+                </Text>
+              </View>
+            }
+          />
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -404,6 +577,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginTop: 16,
   },
+  binderActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  actionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   filterBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -426,5 +610,88 @@ const styles = StyleSheet.create({
   cellWrapper: {
     flex: 1,
     maxWidth: "33.33%",
+  },
+  modalContainer: {
+    flex: 1,
+    paddingTop: 20,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  modalTitle: {
+    fontFamily: "DMSans_700Bold",
+    fontSize: 22,
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 20,
+    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: "DMSans_400Regular",
+    fontSize: 15,
+    padding: 0,
+  },
+  quickAddRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  quickAddInfo: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  quickAddNumber: {
+    fontFamily: "DMSans_500Medium",
+    fontSize: 13,
+    minWidth: 36,
+  },
+  quickAddName: {
+    fontFamily: "DMSans_600SemiBold",
+    fontSize: 15,
+    flex: 1,
+  },
+  qtyBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  qtyBadgeText: {
+    fontFamily: "DMSans_600SemiBold",
+    fontSize: 12,
+  },
+  quickAddActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  quickAddBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickAddEmpty: {
+    paddingVertical: 40,
+    alignItems: "center",
+  },
+  quickAddEmptyText: {
+    fontFamily: "DMSans_400Regular",
+    fontSize: 14,
   },
 });
