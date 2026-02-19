@@ -12,16 +12,17 @@ interface CardCellProps {
   isCollected: boolean;
   quantity?: number;
   price?: number | null;
+  selected?: boolean;
   onPress: () => void;
   onLongPress?: () => void;
 }
 
-export function CardCell({ cardId, localId, name, imageUrl, isCollected, quantity, price, onPress, onLongPress }: CardCellProps) {
+export function CardCell({ cardId, localId, name, imageUrl, isCollected, quantity, price, selected, onPress, onLongPress }: CardCellProps) {
   const { colors } = useTheme();
   return (
     <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={400} style={styles.container}>
 
-      <View style={[styles.cardWrapper, { backgroundColor: colors.surface, borderColor: colors.cardBorder, ...Platform.select({ ios: { shadowColor: colors.shadow }, default: {} }) }, !isCollected && { borderColor: colors.borderLight }]}>
+      <View style={[styles.cardWrapper, { backgroundColor: colors.surface, borderColor: colors.cardBorder, ...Platform.select({ ios: { shadowColor: colors.shadow }, default: {} }) }, !isCollected && { borderColor: colors.borderLight }, selected && { borderColor: colors.error, borderWidth: 2 }]}>
         {imageUrl ? (
           <>
             <Image
@@ -60,6 +61,13 @@ export function CardCell({ cardId, localId, name, imageUrl, isCollected, quantit
         {price != null && price > 0 && (
           <View style={[styles.priceBadge, { backgroundColor: colors.tint }]}>
             <Text style={styles.priceBadgeText}>${price < 1 ? price.toFixed(2) : price < 100 ? price.toFixed(2) : Math.round(price)}</Text>
+          </View>
+        )}
+        {selected && (
+          <View style={[styles.selectedOverlay]}>
+            <View style={[styles.selectedBadge, { backgroundColor: colors.error }]}>
+              <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+            </View>
           </View>
         )}
       </View>
@@ -170,5 +178,18 @@ const styles = StyleSheet.create({
     fontSize: 10,
     textAlign: "center",
     width: "100%",
+  },
+  selectedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(220, 50, 50, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  selectedBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
