@@ -1085,8 +1085,8 @@ Return ONLY valid JSON.`,
       const tcgPrice = sourceCard.pricing?.tcgplayer;
       const cmPrice = sourceCard.pricing?.cardmarket;
       const priceData = tcgPrice?.holofoil || tcgPrice?.normal || tcgPrice?.reverseHolofoil;
-      const currentPrice = priceData?.marketPrice ?? priceData?.midPrice ?? cmPrice?.trend ?? null;
-      const priceLow = priceData?.lowPrice ?? cmPrice?.low ?? null;
+      const currentPrice = priceData?.marketPrice ?? priceData?.midPrice ?? (cmPrice?.trend ? Math.round(cmPrice.trend * 108) / 100 : null);
+      const priceLow = priceData?.lowPrice ?? (cmPrice?.low ? Math.round(cmPrice.low * 108) / 100 : null);
       const priceHigh = priceData?.highPrice ?? null;
 
       const jaDescription = c.attacks?.map((a: any) => `${a.name}: ${a.effect || `${a.damage} damage`}`).join("\n") ||
@@ -1108,7 +1108,7 @@ Return ONLY valid JSON.`,
         description: englishDescription || jaDescription,
         artist: c.illustrator || null,
         currentPrice,
-        priceUnit: tcgPrice ? "USD" : cmPrice ? "EUR" : "USD",
+        priceUnit: "USD",
         priceLow,
         priceHigh,
       });
@@ -1251,7 +1251,10 @@ Return ONLY valid JSON.`,
         const tcgPrice = c.pricing?.tcgplayer;
         const cmPrice = c.pricing?.cardmarket;
         const priceData = tcgPrice?.holofoil || tcgPrice?.normal || tcgPrice?.reverseHolofoil;
-        return priceData?.marketPrice ?? priceData?.midPrice ?? cmPrice?.trend ?? null;
+        const usdPrice = priceData?.marketPrice ?? priceData?.midPrice ?? null;
+        if (usdPrice != null) return usdPrice;
+        if (cmPrice?.trend) return Math.round(cmPrice.trend * 108) / 100;
+        return null;
       }
 
       async function fetchCardPrice(card: { game: string; cardId: string }): Promise<{ cardId: string; name: string; price: number | null }> {
