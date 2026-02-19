@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from "react";
 import type { CollectionData, GameId } from "./types";
+import { GAMES } from "./types";
 import {
   getCollection,
   saveCollection,
@@ -16,6 +17,9 @@ import { getCachedSets, type CachedSet } from "./card-cache";
 import { apiRequest, getApiUrl } from "./query-client";
 import { useAuth } from "./AuthContext";
 import { fetch } from "expo/fetch";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const ENABLED_GAMES_KEY = "cardvault_enabled_games";
 
 type SyncStatus = "idle" | "syncing" | "error" | "success";
 
@@ -46,6 +50,8 @@ interface CollectionContextValue {
   importCollection: (jsonData: string) => Promise<{ success: boolean; error?: string }>;
   progressToast: ProgressToastData | null;
   clearProgressToast: () => void;
+  enabledGames: GameId[];
+  toggleGame: (game: GameId) => void;
 }
 
 const CollectionContext = createContext<CollectionContextValue | null>(null);
@@ -66,6 +72,29 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
   const isSyncingRef = useRef(false);
   const [progressToast, setProgressToast] = useState<ProgressToastData | null>(null);
   const progressToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const allGameIds = useMemo(() => GAMES.map(g => g.id), []);
+  const [enabledGames, setEnabledGames] = useState<GameId[]>(allGameIds);
+
+  useEffect(() => {
+    AsyncStorage.getItem(ENABLED_GAMES_KEY).then(val => {
+      if (val) {
+        try {
+          const parsed = JSON.parse(val) as GameId[];
+          if (Array.isArray(parsed) && parsed.length > 0) setEnabledGames(parsed);
+        } catch {}
+      }
+    });
+  }, []);
+
+  const toggleGame = useCallback((game: GameId) => {
+    setEnabledGames(prev => {
+      const isEnabled = prev.includes(game);
+      if (isEnabled && prev.length <= 1) return prev;
+      const next = isEnabled ? prev.filter(g => g !== game) : [...prev, game];
+      AsyncStorage.setItem(ENABLED_GAMES_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
 
   const performSync = useCallback(async (data: CollectionData): Promise<boolean> => {
     try {
@@ -262,8 +291,8 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
   }, [debouncedSync]);
 
   const value = useMemo(
-    () => ({ collection, loading, addCard, removeCard, removeOneCard, clearSet, totalCards, setCards, hasCard, cardQuantity, refresh: loadCollection, syncCollection, loadFromCloud, syncStatus, lastSyncTime, exportCollection, importCollection, progressToast, clearProgressToast }),
-    [collection, loading, addCard, removeCard, removeOneCard, clearSet, totalCards, setCards, hasCard, cardQuantity, loadCollection, syncCollection, loadFromCloud, syncStatus, lastSyncTime, exportCollection, importCollection, progressToast, clearProgressToast]
+    () => ({ collection, loading, addCard, removeCard, removeOneCard, clearSet, totalCards, setCards, hasCard, cardQuantity, refresh: loadCollection, syncCollection, loadFromCloud, syncStatus, lastSyncTime, exportCollection, importCollection, progressToast, clearProgressToast, enabledGames, toggleGame }),
+    [collection, loading, addCard, removeCard, removeOneCard, clearSet, totalCards, setCards, hasCard, cardQuantity, loadCollection, syncCollection, loadFromCloud, syncStatus, lastSyncTime, exportCollection, importCollection, progressToast, clearProgressToast, enabledGames, toggleGame]
   );
 
   return <CollectionContext.Provider value={value}>{children}</CollectionContext.Provider>;
