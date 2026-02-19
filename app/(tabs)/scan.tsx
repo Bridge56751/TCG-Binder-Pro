@@ -433,6 +433,20 @@ export default function ScanScreen() {
                   </Text>
                 </Pressable>
               </View>
+              <Pressable
+                style={({ pressed }) => ({
+                  flexDirection: "row" as const,
+                  alignItems: "center" as const,
+                  justifyContent: "center" as const,
+                  gap: 6,
+                  paddingVertical: 10,
+                  opacity: pressed ? 0.6 : 1,
+                })}
+                onPress={resetScan}
+              >
+                <Ionicons name="camera-reverse" size={16} color={colors.textTertiary} />
+                <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textTertiary }}>Retake Photo</Text>
+              </Pressable>
             </View>
           ) : (
           <View style={{ gap: 14 }}>
