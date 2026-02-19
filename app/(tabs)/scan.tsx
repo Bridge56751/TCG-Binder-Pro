@@ -198,10 +198,20 @@ export default function ScanScreen() {
       });
       const data: CardIdentification = await res.json();
       if (data.verified) {
-        setScanResult({
+        const corrected: CardIdentification = {
           ...scanResult,
           ...data,
-        });
+        };
+        if (!data.englishName) {
+          corrected.englishName = undefined as any;
+        }
+        if (!data.englishSetName) {
+          corrected.englishSetName = undefined as any;
+        }
+        if (!data.rarity) {
+          corrected.rarity = scanResult.rarity;
+        }
+        setScanResult(corrected);
         setIsEditing(false);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         showToast("Card found!");
