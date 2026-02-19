@@ -20,7 +20,13 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withSpring,
+  withSequence,
+  withDelay,
   interpolate,
+  FadeIn,
+  ZoomIn,
+  SlideInDown,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/lib/ThemeContext";
@@ -103,7 +109,11 @@ export default function CardDetailScreen() {
   const gameInfo = GAMES.find((g) => g.id === gameId);
 
   const [tradeList, setTradeList] = useState<TradeItem[]>([]);
+  const [justAdded, setJustAdded] = useState(false);
   const flipAnim = useSharedValue(90);
+  const addScale = useSharedValue(1);
+  const glowOpacity = useSharedValue(0);
+  const badgeScale = useSharedValue(0);
 
   useEffect(() => {
     getTradeList().then(setTradeList);
@@ -119,9 +129,17 @@ export default function CardDetailScreen() {
   const flipStyle = useAnimatedStyle(() => {
     const rotateY = interpolate(flipAnim.value, [0, 90], [0, 90]);
     return {
-      transform: [{ perspective: 1000 }, { rotateY: `${rotateY}deg` }],
+      transform: [{ perspective: 1000 }, { rotateY: `${rotateY}deg` }, { scale: addScale.value }],
     };
   });
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: glowOpacity.value,
+  }));
+
+  const ownedBadgeStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: badgeScale.value }],
+  }));
 
   const cardLang = lang === "ja" ? "ja" : "en";
   const cardQueryPath = gameId === "pokemon" && cardLang === "ja"
@@ -251,6 +269,10 @@ export default function CardDetailScreen() {
                 <Text style={styles.tradeBadgeText}>For Trade</Text>
               </View>
             )}
+            <Animated.View
+              style={[styles.addGlow, { borderColor: gameInfo?.color || colors.tint }, glowStyle]}
+              pointerEvents="none"
+            />
           </Animated.View>
         </View>
 
@@ -281,7 +303,16 @@ export default function CardDetailScreen() {
             )}
             {isInCollection && (() => {
               const qty = cardQuantity(gameId, card.setId, cardId || "");
-              return (
+              return justAdded ? (
+                <Animated.View
+                  style={[styles.badge, { backgroundColor: colors.success + "18" }, ownedBadgeStyle]}
+                >
+                  <Ionicons name="layers" size={12} color={colors.success} />
+                  <Text style={[styles.badgeText, { color: colors.success }]}>
+                    x{qty} owned
+                  </Text>
+                </Animated.View>
+              ) : (
                 <View style={[styles.badge, { backgroundColor: colors.success + "18" }]}>
                   <Ionicons name="layers" size={12} color={colors.success} />
                   <Text style={[styles.badgeText, { color: colors.success }]}>
@@ -298,6 +329,16 @@ export default function CardDetailScreen() {
               onPress={async () => {
                 await addCard(gameId, card.setId, cardId || "");
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                setJustAdded(true);
+                addScale.value = withSequence(
+                  withTiming(1.08, { duration: 150 }),
+                  withSpring(1, { damping: 8, stiffness: 200 })
+                );
+                glowOpacity.value = withSequence(
+                  withTiming(1, { duration: 200 }),
+                  withDelay(400, withTiming(0, { duration: 500 }))
+                );
+                badgeScale.value = withDelay(100, withSpring(1, { damping: 6, stiffness: 300 }));
               }}
             >
               <Ionicons name="add-circle" size={20} color="#FFFFFF" />
@@ -480,6 +521,11 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_600SemiBold",
     fontSize: 10,
     color: "#FFFFFF",
+  },
+  addGlow: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 3,
+    borderRadius: 12,
   },
   infoSection: {
     paddingHorizontal: 20,
