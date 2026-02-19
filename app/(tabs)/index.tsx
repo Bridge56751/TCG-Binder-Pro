@@ -232,7 +232,7 @@ export default function CollectionScreen() {
         </View>
       </View>
 
-      <View style={styles.statsRow}>
+      <Pressable style={styles.statsRow} onPress={() => router.push("/all-cards")}>
         <StatCard
           icon="layers"
           label="Cards"
@@ -251,7 +251,7 @@ export default function CollectionScreen() {
           value={String(completedSets.length)}
           color={colors.success}
         />
-      </View>
+      </Pressable>
 
       <View style={styles.valueBannerWrapper}>
         <View

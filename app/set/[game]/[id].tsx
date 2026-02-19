@@ -329,10 +329,10 @@ export default function SetDetailScreen() {
           </Pressable>
           {collectedCount > 0 && (
             <Pressable
-              style={[styles.actionBtn, { backgroundColor: (colors.danger || "#E53E3E") + "15" }]}
+              style={[styles.actionBtn, { backgroundColor: colors.error + "15" }]}
               onPress={handleResetSet}
             >
-              <Ionicons name="refresh-outline" size={18} color={colors.danger || "#E53E3E"} />
+              <Ionicons name="refresh-outline" size={18} color={colors.error} />
             </Pressable>
           )}
         </View>
@@ -505,10 +505,10 @@ export default function SetDetailScreen() {
                   <View style={styles.quickAddActions}>
                     {qty > 0 && (
                       <Pressable
-                        style={[styles.quickAddBtn, { backgroundColor: (colors.danger || "#E53E3E") + "15" }]}
+                        style={[styles.quickAddBtn, { backgroundColor: colors.error + "15" }]}
                         onPress={() => handleQuickRemove(item.id, item.englishName || item.name)}
                       >
-                        <Ionicons name="remove" size={20} color={colors.danger || "#E53E3E"} />
+                        <Ionicons name="remove" size={20} color={colors.error} />
                       </Pressable>
                     )}
                     <Pressable

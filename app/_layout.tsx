@@ -69,6 +69,13 @@ function RootLayoutNav() {
           presentation: "modal",
         }}
       />
+      <Stack.Screen
+        name="all-cards"
+        options={{
+          headerShown: false,
+          presentation: "card",
+        }}
+      />
     </Stack>
   );
 }

@@ -85,14 +85,14 @@ function CardRow({
           <Text style={[styles.cardPrice, { color: colors.textTertiary }]}>—</Text>
         )}
         <Pressable
-          style={[styles.deleteBtn, { backgroundColor: colors.danger + "15" }]}
+          style={[styles.deleteBtn, { backgroundColor: colors.error + "15" }]}
           onPress={(e) => {
             e.stopPropagation?.();
             onDelete();
           }}
           hitSlop={8}
         >
-          <Ionicons name="trash-outline" size={16} color={colors.danger || "#E53E3E"} />
+          <Ionicons name="trash-outline" size={16} color={colors.error} />
         </Pressable>
       </View>
     </Pressable>
