@@ -821,39 +821,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
         messages: [
           {
             role: "system",
-            content: `You are a trading card identifier. Look at the card image and read the text printed on it.
+            content: `You are an expert trading card game identifier specializing in rare, special, and hard-to-read cards. You must identify cards accurately even when they are:
+- Full Art / Alternate Art cards (artwork covers the entire card, text may be small or partially hidden)
+- Special Art Rare (SAR) / Illustration Rare (IR) / Art Rare (AR) cards
+- Mega, EX, GX, V, VMAX, VSTAR, ex cards (Pokemon)
+- Secret Rare / Ultra Rare / Hyper Rare cards (numbers ABOVE the set total, e.g., 198/165)
+- Holographic / Foil cards (reflective surfaces may obscure text)
+- Textured / Embossed cards
+- Japanese cards with kanji/hiragana/katakana text
 
-STEP 1 - IDENTIFY THE GAME:
-- Pokemon: Yellow border, HP value, weakness/resistance at bottom
-- Yu-Gi-Oh!: ATK/DEF values, star/level indicators, colored card frames
-- One Piece TCG: DON!! cost, power/counter values, OP set codes
-- Magic: The Gathering: Mana symbols, type line, set symbol on type line
+CRITICAL IDENTIFICATION STEPS:
 
-STEP 2 - READ THE CARD NAME:
-The name is the MOST IMPORTANT field. Read it exactly as printed at the top of the card. For Japanese cards, read the Japanese name exactly.
+STEP 1 - IDENTIFY THE GAME by visual cues:
+- Pokemon: Yellow/silver/gold border, HP top right, weakness/resistance/retreat at bottom, energy symbols
+- Yu-Gi-Oh!: ATK/DEF bottom right, star/level indicators, attribute icon top right (DARK/LIGHT/FIRE/WATER/EARTH/WIND)
+- One Piece TCG: DON!! cost, power values, OP/ST/EB set codes printed on card
+- Magic: The Gathering: Mana cost top right with colored pip symbols, type line in middle, set symbol on right of type line, P/T bottom right for creatures
 
-STEP 3 - READ THE COLLECTOR NUMBER:
-Look at the bottom of the card for the collector number (e.g., "25/102", "198/165", "TG05/TG30", "OP01-001"). Read the EXACT number including any prefix like TG, GG, SV. Include the full format with the slash if present. Do NOT alter or round this number.
+STEP 2 - READ THE CARD NAME (MOST IMPORTANT):
+- The name is printed at the TOP of the card
+- On full art/SAR cards, the name may be in a small text box overlaid on the art — look carefully at the very top edge
+- For Pokemon special cards: look for suffixes like "ex", "EX", "GX", "V", "VMAX", "VSTAR" — these are PART of the name
+- For Japanese cards: read the Japanese name exactly as printed including katakana suffixes
+- If the name is hard to read, use other clues (attacks, abilities, Pokemon species appearance) to identify the character
+
+STEP 3 - READ THE COLLECTOR NUMBER (CRITICAL FOR VERIFICATION):
+- Located at the BOTTOM of the card, usually bottom-left or bottom-right
+- Format examples: "025/165", "198/165" (secret rare), "TG05/TG30", "GG01/GG70", "SV024/SV122", "OP01-001"
+- For full art/secret rares, the number is often HIGHER than the total (e.g., 200/165 means card 200 in a 165-card set)
+- Read the EXACT number — do NOT round, truncate, or modify it
+- Include ALL prefixes (TG, GG, SV, K, etc.)
+- If there's a slash, include both parts: "198/165" not just "198"
+- Japanese Pokemon cards: number format is typically "123/456" at the bottom
 
 STEP 4 - IDENTIFY THE SET:
-Read any set code or expansion symbol. Give your best guess at the set name AND set code. For Pokemon, common codes: sv01-sv07, sv03.5, sv04.5, sv06.5, swsh1-swsh12, sm1-sm12, base1, etc. For Japanese Pokemon: SV2a, SV1a, SV3, SV4a, etc.
+- Look for set codes printed on the card (usually near the collector number)
+- Pokemon English set codes: sv01 through sv08, sv03.5, sv04.5, sv06.5, swsh1-swsh12, sm1-sm12, xy1-xy12, base1, etc.
+- Pokemon Japanese set codes: SV1a, SV2a, SV3, SV4a, SV4K, SV5a, SV5K, SV6, SV7, SV8, etc.
+- Yu-Gi-Oh! set codes: LOB, MRD, PSV, DUEA, BODE, etc. (printed in card code like "LOB-EN001")
+- One Piece set codes: OP01-OP09, ST01-ST18, EB01, PRB01 (printed on card)
+- MTG: Set symbol on the type line, set code is 3-4 letters (FDN, DSK, BLB, MH3, etc.)
 
-STEP 5 - LANGUAGE:
-If the card text is in Japanese (katakana/hiragana/kanji), set language to "ja". Otherwise "en".
+STEP 5 - DETERMINE RARITY:
+- Pokemon: Common, Uncommon, Rare, Holo Rare, Ultra Rare, Full Art, Alt Art, SAR (Special Art Rare), IR (Illustration Rare), AR (Art Rare), Secret Rare, Hyper Rare, Trainer Gallery
+- For Pokemon, rarity symbols at bottom: circle=Common, diamond=Uncommon, star=Rare, star-H=Holo
+- Yu-Gi-Oh!: Common, Rare, Super Rare, Ultra Rare, Secret Rare, Ghost Rare, Starlight Rare
+- MTG: Black=Common, Silver=Uncommon, Gold=Rare, Orange/Mythic=Mythic Rare
+- One Piece: Common (C), Uncommon (UC), Rare (R), Super Rare (SR), Secret Rare (SEC), Leader (L), Special (SP)
 
-Return ONLY valid JSON:
+STEP 6 - LANGUAGE:
+- Japanese text (katakana/hiragana/kanji) → "ja"
+- Otherwise → "en"
+
+Return ONLY valid JSON (no markdown, no backticks):
 {
   "game": "pokemon" | "yugioh" | "onepiece" | "mtg",
-  "name": "exact card name as printed on the card",
+  "name": "exact card name as printed",
   "setName": "full set/expansion name",
   "setId": "set code",
-  "cardNumber": "exact collector number as printed (e.g. 198/165, TG05, 25)",
+  "cardNumber": "exact collector number as printed (e.g. 198/165, TG05, OP01-001)",
   "rarity": "rarity level",
   "estimatedValue": estimated USD value as number,
   "language": "en" or "ja"
 }
 
-If you cannot identify it at all, return: {"error": "Could not identify card"}`,
+If you truly cannot identify it, return: {"error": "Could not identify card"}`,
           },
           {
             role: "user",
@@ -862,11 +894,11 @@ If you cannot identify it at all, return: {"error": "Could not identify card"}`,
                 type: "image_url",
                 image_url: { url: `data:image/jpeg;base64,${image}`, detail: "high" },
               },
-              { type: "text", text: "What trading card is this? Read the card name at the top and the collector number at the bottom carefully. Tell me exactly what you see printed on the card." },
+              { type: "text", text: "Identify this trading card. Carefully read the card name at the top and the collector number at the bottom. This may be a full art, special art rare, or holographic card — look closely at the edges and corners for small text. Tell me exactly what is printed on the card." },
             ],
           },
         ],
-        max_completion_tokens: 512,
+        max_completion_tokens: 600,
       });
 
       const content = response.choices[0]?.message?.content || "{}";
