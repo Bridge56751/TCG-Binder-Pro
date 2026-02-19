@@ -23,6 +23,7 @@ import type { CardIdentification, GameId } from "@/lib/types";
 import {
   addToScanHistory,
 } from "@/lib/scan-history-storage";
+import { cacheCard } from "@/lib/card-cache";
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -127,6 +128,19 @@ export default function ScanScreen() {
       addQuantity
     );
     await addToScanHistory(scanResult, true);
+    cacheCard({
+      id: scanResult.verifiedCardId || `${scanResult.setId}-${scanResult.cardNumber}`,
+      localId: scanResult.cardNumber,
+      name: scanResult.name,
+      englishName: scanResult.englishName,
+      image: null,
+      game: scanResult.game,
+      setId: scanResult.setId,
+      setName: scanResult.setName,
+      rarity: scanResult.rarity,
+      currentPrice: scanResult.estimatedValue,
+      cachedAt: Date.now(),
+    });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     const qtyLabel = addQuantity > 1 ? `${addQuantity} copies of ` : "";

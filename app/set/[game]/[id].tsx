@@ -22,6 +22,7 @@ import { CardCell } from "@/components/CardCell";
 import { useCollection } from "@/lib/CollectionContext";
 import { useTheme } from "@/lib/ThemeContext";
 import { getApiUrl, queryClient } from "@/lib/query-client";
+import { cacheCards, type CachedCard } from "@/lib/card-cache";
 import type { GameId, SetDetail, TCGCard } from "@/lib/types";
 import { GAMES } from "@/lib/types";
 
@@ -54,6 +55,24 @@ export default function SetDetailScreen() {
   const { data: setDetail, isLoading } = useQuery<SetDetail>({
     queryKey: [queryPath],
   });
+
+  useEffect(() => {
+    if (setDetail?.cards && game) {
+      const gameId = game as GameId;
+      const cardsToCache: CachedCard[] = setDetail.cards.map(c => ({
+        id: c.id,
+        localId: c.localId,
+        name: c.name,
+        englishName: c.englishName,
+        image: c.image,
+        game: gameId,
+        setId: String(id),
+        setName: setDetail.name,
+        cachedAt: Date.now(),
+      }));
+      cacheCards(cardsToCache);
+    }
+  }, [setDetail, game, id]);
 
   const handleResetSet = useCallback(() => {
     Alert.alert(

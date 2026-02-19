@@ -257,6 +257,7 @@ export default function CardDetailScreen() {
                 style={styles.cardImage}
                 contentFit="contain"
                 transition={300}
+                cachePolicy="disk"
               />
             ) : (
               <View style={[styles.cardImage, styles.noImage, { backgroundColor: colors.surfaceAlt }]}>

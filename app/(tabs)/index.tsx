@@ -19,6 +19,7 @@ import { apiRequest, queryClient } from "@/lib/query-client";
 import { GameSelector } from "@/components/GameSelector";
 import { SetCard } from "@/components/SetCard";
 import { StatCard } from "@/components/StatCard";
+import { cachePrices, cacheSets } from "@/lib/card-cache";
 import type { GameId, TCGSet } from "@/lib/types";
 import { GAMES } from "@/lib/types";
 
@@ -80,6 +81,7 @@ export default function CollectionScreen() {
         if (fetchId === valueFetchRef.current) {
           const data = await res.json();
           setValueData(data);
+          if (data.cards) cachePrices(data.cards);
         }
       })
       .catch(() => {
@@ -120,6 +122,14 @@ export default function CollectionScreen() {
   const { data: sets, isLoading } = useQuery<TCGSet[]>({
     queryKey: [`/api/tcg/${selectedGame}/sets`],
   });
+
+  useEffect(() => {
+    if (sets && sets.length > 0) {
+      cacheSets(selectedGame, sets.map(s => ({
+        id: s.id, name: s.name, game: s.game || selectedGame, totalCards: s.totalCards, logo: s.logo
+      })));
+    }
+  }, [sets, selectedGame]);
 
   const { data: japaneseSets } = useQuery<TCGSet[]>({
     queryKey: [`/api/tcg/pokemon/sets?lang=ja`],

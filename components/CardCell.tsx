@@ -29,6 +29,7 @@ export function CardCell({ cardId, localId, name, imageUrl, isCollected, quantit
               style={[styles.cardImage, !isCollected && styles.grayedImage]}
               contentFit="contain"
               transition={300}
+              cachePolicy="disk"
             />
             {!isCollected && <View style={styles.grayOverlay} />}
           </>

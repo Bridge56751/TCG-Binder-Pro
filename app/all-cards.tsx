@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   StyleSheet,
   Text,
@@ -18,6 +18,7 @@ import * as Haptics from "expo-haptics";
 import { useTheme } from "@/lib/ThemeContext";
 import { useCollection } from "@/lib/CollectionContext";
 import { apiRequest } from "@/lib/query-client";
+import { cachePrices, getCachedPrices } from "@/lib/card-cache";
 import type { GameId } from "@/lib/types";
 import { GAMES } from "@/lib/types";
 
@@ -157,10 +158,24 @@ export default function AllCardsScreen() {
       const res = await apiRequest("POST", "/api/collection/value", {
         cards: cardListForValue,
       });
-      return res.json();
+      const data = await res.json();
+      if (data.cards) cachePrices(data.cards);
+      return data;
     },
     enabled: cardListForValue.length > 0,
   });
+
+  const [cachedPriceMap, setCachedPriceMap] = useState<Map<string, { name: string; price: number | null }>>(new Map());
+
+  useEffect(() => {
+    getCachedPrices().then(cached => {
+      const map = new Map<string, { name: string; price: number | null }>();
+      for (const [cardId, info] of Object.entries(cached)) {
+        map.set(cardId, { name: info.name, price: info.price });
+      }
+      setCachedPriceMap(map);
+    });
+  }, []);
 
   const priceMap = useMemo(() => {
     const map = new Map<string, CardPriceInfo>();
@@ -168,9 +183,13 @@ export default function AllCardsScreen() {
       for (const c of valueData.cards) {
         map.set(c.cardId, c);
       }
+    } else {
+      for (const [cardId, info] of cachedPriceMap) {
+        map.set(cardId, { cardId, name: info.name, price: info.price });
+      }
     }
     return map;
-  }, [valueData]);
+  }, [valueData, cachedPriceMap]);
 
   const handleDelete = useCallback(
     (card: CardWithMeta) => {
