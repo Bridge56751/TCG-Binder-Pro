@@ -11,11 +11,12 @@ interface CardCellProps {
   imageUrl: string | null;
   isCollected: boolean;
   quantity?: number;
+  price?: number | null;
   onPress: () => void;
   onLongPress?: () => void;
 }
 
-export function CardCell({ cardId, localId, name, imageUrl, isCollected, quantity, onPress, onLongPress }: CardCellProps) {
+export function CardCell({ cardId, localId, name, imageUrl, isCollected, quantity, price, onPress, onLongPress }: CardCellProps) {
   const { colors } = useTheme();
   return (
     <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={400} style={styles.container}>
@@ -53,6 +54,11 @@ export function CardCell({ cardId, localId, name, imageUrl, isCollected, quantit
         {!isCollected && imageUrl && (
           <View style={styles.missingBadge}>
             <Text style={[styles.missingBadgeText, { color: colors.textTertiary }]}>#{localId}</Text>
+          </View>
+        )}
+        {price != null && price > 0 && (
+          <View style={[styles.priceBadge, { backgroundColor: colors.tint }]}>
+            <Text style={styles.priceBadgeText}>${price < 1 ? price.toFixed(2) : price < 100 ? price.toFixed(2) : Math.round(price)}</Text>
           </View>
         )}
       </View>
@@ -142,6 +148,21 @@ const styles = StyleSheet.create({
   noImageNumber: {
     fontFamily: "DMSans_500Medium",
     fontSize: 11,
+  },
+  priceBadge: {
+    position: "absolute",
+    bottom: 4,
+    right: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 6,
+    minWidth: 28,
+    alignItems: "center",
+  },
+  priceBadgeText: {
+    fontFamily: "DMSans_700Bold",
+    fontSize: 9,
+    color: "#FFFFFF",
   },
   cardName: {
     fontFamily: "DMSans_400Regular",

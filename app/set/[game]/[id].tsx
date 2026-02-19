@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -20,13 +20,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { CardCell } from "@/components/CardCell";
 import { useCollection } from "@/lib/CollectionContext";
 import { useTheme } from "@/lib/ThemeContext";
+import { getApiUrl } from "@/lib/query-client";
 import type { GameId, SetDetail, TCGCard } from "@/lib/types";
 import { GAMES } from "@/lib/types";
 
 const NUM_COLUMNS = 3;
 
 type FilterMode = "all" | "collected" | "missing";
-type SortMode = "number" | "name";
+type SortMode = "number" | "name" | "value";
 
 export default function SetDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -39,6 +40,9 @@ export default function SetDetailScreen() {
   const [sortMode, setSortMode] = useState<SortMode>("number");
   const [quickAddVisible, setQuickAddVisible] = useState(false);
   const [quickAddSearch, setQuickAddSearch] = useState("");
+  const [cardPrices, setCardPrices] = useState<Record<string, number | null>>({});
+  const [pricesLoading, setPricesLoading] = useState(false);
+  const pricesFetched = React.useRef(false);
 
   const langParam = lang === "ja" ? "ja" : "en";
   const queryPath = gameId === "pokemon" && langParam === "ja"
@@ -107,6 +111,28 @@ export default function SetDetailScreen() {
     );
   }, [setDetail?.cards, quickAddSearch]);
 
+  const fetchPrices = useCallback(async () => {
+    if (pricesFetched.current || pricesLoading) return;
+    setPricesLoading(true);
+    try {
+      const langQ = langParam === "ja" ? "?lang=ja" : "";
+      const url = new URL(`/api/tcg/${game}/sets/${id}/prices${langQ}`, getApiUrl());
+      const res = await fetch(url.toString());
+      if (res.ok) {
+        const data = await res.json();
+        setCardPrices(data.prices || {});
+        pricesFetched.current = true;
+      }
+    } catch {}
+    setPricesLoading(false);
+  }, [game, id, langParam, pricesLoading]);
+
+  useEffect(() => {
+    if (sortMode === "value" && !pricesFetched.current) {
+      fetchPrices();
+    }
+  }, [sortMode, fetchPrices]);
+
   const gameInfo = GAMES.find((g) => g.id === gameId);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
@@ -132,6 +158,12 @@ export default function SetDetailScreen() {
 
     if (sortMode === "name") {
       filtered.sort((a, b) => (a.englishName || a.name).localeCompare(b.englishName || b.name));
+    } else if (sortMode === "value") {
+      filtered.sort((a, b) => {
+        const priceA = cardPrices[a.id] ?? (a as any).price ?? -1;
+        const priceB = cardPrices[b.id] ?? (b as any).price ?? -1;
+        return priceB - priceA;
+      });
     } else {
       filtered.sort((a, b) => {
         const numA = parseInt(a.localId, 10);
@@ -144,7 +176,7 @@ export default function SetDetailScreen() {
     }
 
     return filtered;
-  }, [setDetail?.cards, filterMode, sortMode, gameId, id, hasCard]);
+  }, [setDetail?.cards, filterMode, sortMode, gameId, id, hasCard, cardPrices]);
 
   const dynamicStyles = useMemo(
     () =>
@@ -362,12 +394,27 @@ export default function SetDetailScreen() {
         </View>
         <Pressable
           style={dynamicStyles.sortButton}
-          onPress={() => setSortMode((prev) => (prev === "number" ? "name" : "number"))}
+          onPress={() => setSortMode((prev) => {
+            if (prev === "number") return "name";
+            if (prev === "name") return "value";
+            return "number";
+          })}
         >
-          <Ionicons name="swap-vertical" size={14} color={colors.textSecondary} />
-          <Text style={dynamicStyles.sortButtonText}>
-            {sortMode === "number" ? "#" : "A-Z"}
-          </Text>
+          <Ionicons
+            name={sortMode === "value" ? "trending-down" : "swap-vertical"}
+            size={14}
+            color={sortMode === "value" ? colors.tint : colors.textSecondary}
+          />
+          {sortMode === "value" && pricesLoading ? (
+            <ActivityIndicator size={10} color={colors.tint} />
+          ) : (
+            <Text style={[
+              dynamicStyles.sortButtonText,
+              sortMode === "value" && { color: colors.tint },
+            ]}>
+              {sortMode === "number" ? "#" : sortMode === "name" ? "A-Z" : "$"}
+            </Text>
+          )}
         </Pressable>
       </View>
 
@@ -398,6 +445,7 @@ export default function SetDetailScreen() {
         renderItem={({ item }) => {
           const collected = hasCard(gameId, id || "", item.id);
           const qty = collected ? cardQuantity(gameId, id || "", item.id) : 0;
+          const itemPrice = sortMode === "value" ? (cardPrices[item.id] ?? (item as any).price ?? null) : undefined;
           return (
             <View style={styles.cellWrapper}>
               <CardCell
@@ -407,6 +455,7 @@ export default function SetDetailScreen() {
                 imageUrl={item.image}
                 isCollected={collected}
                 quantity={qty}
+                price={itemPrice}
                 onPress={() => {
                   const cardRoute = langParam === "ja"
                     ? `/card/${game}/${item.id}?lang=ja`

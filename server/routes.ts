@@ -1291,12 +1291,19 @@ If you cannot identify it at all, return: {"error": "Could not identify card"}`,
         return res.status(404).json({ error: "Set not found" });
       }
 
-      const cards = allCards.map((c: any) => ({
-        id: c.id,
-        localId: c.collector_number || "0",
-        name: c.name,
-        image: c.image_uris?.small || c.card_faces?.[0]?.image_uris?.small || null,
-      }));
+      const cards = allCards.map((c: any) => {
+        const prices = c.prices || {};
+        const price = prices.usd ? parseFloat(prices.usd)
+          : (prices.usd_foil ? parseFloat(prices.usd_foil)
+          : (prices.eur ? Math.round(parseFloat(prices.eur) * 108) / 100 : null));
+        return {
+          id: c.id,
+          localId: c.collector_number || "0",
+          name: c.name,
+          image: c.image_uris?.small || c.card_faces?.[0]?.image_uris?.small || null,
+          price,
+        };
+      });
 
       cards.sort((a: any, b: any) => {
         const numA = parseInt(a.localId, 10);
@@ -1316,6 +1323,108 @@ If you cannot identify it at all, return: {"error": "Could not identify card"}`,
     } catch (error) {
       console.error("Error fetching MTG set cards:", error);
       res.status(500).json({ error: "Failed to fetch set cards" });
+    }
+  });
+
+  // ───── SET PRICES ENDPOINT ─────
+
+  const setPriceCache = new Map<string, { prices: Record<string, number | null>; ts: number }>();
+  const SET_PRICE_CACHE_TTL = 30 * 60 * 1000;
+
+  app.get("/api/tcg/:game/sets/:id/prices", async (req, res) => {
+    try {
+      const { game, id } = req.params;
+      const lang = req.query.lang === "ja" ? "ja" : "en";
+      const cacheKey = `${game}:${id}:${lang}`;
+      const cached = setPriceCache.get(cacheKey);
+      if (cached && Date.now() - cached.ts < SET_PRICE_CACHE_TTL) {
+        return res.json({ prices: cached.prices });
+      }
+
+      const prices: Record<string, number | null> = {};
+
+      if (game === "pokemon") {
+        const setRes = await fetch(`https://api.tcgdex.net/v2/${lang}/sets/${id}`);
+        if (!setRes.ok) return res.json({ prices: {} });
+        const setData = await setRes.json();
+        const cardIds = (setData.cards || []).map((c: any) => c.id);
+        const batchSize = 5;
+        for (let i = 0; i < cardIds.length; i += batchSize) {
+          const batch = cardIds.slice(i, i + batchSize);
+          const results = await Promise.allSettled(
+            batch.map(async (cid: string) => {
+              const r = await fetch(`https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(cid)}`);
+              if (!r.ok) return { id: cid, price: null };
+              const c = await r.json();
+              const tcgPrice = c.pricing?.tcgplayer;
+              const cmPrice = c.pricing?.cardmarket;
+              const priceData = tcgPrice?.holofoil || tcgPrice?.normal || tcgPrice?.reverseHolofoil;
+              const usdPrice = priceData?.marketPrice ?? priceData?.midPrice ?? null;
+              const price = usdPrice ?? (cmPrice?.trend ? Math.round(cmPrice.trend * 108) / 100
+                : (cmPrice?.avg ? Math.round(cmPrice.avg * 108) / 100 : null));
+              return { id: cid, price };
+            })
+          );
+          for (const r of results) {
+            if (r.status === "fulfilled") prices[r.value.id] = r.value.price;
+          }
+          if (i + batchSize < cardIds.length) await new Promise(r => setTimeout(r, 100));
+        }
+      } else if (game === "yugioh") {
+        const allSets = await fetchSetsForGame("yugioh");
+        const setMeta = (allSets as any[]).find((s: any) => s.set_code === id);
+        const setName = setMeta?.set_name || id;
+        const response = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?cardset=${encodeURIComponent(setName)}`);
+        const data = await response.json();
+        if (data?.data) {
+          for (const card of data.data) {
+            if (!card.card_sets) continue;
+            for (const cs of card.card_sets) {
+              if (cs.set_code?.startsWith(id)) {
+                const setPrice = cs.set_price ? parseFloat(cs.set_price) : null;
+                const tcgPrice = card.card_prices?.[0]?.tcgplayer_price ? parseFloat(card.card_prices[0].tcgplayer_price) : null;
+                prices[cs.set_code] = (setPrice && setPrice > 0) ? setPrice : tcgPrice;
+              }
+            }
+          }
+        }
+      } else if (game === "onepiece") {
+        const setRes = await fetch(`https://optcgapi.com/api/sets/card-list/?set_id=${id}`);
+        if (setRes.ok) {
+          const data = await setRes.json();
+          if (Array.isArray(data)) {
+            for (const c of data) {
+              const cardId = c.card_id || c.id;
+              if (cardId) prices[cardId] = c.market_price ?? c.inventory_price ?? null;
+            }
+          }
+        }
+      } else if (game === "mtg") {
+        const allCards: any[] = [];
+        let url: string | null = `https://api.scryfall.com/cards/search?order=set&q=set:${encodeURIComponent(id)}&unique=prints`;
+        while (url) {
+          const pageRes: Response = await fetch(url);
+          if (!pageRes.ok) break;
+          const pageData: any = await pageRes.json();
+          if (pageData.data) {
+            for (const c of pageData.data) {
+              const p = c.prices || {};
+              const price = p.usd ? parseFloat(p.usd)
+                : (p.usd_foil ? parseFloat(p.usd_foil)
+                : (p.eur ? Math.round(parseFloat(p.eur) * 108) / 100 : null));
+              prices[c.id] = price;
+            }
+          }
+          url = pageData.has_more ? pageData.next_page : null;
+          if (url) await new Promise(r => setTimeout(r, 100));
+        }
+      }
+
+      setPriceCache.set(cacheKey, { prices, ts: Date.now() });
+      res.json({ prices });
+    } catch (error) {
+      console.error("Error fetching set prices:", error);
+      res.json({ prices: {} });
     }
   });
 
