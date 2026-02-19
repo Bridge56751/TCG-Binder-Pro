@@ -1115,6 +1115,88 @@ Return ONLY valid JSON with your corrected identification:
     }
   });
 
+  app.post("/api/correct-card", async (req, res) => {
+    try {
+      const { game, name, cardNumber, setId, language } = req.body;
+      if (!game) {
+        return res.status(400).json({ error: "Game is required" });
+      }
+
+      const lang = language === "ja" ? "ja" : "en";
+      console.log(`[Correct] game=${game} name="${name}" num="${cardNumber}" setId="${setId}" lang=${lang}`);
+
+      const correctionInput: any = {
+        game,
+        name: name || "",
+        setId: setId || "",
+        cardNumber: cardNumber ? cleanCardNumber(cardNumber) : "",
+        language: lang,
+      };
+
+      if (correctionInput.setId) {
+        try {
+          const resolvedSetId = await resolveSetId(game, correctionInput.setId, "", lang);
+          if (resolvedSetId) {
+            console.log(`[Correct SetResolve] ${correctionInput.setId} -> ${resolvedSetId}`);
+            correctionInput.setId = resolvedSetId;
+          }
+        } catch {}
+      }
+
+      const deepResult = await deepVerifyCard(correctionInput);
+      console.log(`[Correct DeepVerify] verified=${deepResult.verified} name="${deepResult.name}" cardId="${deepResult.cardId}" setId="${deepResult.setId}"`);
+
+      if (deepResult.verified) {
+        const result: any = {
+          game,
+          name: deepResult.name,
+          setId: deepResult.setId || correctionInput.setId,
+          cardNumber: correctionInput.cardNumber,
+          verified: true,
+          verifiedCardId: deepResult.cardId,
+          language: lang,
+        };
+
+        if (deepResult.setId) {
+          const sets = await fetchSetsForGame(game, lang);
+          let setName: string | null = null;
+          if (game === "pokemon") {
+            const s = sets.find((s: any) => s.id === deepResult.setId);
+            if (s) setName = s.name;
+          } else if (game === "yugioh") {
+            const s = sets.find((s: any) => s.set_code === deepResult.setId);
+            if (s) setName = s.set_name;
+          } else if (game === "onepiece") {
+            const s = sets.find((s: any) => s.id === deepResult.setId || s.set_id === deepResult.setId);
+            if (s) setName = s.name || s.set_name;
+          } else if (game === "mtg") {
+            const s = sets.find((s: any) => s.code === deepResult.setId);
+            if (s) setName = s.name;
+          }
+          if (setName) result.setName = setName;
+        }
+
+        if (lang === "ja" && game === "pokemon" && deepResult.cardId) {
+          try {
+            const enRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${deepResult.cardId}`);
+            if (enRes.ok) {
+              const enCard = await enRes.json();
+              if (enCard.name) result.englishName = enCard.name;
+              if (enCard.set?.name) result.englishSetName = enCard.set.name;
+            }
+          } catch {}
+        }
+
+        res.json(result);
+      } else {
+        res.json({ verified: false, error: "Could not find a matching card with the provided details" });
+      }
+    } catch (error) {
+      console.error("Error correcting card:", error);
+      res.status(500).json({ error: "Failed to search for card" });
+    }
+  });
+
   // ───── POKEMON (TCGdex API) ─────
 
   app.get("/api/tcg/pokemon/sets", async (req, res) => {
