@@ -147,3 +147,15 @@ export async function cachePrices(prices: { cardId: string; name: string; price:
 export async function getCachedPrices(): Promise<CachedPrices> {
   return getPriceCache();
 }
+
+export async function getCachedSetCards(game: GameId, setId: string): Promise<CachedCard[]> {
+  const cache = await getCardCache();
+  const results: CachedCard[] = [];
+  for (const key of Object.keys(cache)) {
+    const card = cache[key];
+    if (card.game === game && card.setId === setId) {
+      results.push(card);
+    }
+  }
+  return results;
+}

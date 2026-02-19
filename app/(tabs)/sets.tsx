@@ -19,6 +19,7 @@ import { SetCard } from "@/components/SetCard";
 import { useCollection } from "@/lib/CollectionContext";
 import { useTheme } from "@/lib/ThemeContext";
 import { apiRequest } from "@/lib/query-client";
+import { getCachedSets, cacheSets, type CachedSet } from "@/lib/card-cache";
 import type { GameId, TCGSet } from "@/lib/types";
 
 type SearchMode = "sets" | "cards";
@@ -51,14 +52,55 @@ export default function SetsScreen() {
 
   const setsQueryPath = `/api/tcg/${selectedGame}/sets`;
 
-  const { data: sets, isLoading } = useQuery<TCGSet[]>({
+  const { data: sets, isLoading, isError } = useQuery<TCGSet[]>({
     queryKey: [setsQueryPath],
   });
+
+  const [offlineSets, setOfflineSets] = useState<TCGSet[] | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
+
+  useEffect(() => {
+    if (sets && sets.length > 0) {
+      setIsOffline(false);
+      setOfflineSets(null);
+      cacheSets(selectedGame, sets.map(s => ({
+        id: s.id,
+        name: s.name,
+        game: selectedGame,
+        totalCards: s.totalCards,
+        logo: s.logo,
+        cachedAt: Date.now(),
+      })));
+    }
+  }, [sets, selectedGame]);
+
+  useEffect(() => {
+    if (isError && !sets) {
+      (async () => {
+        const cached = await getCachedSets(selectedGame);
+        if (cached && cached.length > 0) {
+          const asSets: TCGSet[] = cached.map(c => ({
+            id: c.id,
+            name: c.name,
+            game: c.game,
+            totalCards: c.totalCards,
+            logo: c.logo || undefined,
+          }));
+          setOfflineSets(asSets);
+          setIsOffline(true);
+        }
+      })();
+    } else if (sets) {
+      setIsOffline(false);
+    }
+  }, [isError, sets, selectedGame]);
+
+  const activeSets = sets || offlineSets;
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
 
   const filteredSets =
-    sets?.filter(
+    activeSets?.filter(
       (s) =>
         s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.id.toLowerCase().includes(searchQuery.toLowerCase()),
@@ -280,7 +322,12 @@ export default function SetsScreen() {
 
   const renderHeader = () => (
     <View style={{ gap: 16, paddingBottom: 16 }}>
-      <View style={{ paddingHorizontal: 20, paddingTop: topInset + 8, paddingBottom: 4 }}>
+      {isOffline && (
+        <View style={{ backgroundColor: "#F59E0B", paddingVertical: 6, paddingHorizontal: 14, borderRadius: 8, marginHorizontal: 20, marginTop: topInset + 8, alignItems: "center" }}>
+          <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 12, color: "#FFFFFF" }}>Offline Mode - Showing cached sets</Text>
+        </View>
+      )}
+      <View style={{ paddingHorizontal: 20, paddingTop: isOffline ? 4 : topInset + 8, paddingBottom: 4 }}>
         <Text
           style={{
             fontFamily: "DMSans_700Bold",

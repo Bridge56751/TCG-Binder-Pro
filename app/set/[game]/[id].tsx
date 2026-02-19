@@ -22,7 +22,7 @@ import { CardCell } from "@/components/CardCell";
 import { useCollection } from "@/lib/CollectionContext";
 import { useTheme } from "@/lib/ThemeContext";
 import { getApiUrl, queryClient } from "@/lib/query-client";
-import { cacheCards, type CachedCard } from "@/lib/card-cache";
+import { cacheCards, getCachedSetCards, getCachedSets, type CachedCard } from "@/lib/card-cache";
 import type { GameId, SetDetail, TCGCard } from "@/lib/types";
 import { GAMES } from "@/lib/types";
 
@@ -47,34 +47,64 @@ export default function SetDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [trashMode, setTrashMode] = useState(false);
   const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set());
+  const [offlineData, setOfflineData] = useState<SetDetail | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
   const pricesFetched = React.useRef(false);
 
-  const langParam = lang === "ja" ? "ja" : "en";
-  const queryPath = gameId === "pokemon" && langParam === "ja"
-    ? `/api/tcg/${game}/sets/${id}/cards?lang=ja`
-    : `/api/tcg/${game}/sets/${id}/cards`;
+  const queryPath = `/api/tcg/${game}/sets/${id}/cards`;
 
-  const { data: setDetail, isLoading } = useQuery<SetDetail>({
+  const { data: setDetail, isLoading, isError } = useQuery<SetDetail>({
     queryKey: [queryPath],
   });
 
   useEffect(() => {
     if (setDetail?.cards && game) {
-      const gameId = game as GameId;
+      setIsOffline(false);
+      const gId = game as GameId;
       const cardsToCache: CachedCard[] = setDetail.cards.map(c => ({
         id: c.id,
         localId: c.localId,
         name: c.name,
         englishName: c.englishName,
         image: c.image,
-        game: gameId,
+        game: gId,
         setId: String(id),
         setName: setDetail.name,
+        rarity: c.rarity,
         cachedAt: Date.now(),
       }));
       cacheCards(cardsToCache);
     }
   }, [setDetail, game, id]);
+
+  useEffect(() => {
+    if (isError && !setDetail && game && id) {
+      (async () => {
+        const cachedCards = await getCachedSetCards(game as GameId, String(id));
+        if (cachedCards.length > 0) {
+          const cachedSetsData = await getCachedSets(game);
+          const setInfo = cachedSetsData?.find(s => s.id === id);
+          const cards: TCGCard[] = cachedCards.map(c => ({
+            id: c.id,
+            localId: c.localId,
+            name: c.name,
+            englishName: c.englishName,
+            image: c.image,
+            rarity: c.rarity || null,
+            number: c.localId,
+          }));
+          setOfflineData({
+            id: String(id),
+            name: setInfo?.name || "Offline Set",
+            game: game,
+            totalCards: setInfo?.totalCards || cards.length,
+            cards,
+          });
+          setIsOffline(true);
+        }
+      })();
+    }
+  }, [isError, setDetail, game, id]);
 
   const toggleTrashMode = useCallback(() => {
     if (trashMode) {
@@ -169,8 +199,10 @@ export default function SetDetailScreen() {
     setRefreshing(false);
   }, [queryPath]);
 
+  const activeData = setDetail || offlineData;
+
   const quickAddFilteredCards = useMemo(() => {
-    const allCards = setDetail?.cards || [];
+    const allCards = activeData?.cards || [];
     if (!quickAddSearch.trim()) return allCards;
     const q = quickAddSearch.toLowerCase();
     return allCards.filter(
@@ -178,14 +210,13 @@ export default function SetDetailScreen() {
         (c.englishName || c.name).toLowerCase().includes(q) ||
         c.localId.toLowerCase().includes(q)
     );
-  }, [setDetail?.cards, quickAddSearch]);
+  }, [activeData?.cards, quickAddSearch]);
 
   const fetchPrices = useCallback(async () => {
     if (pricesFetched.current || pricesLoading) return;
     setPricesLoading(true);
     try {
-      const langQ = langParam === "ja" ? "?lang=ja" : "";
-      const url = new URL(`/api/tcg/${game}/sets/${id}/prices${langQ}`, getApiUrl());
+      const url = new URL(`/api/tcg/${game}/sets/${id}/prices`, getApiUrl());
       const res = await fetch(url.toString());
       if (res.ok) {
         const data = await res.json();
@@ -194,7 +225,7 @@ export default function SetDetailScreen() {
       }
     } catch {}
     setPricesLoading(false);
-  }, [game, id, langParam, pricesLoading]);
+  }, [game, id, pricesLoading]);
 
   useEffect(() => {
     if (sortMode === "value" && !pricesFetched.current) {
@@ -207,11 +238,11 @@ export default function SetDetailScreen() {
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
 
   const collectedCount = setCards(gameId, id || "");
-  const totalCards = setDetail?.totalCards || 0;
+  const totalCards = activeData?.totalCards || 0;
   const progress = totalCards > 0 ? collectedCount / totalCards : 0;
 
   const filteredAndSortedCards = useMemo(() => {
-    const allCards = setDetail?.cards || [];
+    const allCards = activeData?.cards || [];
 
     let filtered: TCGCard[];
     switch (filterMode) {
@@ -245,7 +276,7 @@ export default function SetDetailScreen() {
     }
 
     return filtered;
-  }, [setDetail?.cards, filterMode, sortMode, gameId, id, hasCard, cardPrices]);
+  }, [activeData?.cards, filterMode, sortMode, gameId, id, hasCard, cardPrices]);
 
   const dynamicStyles = useMemo(
     () =>
@@ -378,7 +409,7 @@ export default function SetDetailScreen() {
         </Pressable>
         <View style={styles.headerInfo}>
           <Text style={dynamicStyles.setName} numberOfLines={1}>
-            {setDetail?.name || id}
+            {activeData?.name || id}
           </Text>
           <Text style={dynamicStyles.setMeta}>
             {id} - {gameInfo?.name}
@@ -391,6 +422,12 @@ export default function SetDetailScreen() {
           <Ionicons name="scan" size={18} color="#FFFFFF" />
         </Pressable>
       </View>
+
+      {isOffline && (
+        <View style={{ backgroundColor: "#F59E0B", paddingVertical: 6, paddingHorizontal: 14, borderRadius: 8, marginHorizontal: 16, marginBottom: 8, alignItems: "center" }}>
+          <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 12, color: "#FFFFFF" }}>Offline Mode - Showing cached data</Text>
+        </View>
+      )}
 
       <View style={dynamicStyles.progressSection}>
         <View style={styles.progressInfo}>
@@ -495,7 +532,7 @@ export default function SetDetailScreen() {
     </View>
   );
 
-  if (isLoading) {
+  if (isLoading && !activeData) {
     return (
       <View style={[dynamicStyles.container, styles.centered]}>
         <ActivityIndicator size="large" color={colors.tint} />
@@ -533,10 +570,7 @@ export default function SetDetailScreen() {
                     toggleCardSelection(item.id);
                     return;
                   }
-                  const cardRoute = langParam === "ja"
-                    ? `/card/${game}/${item.id}?lang=ja`
-                    : `/card/${game}/${item.id}`;
-                  router.push(cardRoute);
+                  router.push(`/card/${game}/${item.id}`);
                 }}
                 onLongPress={collected && !trashMode ? () => {
                   Alert.alert(
