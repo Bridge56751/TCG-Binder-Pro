@@ -1044,81 +1044,53 @@ Return ONLY valid JSON.`,
 
       let englishName: string | null = null;
       let englishSetName: string | null = null;
+      let englishDescription: string | null = null;
+      let enCard: any = null;
+
       if (lang === "ja") {
+        const jaToEnSetMap: Record<string, string> = {
+          "SV2a": "sv03.5", "SV1a": "sv01", "SV1s": "sv01", "SV1v": "sv01",
+          "SV3": "sv02", "SV3a": "sv02", "SV4": "sv03", "SV4a": "sv03",
+          "SV4K": "sv04", "SV5a": "sv04.5", "SV5K": "sv04", "SV5M": "sv04",
+          "SV6": "sv05", "SV6a": "sv05", "SV7": "sv06", "SV7a": "sv06",
+          "SV8": "sv07", "SV8a": "sv07",
+        };
         try {
           const enRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${cardId}`);
           if (enRes.ok) {
-            const enCard = await enRes.json();
-            englishName = enCard.name || null;
-            englishSetName = enCard.set?.name || null;
+            enCard = await enRes.json();
           }
         } catch {}
-        if (!englishName) {
-          const jaToEnSetMap: Record<string, string> = {
-            "SV2a": "sv03.5", "SV1a": "sv01", "SV1s": "sv01", "SV1v": "sv01",
-            "SV3": "sv02", "SV3a": "sv02", "SV4": "sv03", "SV4a": "sv03",
-            "SV4K": "sv04", "SV5a": "sv04.5", "SV5K": "sv04", "SV5M": "sv04",
-            "SV6": "sv05", "SV6a": "sv05", "SV7": "sv06", "SV7a": "sv06",
-            "SV8": "sv07", "SV8a": "sv07",
-          };
+        if (!enCard?.name) {
           const jaSetId = c.set?.id || "";
-          const localId = c.localId;
           const enSetId = jaToEnSetMap[jaSetId];
-          if (enSetId && localId) {
+          if (enSetId && c.localId) {
             try {
-              const enMappedRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${enSetId}-${localId}`);
+              const enMappedRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${enSetId}-${c.localId}`);
               if (enMappedRes.ok) {
-                const enMappedCard = await enMappedRes.json();
-                englishName = enMappedCard.name || null;
-                englishSetName = enMappedCard.set?.name || null;
+                enCard = await enMappedRes.json();
               }
             } catch {}
           }
         }
+        if (enCard) {
+          englishName = enCard.name || null;
+          englishSetName = enCard.set?.name || null;
+          englishDescription = enCard.attacks?.map((a: any) => `${a.name}: ${a.effect || `${a.damage} damage`}`).join("\n") ||
+            enCard.abilities?.map((a: any) => `${a.name}: ${a.effect}`).join("\n") || null;
+        }
       }
 
-      let tcgPrice = c.pricing?.tcgplayer;
-      let cmPrice = c.pricing?.cardmarket;
-      let priceData = tcgPrice?.holofoil || tcgPrice?.normal || tcgPrice?.reverseHolofoil;
-      let currentPrice = priceData?.marketPrice ?? priceData?.midPrice ?? cmPrice?.trend ?? null;
-      let priceLow = priceData?.lowPrice ?? cmPrice?.low ?? null;
-      let priceHigh = priceData?.highPrice ?? null;
+      const sourceCard = (lang === "ja" && enCard?.pricing) ? enCard : c;
+      const tcgPrice = sourceCard.pricing?.tcgplayer;
+      const cmPrice = sourceCard.pricing?.cardmarket;
+      const priceData = tcgPrice?.holofoil || tcgPrice?.normal || tcgPrice?.reverseHolofoil;
+      const currentPrice = priceData?.marketPrice ?? priceData?.midPrice ?? cmPrice?.trend ?? null;
+      const priceLow = priceData?.lowPrice ?? cmPrice?.low ?? null;
+      const priceHigh = priceData?.highPrice ?? null;
 
-      if (currentPrice == null && lang === "ja") {
-        try {
-          const enCardId = cardId;
-          const enPriceRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${enCardId}`);
-          let enPriceCard: any = null;
-          if (enPriceRes.ok) {
-            enPriceCard = await enPriceRes.json();
-          }
-          if (!enPriceCard?.pricing) {
-            const jaToEnSetMap: Record<string, string> = {
-              "SV2a": "sv03.5", "SV1a": "sv01", "SV1s": "sv01", "SV1v": "sv01",
-              "SV3": "sv02", "SV3a": "sv02", "SV4": "sv03", "SV4a": "sv03",
-              "SV4K": "sv04", "SV5a": "sv04.5", "SV5K": "sv04", "SV5M": "sv04",
-              "SV6": "sv05", "SV6a": "sv05", "SV7": "sv06", "SV7a": "sv06",
-              "SV8": "sv07", "SV8a": "sv07",
-            };
-            const jaSetId = c.set?.id || "";
-            const enSetId = jaToEnSetMap[jaSetId];
-            if (enSetId && c.localId) {
-              const enMappedRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${enSetId}-${c.localId}`);
-              if (enMappedRes.ok) {
-                enPriceCard = await enMappedRes.json();
-              }
-            }
-          }
-          if (enPriceCard?.pricing) {
-            tcgPrice = enPriceCard.pricing.tcgplayer;
-            cmPrice = enPriceCard.pricing.cardmarket;
-            priceData = tcgPrice?.holofoil || tcgPrice?.normal || tcgPrice?.reverseHolofoil;
-            currentPrice = priceData?.marketPrice ?? priceData?.midPrice ?? cmPrice?.trend ?? null;
-            priceLow = priceData?.lowPrice ?? cmPrice?.low ?? null;
-            priceHigh = priceData?.highPrice ?? null;
-          }
-        } catch {}
-      }
+      const jaDescription = c.attacks?.map((a: any) => `${a.name}: ${a.effect || `${a.damage} damage`}`).join("\n") ||
+        c.abilities?.map((a: any) => `${a.name}: ${a.effect}`).join("\n") || null;
 
       res.json({
         id: c.id,
@@ -1133,8 +1105,7 @@ Return ONLY valid JSON.`,
         rarity: c.rarity || null,
         cardType: c.stage || (c.types ? c.types.join(", ") : null),
         hp: c.hp || null,
-        description: c.attacks?.map((a: any) => `${a.name}: ${a.effect || `${a.damage} damage`}`).join("\n") ||
-          c.abilities?.map((a: any) => `${a.name}: ${a.effect}`).join("\n") || null,
+        description: englishDescription || jaDescription,
         artist: c.illustrator || null,
         currentPrice,
         priceUnit: tcgPrice ? "USD" : cmPrice ? "EUR" : "USD",
