@@ -9,6 +9,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient } from "@/lib/query-client";
 import { CollectionProvider } from "@/lib/CollectionContext";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
+import { PurchaseProvider } from "@/lib/PurchaseContext";
 import { ThemeProvider, useTheme } from "@/lib/ThemeContext";
 import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold } from "@expo-google-fonts/dm-sans";
 import { StatusBar } from "expo-status-bar";
@@ -86,6 +87,13 @@ function RootLayoutNav() {
             presentation: "card",
           }}
         />
+        <Stack.Screen
+          name="upgrade"
+          options={{
+            headerShown: false,
+            presentation: "modal",
+          }}
+        />
       </Stack>
     </>
   );
@@ -113,12 +121,14 @@ export default function RootLayout() {
         <GestureHandlerRootView>
           <KeyboardProvider>
             <AuthProvider>
-              <CollectionProvider>
-                <ThemeProvider>
-                  <ThemedStatusBar />
-                  <RootLayoutNav />
-                </ThemeProvider>
-              </CollectionProvider>
+              <PurchaseProvider>
+                <CollectionProvider>
+                  <ThemeProvider>
+                    <ThemedStatusBar />
+                    <RootLayoutNav />
+                  </ThemeProvider>
+                </CollectionProvider>
+              </PurchaseProvider>
             </AuthProvider>
           </KeyboardProvider>
         </GestureHandlerRootView>

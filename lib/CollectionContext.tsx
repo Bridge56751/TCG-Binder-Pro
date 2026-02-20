@@ -30,7 +30,8 @@ export interface ProgressToastData {
   game: GameId;
 }
 
-export const GUEST_CARD_LIMIT = 20;
+export const FREE_CARD_LIMIT = 20;
+export const GUEST_CARD_LIMIT = FREE_CARD_LIMIT;
 
 interface CollectionContextValue {
   collection: CollectionData;
@@ -55,6 +56,7 @@ interface CollectionContextValue {
   enabledGames: GameId[];
   toggleGame: (game: GameId) => void;
   isAtGuestLimit: boolean;
+  isAtFreeLimit: boolean;
 }
 
 const CollectionContext = createContext<CollectionContextValue | null>(null);
@@ -203,18 +205,21 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     setProgressToast(null);
   }, []);
 
+  const isPremium = user?.isPremium ?? false;
+
   const addCard = useCallback(async (game: GameId, setId: string, cardId: string, quantity: number = 1) => {
-    if (!user && isGuest) {
+    if (!isPremium) {
       const currentTotal = getCollectedCount(collection);
-      if (currentTotal >= GUEST_CARD_LIMIT) {
-        throw new Error("GUEST_LIMIT");
+      if (currentTotal >= FREE_CARD_LIMIT) {
+        throw new Error("FREE_LIMIT");
       }
-      const allowed = Math.min(quantity, GUEST_CARD_LIMIT - currentTotal);
+      const allowed = Math.min(quantity, FREE_CARD_LIMIT - currentTotal);
       if (allowed <= 0) {
-        throw new Error("GUEST_LIMIT");
+        throw new Error("FREE_LIMIT");
       }
       const updated = await addCardToCollection(game, setId, cardId, allowed);
       setCollection(updated);
+      if (user) debouncedSync(updated);
       showProgressToast(game, setId, updated);
       return;
     }
@@ -222,7 +227,7 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     setCollection(updated);
     debouncedSync(updated);
     showProgressToast(game, setId, updated);
-  }, [user, isGuest, collection, debouncedSync, showProgressToast]);
+  }, [user, isPremium, collection, debouncedSync, showProgressToast]);
 
   const removeCard = useCallback(async (game: GameId, setId: string, cardId: string) => {
     const updated = await removeCardFromCollection(game, setId, cardId);
@@ -307,11 +312,12 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     }
   }, [debouncedSync]);
 
-  const isAtGuestLimit = isGuest && !user && getCollectedCount(collection) >= GUEST_CARD_LIMIT;
+  const isAtGuestLimit = isGuest && !user && getCollectedCount(collection) >= FREE_CARD_LIMIT;
+  const isAtFreeLimit = !isPremium && getCollectedCount(collection) >= FREE_CARD_LIMIT;
 
   const value = useMemo(
-    () => ({ collection, loading, addCard, removeCard, removeOneCard, clearSet, totalCards, setCards, hasCard, cardQuantity, refresh: loadCollection, syncCollection, loadFromCloud, syncStatus, lastSyncTime, exportCollection, importCollection, progressToast, clearProgressToast, enabledGames, toggleGame, isAtGuestLimit }),
-    [collection, loading, addCard, removeCard, removeOneCard, clearSet, totalCards, setCards, hasCard, cardQuantity, loadCollection, syncCollection, loadFromCloud, syncStatus, lastSyncTime, exportCollection, importCollection, progressToast, clearProgressToast, enabledGames, toggleGame, isAtGuestLimit]
+    () => ({ collection, loading, addCard, removeCard, removeOneCard, clearSet, totalCards, setCards, hasCard, cardQuantity, refresh: loadCollection, syncCollection, loadFromCloud, syncStatus, lastSyncTime, exportCollection, importCollection, progressToast, clearProgressToast, enabledGames, toggleGame, isAtGuestLimit, isAtFreeLimit }),
+    [collection, loading, addCard, removeCard, removeOneCard, clearSet, totalCards, setCards, hasCard, cardQuantity, loadCollection, syncCollection, loadFromCloud, syncStatus, lastSyncTime, exportCollection, importCollection, progressToast, clearProgressToast, enabledGames, toggleGame, isAtGuestLimit, isAtFreeLimit]
   );
 
   return <CollectionContext.Provider value={value}>{children}</CollectionContext.Provider>;

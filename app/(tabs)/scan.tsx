@@ -129,13 +129,13 @@ export default function ScanScreen() {
         addQuantity
       );
     } catch (err: any) {
-      if (err?.message === "GUEST_LIMIT") {
+      if (err?.message === "FREE_LIMIT" || err?.message === "GUEST_LIMIT") {
         Alert.alert(
-          "Guest Limit Reached",
-          "You've hit the 20-card limit for guest accounts. Create a free account for unlimited cards and cloud backup.",
+          "Card Limit Reached",
+          "You've reached the 20-card free limit. Upgrade to Premium ($2.99) for unlimited cards.",
           [
             { text: "OK", style: "cancel" },
-            { text: "Sign Up", onPress: () => router.push("/auth") },
+            { text: "Upgrade", onPress: () => router.push("/upgrade") },
           ]
         );
         return;
