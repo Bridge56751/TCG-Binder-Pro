@@ -35,7 +35,7 @@ function useProtectedRoute() {
 
     if (!user && !isGuest && !inAuthScreen && !inUpgradeScreen) {
       router.replace("/auth");
-    } else if (user && inAuthScreen) {
+    } else if ((user || isGuest) && inAuthScreen) {
       router.replace("/(tabs)");
     }
   }, [user, isGuest, loading, segments]);
