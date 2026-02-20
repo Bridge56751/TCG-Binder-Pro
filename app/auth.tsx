@@ -55,6 +55,12 @@ export default function AuthScreen() {
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
 
   useEffect(() => {
+    if (!canDismiss && (isGuest || user)) {
+      router.replace("/(tabs)");
+    }
+  }, [isGuest, user, canDismiss]);
+
+  useEffect(() => {
     if (needsVerification && user && mode !== "verify") {
       setMode("verify");
     }
