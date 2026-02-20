@@ -119,6 +119,27 @@ export default function SettingsScreen() {
           )}
         </View>
 
+        {isGuest && !user && (
+          <View style={styles.section}>
+            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              <Pressable style={styles.menuItem} onPress={() => router.push("/auth")}>
+                <View style={[styles.menuIcon, { backgroundColor: colors.tint + "18" }]}>
+                  <Ionicons name="person-add" size={20} color={colors.tint} />
+                </View>
+                <View style={styles.menuContent}>
+                  <Text style={[styles.menuLabel, { color: colors.text }]}>
+                    Create Account
+                  </Text>
+                  <Text style={[styles.menuHint, { color: colors.textSecondary }]}>
+                    Save your collection with cloud backup
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+              </Pressable>
+            </View>
+          </View>
+        )}
+
         {!isPremium && (
           <View style={styles.section}>
             <View style={[styles.upgradeCard, { backgroundColor: colors.tint + "12", borderColor: colors.tint + "30" }]}>
@@ -358,21 +379,6 @@ export default function SettingsScreen() {
               ACCOUNT
             </Text>
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-              <Pressable style={styles.menuItem} onPress={() => router.push("/auth")}>
-                <View style={[styles.menuIcon, { backgroundColor: colors.tint + "18" }]}>
-                  <Ionicons name="person-add" size={20} color={colors.tint} />
-                </View>
-                <View style={styles.menuContent}>
-                  <Text style={[styles.menuLabel, { color: colors.text }]}>
-                    Create Account
-                  </Text>
-                  <Text style={[styles.menuHint, { color: colors.textSecondary }]}>
-                    Save your collection with cloud backup
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-              </Pressable>
-              <View style={[styles.separator, { backgroundColor: colors.cardBorder }]} />
               <Pressable style={styles.menuItem} onPress={handleLogout}>
                 <View style={[styles.menuIcon, { backgroundColor: colors.error + "18" }]}>
                   <Ionicons name="log-out" size={20} color={colors.error} />
