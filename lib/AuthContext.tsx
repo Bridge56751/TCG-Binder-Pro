@@ -19,6 +19,7 @@ interface AuthContextValue {
   needsVerification: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
+  appleSignIn: (identityToken: string, fullName?: { givenName?: string; familyName?: string } | null, email?: string | null) => Promise<void>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   continueAsGuest: () => void;
@@ -89,6 +90,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setNeedsVerification(true);
   }, []);
 
+  const appleSignIn = useCallback(async (
+    identityToken: string,
+    fullName?: { givenName?: string; familyName?: string } | null,
+    email?: string | null
+  ) => {
+    const res = await apiRequest("POST", "/api/auth/apple", {
+      identityToken,
+      fullName: fullName || undefined,
+      email: email || undefined,
+    });
+    const data = await res.json();
+    setUser({ id: data.id, email: data.email, isPremium: data.isPremium ?? false, isVerified: true });
+    setIsGuest(false);
+    await AsyncStorage.removeItem(GUEST_KEY);
+  }, []);
+
   const verifyEmail = useCallback(async (code: string) => {
     await apiRequest("POST", "/api/auth/verify-email", { code });
     setUser(prev => prev ? { ...prev, isVerified: true } : prev);
@@ -133,8 +150,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, isGuest, loading, needsVerification, login, register, logout, deleteAccount, continueAsGuest, setPremiumStatus, verifyEmail, resendVerification, requestPasswordReset, resetPassword, clearVerification }),
-    [user, isGuest, loading, needsVerification, login, register, logout, deleteAccount, continueAsGuest, setPremiumStatus, verifyEmail, resendVerification, requestPasswordReset, resetPassword, clearVerification]
+    () => ({ user, isGuest, loading, needsVerification, login, register, appleSignIn, logout, deleteAccount, continueAsGuest, setPremiumStatus, verifyEmail, resendVerification, requestPasswordReset, resetPassword, clearVerification }),
+    [user, isGuest, loading, needsVerification, login, register, appleSignIn, logout, deleteAccount, continueAsGuest, setPremiumStatus, verifyEmail, resendVerification, requestPasswordReset, resetPassword, clearVerification]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
