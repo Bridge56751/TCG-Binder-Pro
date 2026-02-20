@@ -20,7 +20,7 @@ import { usePurchase } from "@/lib/PurchaseContext";
 import { useCollection, FREE_CARD_LIMIT, GUEST_CARD_LIMIT } from "@/lib/CollectionContext";
 import { GAMES } from "@/lib/types";
 import type { GameId } from "@/lib/types";
-import { getApiUrl } from "@/lib/query-client";
+import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "@/lib/legal-urls";
 
 const GAME_ICONS: Record<GameId, keyof typeof MaterialCommunityIcons.glyphMap> = {
   pokemon: "pokeball",
@@ -263,7 +263,7 @@ export default function SettingsScreen() {
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             </Pressable>
             <View style={[styles.separator, { backgroundColor: colors.cardBorder }]} />
-            <Pressable style={styles.menuItem} onPress={() => Linking.openURL(`${getApiUrl()}privacy`)}>
+            <Pressable style={styles.menuItem} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
               <View style={[styles.menuIcon, { backgroundColor: colors.tint + "18" }]}>
                 <Ionicons name="shield-checkmark-outline" size={20} color={colors.tint} />
               </View>
@@ -275,13 +275,13 @@ export default function SettingsScreen() {
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             </Pressable>
             <View style={[styles.separator, { backgroundColor: colors.cardBorder }]} />
-            <Pressable style={styles.menuItem} onPress={() => Linking.openURL(`${getApiUrl()}terms`)}>
+            <Pressable style={styles.menuItem} onPress={() => Linking.openURL(TERMS_OF_SERVICE_URL)}>
               <View style={[styles.menuIcon, { backgroundColor: colors.tint + "18" }]}>
                 <Ionicons name="document-text-outline" size={20} color={colors.tint} />
               </View>
               <View style={styles.menuContent}>
                 <Text style={[styles.menuLabel, { color: colors.text }]}>
-                  Terms of Service
+                  Terms of Service (EULA)
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />

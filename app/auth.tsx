@@ -17,7 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useTheme } from "@/lib/ThemeContext";
 import { useAuth } from "@/lib/AuthContext";
-import { getApiUrl } from "@/lib/query-client";
+import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "@/lib/legal-urls";
 import * as AppleAuthentication from "expo-apple-authentication";
 
 type ScreenMode = "login" | "register" | "verify" | "forgot" | "reset";
@@ -567,9 +567,9 @@ export default function AuthScreen() {
           {mode === "register" && (
             <Text style={[styles.legalText, { color: colors.textTertiary }]}>
               By creating an account, you agree to our{" "}
-              <Text style={{ color: colors.tint }} onPress={() => Linking.openURL(`${getApiUrl()}terms`)}>Terms of Service</Text>
+              <Text style={{ color: colors.tint }} onPress={() => Linking.openURL(TERMS_OF_SERVICE_URL)}>Terms of Service (EULA)</Text>
               {" "}and{" "}
-              <Text style={{ color: colors.tint }} onPress={() => Linking.openURL(`${getApiUrl()}privacy`)}>Privacy Policy</Text>.
+              <Text style={{ color: colors.tint }} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>Privacy Policy</Text>.
             </Text>
           )}
         </View>

@@ -15,7 +15,7 @@ import { router } from "expo-router";
 import { useAuth } from "@/lib/AuthContext";
 import { usePurchase } from "@/lib/PurchaseContext";
 import { useCollection, FREE_CARD_LIMIT } from "@/lib/CollectionContext";
-import { getApiUrl } from "@/lib/query-client";
+import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "@/lib/legal-urls";
 
 const PREMIUM_FEATURES = [
   { icon: "infinite" as const, title: "Unlimited Cards", desc: "No more 20-card limit" },
@@ -219,9 +219,9 @@ export default function UpgradeScreen() {
         )}
 
         <Text style={[styles.legalLinks, { color: colors.textTertiary }]}>
-          <Text style={{ color: colors.textSecondary }} onPress={() => Linking.openURL(`${getApiUrl()}terms`)}>Terms of Service</Text>
+          <Text style={{ color: colors.textSecondary }} onPress={() => Linking.openURL(TERMS_OF_SERVICE_URL)}>Terms of Service (EULA)</Text>
           {"  |  "}
-          <Text style={{ color: colors.textSecondary }} onPress={() => Linking.openURL(`${getApiUrl()}privacy`)}>Privacy Policy</Text>
+          <Text style={{ color: colors.textSecondary }} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>Privacy Policy</Text>
         </Text>
       </View>
     </View>
