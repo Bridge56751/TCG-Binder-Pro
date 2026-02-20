@@ -21,7 +21,6 @@ import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "@/lib/legal-urls";
 const PREMIUM_FEATURES = [
   { icon: "infinite" as const, title: "Unlimited Cards", desc: "No more 20-card limit" },
   { icon: "scan" as const, title: "Unlimited Scanning", desc: "Scan as many cards as you want" },
-  { icon: "shield-checkmark" as const, title: "Priority Support", desc: "Get help when you need it" },
 ];
 
 const FREE_ACCOUNT_FEATURES = [
