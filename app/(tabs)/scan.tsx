@@ -9,6 +9,7 @@ import {
   Alert,
   ScrollView,
   TextInput,
+  KeyboardAvoidingView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
@@ -60,6 +61,13 @@ export default function ScanScreen() {
   const [isCorrecting, setIsCorrecting] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  const scrollToFocusedInput = useCallback(() => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 350);
+  }, []);
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 84 + 34 : 100;
@@ -259,10 +267,17 @@ export default function ScanScreen() {
   const dynamicStyles = getDynamicStyles(colors);
 
   return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+    >
     <ScrollView
+      ref={scrollViewRef}
       style={[dynamicStyles.container, { paddingTop: topInset }]}
-      contentContainerStyle={{ paddingBottom: bottomInset }}
+      contentContainerStyle={{ paddingBottom: bottomInset + 40 }}
       showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
     >
       {toastMessage && (
         <Animated.View
@@ -423,6 +438,7 @@ export default function ScanScreen() {
                   autoCapitalize="words"
                   returnKeyType="search"
                   onSubmitEditing={searchCards}
+                  onFocus={scrollToFocusedInput}
                 />
               </View>
 
@@ -447,6 +463,7 @@ export default function ScanScreen() {
                   autoCapitalize="none"
                   returnKeyType="search"
                   onSubmitEditing={searchCards}
+                  onFocus={scrollToFocusedInput}
                 />
               </View>
 
@@ -471,6 +488,7 @@ export default function ScanScreen() {
                   autoCapitalize="words"
                   returnKeyType="search"
                   onSubmitEditing={searchCards}
+                  onFocus={scrollToFocusedInput}
                 />
               </View>
 
@@ -751,6 +769,7 @@ export default function ScanScreen() {
       </View>
 
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
