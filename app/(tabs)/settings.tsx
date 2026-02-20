@@ -14,8 +14,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useTheme } from "@/lib/ThemeContext";
+import { router } from "expo-router";
 import { useAuth } from "@/lib/AuthContext";
-import { useCollection } from "@/lib/CollectionContext";
+import { useCollection, GUEST_CARD_LIMIT } from "@/lib/CollectionContext";
 import { GAMES } from "@/lib/types";
 import type { GameId } from "@/lib/types";
 
@@ -29,8 +30,8 @@ const GAME_ICONS: Record<GameId, keyof typeof MaterialCommunityIcons.glyphMap> =
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { colors, toggle, isDark } = useTheme();
-  const { user, logout, deleteAccount } = useAuth();
-  const { totalCards, syncCollection, syncStatus, lastSyncTime, enabledGames, toggleGame } = useCollection();
+  const { user, isGuest, logout, deleteAccount } = useAuth();
+  const { totalCards, syncCollection, syncStatus, lastSyncTime, enabledGames, toggleGame, isAtGuestLimit } = useCollection();
 
   const [submitting, setSubmitting] = useState(false);
   const [confirmingAction, setConfirmingAction] = useState<"logout" | "delete" | null>(null);
@@ -94,58 +95,82 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.profileSection}>
-          <View style={[styles.avatar, { backgroundColor: colors.tint }]}>
+          <View style={[styles.avatar, { backgroundColor: isGuest && !user ? colors.textTertiary : colors.tint }]}>
             <Text style={styles.avatarText}>
-              {user?.username?.charAt(0).toUpperCase() || "?"}
+              {user ? user.username.charAt(0).toUpperCase() : "G"}
             </Text>
           </View>
           <Text style={[styles.usernameDisplay, { color: colors.text }]}>
-            {user?.username || ""}
+            {user ? user.username : "Guest"}
           </Text>
           <Text style={[styles.statsText, { color: colors.textSecondary }]}>
-            {totalCards()} cards collected
+            {isGuest && !user
+              ? `${totalCards()} / ${GUEST_CARD_LIMIT} cards (guest limit)`
+              : `${totalCards()} cards collected`}
           </Text>
         </View>
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-            CLOUD SYNC
-          </Text>
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-            <Pressable style={styles.menuItem} onPress={handleSync} disabled={submitting}>
-              <View style={[styles.menuIcon, { backgroundColor: colors.success + "18" }]}>
-                <Ionicons name="cloud-upload" size={20} color={colors.success} />
-              </View>
-              <View style={styles.menuContent}>
-                <Text style={[styles.menuLabel, { color: colors.text }]}>
-                  Save to Cloud
-                </Text>
+        {isGuest && !user && (
+          <View style={styles.section}>
+            <View style={[styles.upgradeCard, { backgroundColor: colors.tint + "12", borderColor: colors.tint + "30" }]}>
+              <Ionicons name="sparkles" size={22} color={colors.tint} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.menuLabel, { color: colors.text }]}>Create a Free Account</Text>
                 <Text style={[styles.menuHint, { color: colors.textSecondary }]}>
-                  {syncStatus === "syncing"
-                    ? "Syncing..."
-                    : syncStatus === "error"
-                    ? "Sync failed - tap to retry"
-                    : syncStatus === "success"
-                    ? "Just synced"
-                    : lastSyncTime
-                    ? `Last synced ${formatTimeAgo(lastSyncTime)}`
-                    : "Back up your collection"}
+                  Unlimited cards, cloud backup, and sync across devices
                 </Text>
               </View>
-              {submitting ? (
-                <ActivityIndicator size="small" color={colors.tint} />
-              ) : syncStatus === "syncing" ? (
-                <ActivityIndicator size="small" color={colors.success} />
-              ) : syncStatus === "error" ? (
-                <Ionicons name="alert-circle" size={18} color={colors.error} />
-              ) : syncStatus === "success" ? (
-                <Ionicons name="checkmark-circle" size={18} color={colors.success} />
-              ) : (
-                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-              )}
-            </Pressable>
+              <Pressable
+                style={[styles.upgradeBtn, { backgroundColor: colors.tint }]}
+                onPress={() => router.push("/auth")}
+              >
+                <Text style={styles.upgradeBtnText}>Sign Up</Text>
+              </Pressable>
+            </View>
           </View>
-        </View>
+        )}
+
+        {user && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+              CLOUD SYNC
+            </Text>
+            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              <Pressable style={styles.menuItem} onPress={handleSync} disabled={submitting}>
+                <View style={[styles.menuIcon, { backgroundColor: colors.success + "18" }]}>
+                  <Ionicons name="cloud-upload" size={20} color={colors.success} />
+                </View>
+                <View style={styles.menuContent}>
+                  <Text style={[styles.menuLabel, { color: colors.text }]}>
+                    Save to Cloud
+                  </Text>
+                  <Text style={[styles.menuHint, { color: colors.textSecondary }]}>
+                    {syncStatus === "syncing"
+                      ? "Syncing..."
+                      : syncStatus === "error"
+                      ? "Sync failed - tap to retry"
+                      : syncStatus === "success"
+                      ? "Just synced"
+                      : lastSyncTime
+                      ? `Last synced ${formatTimeAgo(lastSyncTime)}`
+                      : "Back up your collection"}
+                  </Text>
+                </View>
+                {submitting ? (
+                  <ActivityIndicator size="small" color={colors.tint} />
+                ) : syncStatus === "syncing" ? (
+                  <ActivityIndicator size="small" color={colors.success} />
+                ) : syncStatus === "error" ? (
+                  <Ionicons name="alert-circle" size={18} color={colors.error} />
+                ) : syncStatus === "success" ? (
+                  <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+                ) : (
+                  <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+                )}
+              </Pressable>
+            </View>
+          </View>
+        )}
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
@@ -277,39 +302,75 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-            ACCOUNT
-          </Text>
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-            <Pressable style={styles.menuItem} onPress={handleLogout}>
-              <View style={[styles.menuIcon, { backgroundColor: colors.error + "18" }]}>
-                <Ionicons name="log-out" size={20} color={colors.error} />
-              </View>
-              <View style={styles.menuContent}>
-                <Text style={[styles.menuLabel, { color: colors.error }]}>
-                  Log Out
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-            </Pressable>
-            <View style={[styles.separator, { backgroundColor: colors.cardBorder }]} />
-            <Pressable style={styles.menuItem} onPress={handleDeleteAccount}>
-              <View style={[styles.menuIcon, { backgroundColor: colors.error + "18" }]}>
-                <Ionicons name="trash" size={20} color={colors.error} />
-              </View>
-              <View style={styles.menuContent}>
-                <Text style={[styles.menuLabel, { color: colors.error }]}>
-                  Delete Account
-                </Text>
-                <Text style={[styles.menuHint, { color: colors.textSecondary }]}>
-                  Permanently remove your data
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-            </Pressable>
+        {user ? (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+              ACCOUNT
+            </Text>
+            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              <Pressable style={styles.menuItem} onPress={handleLogout}>
+                <View style={[styles.menuIcon, { backgroundColor: colors.error + "18" }]}>
+                  <Ionicons name="log-out" size={20} color={colors.error} />
+                </View>
+                <View style={styles.menuContent}>
+                  <Text style={[styles.menuLabel, { color: colors.error }]}>
+                    Log Out
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+              </Pressable>
+              <View style={[styles.separator, { backgroundColor: colors.cardBorder }]} />
+              <Pressable style={styles.menuItem} onPress={handleDeleteAccount}>
+                <View style={[styles.menuIcon, { backgroundColor: colors.error + "18" }]}>
+                  <Ionicons name="trash" size={20} color={colors.error} />
+                </View>
+                <View style={styles.menuContent}>
+                  <Text style={[styles.menuLabel, { color: colors.error }]}>
+                    Delete Account
+                  </Text>
+                  <Text style={[styles.menuHint, { color: colors.textSecondary }]}>
+                    Permanently remove your data
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+              </Pressable>
+            </View>
           </View>
-        </View>
+        ) : isGuest ? (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+              ACCOUNT
+            </Text>
+            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              <Pressable style={styles.menuItem} onPress={() => router.push("/auth")}>
+                <View style={[styles.menuIcon, { backgroundColor: colors.tint + "18" }]}>
+                  <Ionicons name="person-add" size={20} color={colors.tint} />
+                </View>
+                <View style={styles.menuContent}>
+                  <Text style={[styles.menuLabel, { color: colors.text }]}>
+                    Create Account
+                  </Text>
+                  <Text style={[styles.menuHint, { color: colors.textSecondary }]}>
+                    Unlimited cards and cloud backup
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+              </Pressable>
+              <View style={[styles.separator, { backgroundColor: colors.cardBorder }]} />
+              <Pressable style={styles.menuItem} onPress={handleLogout}>
+                <View style={[styles.menuIcon, { backgroundColor: colors.error + "18" }]}>
+                  <Ionicons name="log-out" size={20} color={colors.error} />
+                </View>
+                <View style={styles.menuContent}>
+                  <Text style={[styles.menuLabel, { color: colors.error }]}>
+                    Sign Out
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
       </ScrollView>
 
       {confirmingAction && (
@@ -435,6 +496,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "DMSans_400Regular",
     marginTop: 1,
+  },
+  upgradeCard: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 12,
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  upgradeBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  upgradeBtnText: {
+    fontSize: 14,
+    fontFamily: "DMSans_700Bold",
+    color: "#FFFFFF",
   },
   modalOverlay: {
     position: "absolute" as const,
