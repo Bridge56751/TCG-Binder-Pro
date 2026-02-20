@@ -9,19 +9,28 @@ import {
   ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useTheme } from "@/lib/ThemeContext";
 import { useAuth } from "@/lib/AuthContext";
+import * as AppleAuthentication from "expo-apple-authentication";
 
 type ScreenMode = "login" | "register" | "verify" | "forgot" | "reset";
 
 export default function AuthScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const { login, register, continueAsGuest, needsVerification, verifyEmail, resendVerification, requestPasswordReset, resetPassword, clearVerification, user } = useAuth();
+  const { login, register, appleSignIn, continueAsGuest, needsVerification, verifyEmail, resendVerification, requestPasswordReset, resetPassword, clearVerification, user } = useAuth();
+  const [appleAuthAvailable, setAppleAuthAvailable] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === "ios") {
+      AppleAuthentication.isAvailableAsync().then(setAppleAuthAvailable);
+    }
+  }, []);
 
   const [mode, setMode] = useState<ScreenMode>("login");
   const [email, setEmail] = useState("");
@@ -93,6 +102,34 @@ export default function AuthScreen() {
       }
     }
     return msg;
+  };
+
+  const handleAppleSignIn = async () => {
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      if (!credential.identityToken) {
+        setError("Apple Sign-In failed: no identity token");
+        return;
+      }
+      setSubmitting(true);
+      setError("");
+      await appleSignIn(
+        credential.identityToken,
+        credential.fullName,
+        credential.email
+      );
+    } catch (err: any) {
+      if (err.code === "ERR_REQUEST_CANCELED") {
+        return;
+      }
+      setError(parseError(err));
+    }
+    setSubmitting(false);
   };
 
   const handleSubmit = async () => {
@@ -547,6 +584,16 @@ export default function AuthScreen() {
           <View style={[styles.dividerLine, { backgroundColor: colors.cardBorder }]} />
         </View>
 
+        {appleAuthAvailable && (
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+            cornerRadius={12}
+            style={styles.appleButton}
+            onPress={handleAppleSignIn}
+          />
+        )}
+
         <Pressable
           style={[styles.guestButton, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}
           onPress={continueAsGuest}
@@ -679,6 +726,11 @@ const styles = StyleSheet.create({
   dividerText: {
     fontSize: 13,
     fontFamily: "DMSans_500Medium",
+  },
+  appleButton: {
+    width: "100%",
+    height: 52,
+    marginBottom: 12,
   },
   guestButton: {
     flexDirection: "row",
