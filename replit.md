@@ -44,7 +44,7 @@ Preferred communication style: Simple, everyday language.
 
 - **ORM**: Drizzle ORM configured for PostgreSQL (`drizzle.config.ts`)
 - **Schema location**: `shared/schema.ts` (users table, user_collections table) and `shared/models/chat.ts` (conversations and messages tables for chat integration)
-- **Current schema**: Users table (id, username, password, isPremium) and user_collections table (userId FK, collection JSONB, updatedAt) and chat-related tables (conversations, messages). The TCG card/set data appears to come from external APIs rather than the database.
+- **Current schema**: Users table (id, email, password, isPremium) and user_collections table (userId FK, collection JSONB, updatedAt) and chat-related tables (conversations, messages). The TCG card/set data appears to come from external APIs rather than the database.
 - **Migration management**: Drizzle Kit with `db:push` script for schema sync
 - **Connection**: `DATABASE_URL` environment variable required
 
