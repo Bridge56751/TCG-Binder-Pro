@@ -18,7 +18,7 @@ import { useAuth } from "@/lib/AuthContext";
 export default function AuthScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const { login, register } = useAuth();
+  const { login, register, continueAsGuest } = useAuth();
 
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
@@ -175,27 +175,22 @@ export default function AuthScreen() {
           </Text>
         </Pressable>
 
+        <View style={styles.dividerRow}>
+          <View style={[styles.dividerLine, { backgroundColor: colors.cardBorder }]} />
+          <Text style={[styles.dividerText, { color: colors.textTertiary }]}>or</Text>
+          <View style={[styles.dividerLine, { backgroundColor: colors.cardBorder }]} />
+        </View>
+
         <Pressable
-          style={[styles.devButton, { borderColor: colors.cardBorder }]}
-          onPress={async () => {
-            setError("");
-            setSubmitting(true);
-            try {
-              await login("dev", "dev123");
-            } catch {
-              try {
-                await register("dev", "dev123");
-              } catch (err: any) {
-                setError("Dev login failed");
-              }
-            }
-            setSubmitting(false);
-          }}
-          disabled={submitting}
+          style={[styles.guestButton, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}
+          onPress={continueAsGuest}
         >
-          <Ionicons name="code-slash" size={16} color={colors.textTertiary} />
-          <Text style={[styles.devButtonText, { color: colors.textTertiary }]}>Dev Login</Text>
+          <Ionicons name="person-outline" size={18} color={colors.textSecondary} />
+          <Text style={[styles.guestButtonText, { color: colors.text }]}>Continue as Guest</Text>
         </Pressable>
+        <Text style={[styles.guestHint, { color: colors.textTertiary }]}>
+          Limited to 50 cards. Create an account anytime for unlimited cards and cloud backup.
+        </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -295,19 +290,42 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_400Regular",
     textAlign: "center",
   },
-  devButton: {
+  dividerRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginTop: 32,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderStyle: "dashed",
+    gap: 12,
+    marginTop: 24,
+    marginBottom: 20,
+    alignSelf: "stretch",
   },
-  devButtonText: {
-    fontSize: 14,
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    fontSize: 13,
     fontFamily: "DMSans_500Medium",
+  },
+  guestButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    height: 52,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignSelf: "stretch",
+  },
+  guestButtonText: {
+    fontSize: 16,
+    fontFamily: "DMSans_600SemiBold",
+  },
+  guestHint: {
+    fontSize: 12,
+    fontFamily: "DMSans_400Regular",
+    textAlign: "center",
+    marginTop: 10,
+    lineHeight: 18,
+    paddingHorizontal: 20,
   },
 });
