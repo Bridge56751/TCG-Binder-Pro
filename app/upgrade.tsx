@@ -3,6 +3,7 @@ import {
   StyleSheet,
   Text,
   View,
+  ScrollView,
   Pressable,
   ActivityIndicator,
   Platform,
@@ -99,50 +100,52 @@ export default function UpgradeScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.heroSection}>
-        <View style={[styles.heroBadge, { backgroundColor: colors.tint + "14" }]}>
-          <Ionicons name="star" size={48} color={colors.tint} />
-        </View>
-        <Text style={[styles.heroTitle, { color: colors.text }]}>Unlock Premium</Text>
-        <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-          You've used {totalCards()} of {FREE_CARD_LIMIT} free cards.{"\n"}
-          Go unlimited for just $2.99/month.
-        </Text>
-      </View>
-
-      <View style={styles.featuresSection}>
-        <Text style={[styles.sectionLabel, { color: colors.tint }]}>PREMIUM - $2.99/MONTH</Text>
-        {PREMIUM_FEATURES.map((f, i) => (
-          <View key={i} style={[styles.featureRow, { borderColor: colors.cardBorder }]}>
-            <View style={[styles.featureIcon, { backgroundColor: colors.tint + "14" }]}>
-              <Ionicons name={f.icon} size={22} color={colors.tint} />
-            </View>
-            <View style={styles.featureText}>
-              <Text style={[styles.featureTitle, { color: colors.text }]}>{f.title}</Text>
-              <Text style={[styles.featureDesc, { color: colors.textSecondary }]}>{f.desc}</Text>
-            </View>
-            <Ionicons name="checkmark-circle" size={22} color={colors.tint} />
+      <ScrollView style={styles.scrollContent} contentContainerStyle={styles.scrollContentContainer} showsVerticalScrollIndicator={false}>
+        <View style={styles.heroSection}>
+          <View style={[styles.heroBadge, { backgroundColor: colors.tint + "14" }]}>
+            <Ionicons name="star" size={48} color={colors.tint} />
           </View>
-        ))}
-      </View>
+          <Text style={[styles.heroTitle, { color: colors.text }]}>Unlock Premium</Text>
+          <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
+            You've used {totalCards()} of {FREE_CARD_LIMIT} free cards.{"\n"}
+            Go unlimited for just $2.99/month.
+          </Text>
+        </View>
 
-      {needsAccount && (
         <View style={styles.featuresSection}>
-          <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>FREE ACCOUNT</Text>
-          {FREE_ACCOUNT_FEATURES.map((f, i) => (
+          <Text style={[styles.sectionLabel, { color: colors.tint }]}>PREMIUM - $2.99/MONTH</Text>
+          {PREMIUM_FEATURES.map((f, i) => (
             <View key={i} style={[styles.featureRow, { borderColor: colors.cardBorder }]}>
-              <View style={[styles.featureIcon, { backgroundColor: colors.textSecondary + "14" }]}>
-                <Ionicons name={f.icon} size={22} color={colors.textSecondary} />
+              <View style={[styles.featureIcon, { backgroundColor: colors.tint + "14" }]}>
+                <Ionicons name={f.icon} size={22} color={colors.tint} />
               </View>
               <View style={styles.featureText}>
                 <Text style={[styles.featureTitle, { color: colors.text }]}>{f.title}</Text>
                 <Text style={[styles.featureDesc, { color: colors.textSecondary }]}>{f.desc}</Text>
               </View>
-              <Ionicons name="checkmark-circle" size={22} color={colors.textSecondary} />
+              <Ionicons name="checkmark-circle" size={22} color={colors.tint} />
             </View>
           ))}
         </View>
-      )}
+
+        {needsAccount && (
+          <View style={styles.featuresSection}>
+            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>FREE ACCOUNT</Text>
+            {FREE_ACCOUNT_FEATURES.map((f, i) => (
+              <View key={i} style={[styles.featureRow, { borderColor: colors.cardBorder }]}>
+                <View style={[styles.featureIcon, { backgroundColor: colors.textSecondary + "14" }]}>
+                  <Ionicons name={f.icon} size={22} color={colors.textSecondary} />
+                </View>
+                <View style={styles.featureText}>
+                  <Text style={[styles.featureTitle, { color: colors.text }]}>{f.title}</Text>
+                  <Text style={[styles.featureDesc, { color: colors.textSecondary }]}>{f.desc}</Text>
+                </View>
+                <Ionicons name="checkmark-circle" size={22} color={colors.textSecondary} />
+              </View>
+            ))}
+          </View>
+        )}
+      </ScrollView>
 
       <View style={[styles.ctaSection, { paddingBottom: bottomInset + 16 }]}>
         {needsAccount ? (
@@ -238,6 +241,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 4,
+  },
+  scrollContent: {
+    flex: 1,
+  },
+  scrollContentContainer: {
+    paddingBottom: 16,
   },
   heroSection: {
     alignItems: "center",
