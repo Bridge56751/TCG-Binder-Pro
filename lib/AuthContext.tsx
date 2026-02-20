@@ -8,6 +8,7 @@ const GUEST_KEY = "cardvault_guest_mode";
 interface AuthUser {
   id: string;
   username: string;
+  isPremium: boolean;
 }
 
 interface AuthContextValue {
@@ -19,6 +20,7 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   continueAsGuest: () => void;
+  setPremiumStatus: (status: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -36,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const res = await fetch(url.toString(), { credentials: "include" });
         if (res.ok) {
           const data = await res.json();
-          setUser(data);
+          setUser({ id: data.id, username: data.username, isPremium: data.isPremium ?? false });
           setLoading(false);
           return;
         }
@@ -52,10 +54,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkSession();
   }, []);
 
+  const setPremiumStatus = useCallback((status: boolean) => {
+    setUser(prev => prev ? { ...prev, isPremium: status } : prev);
+  }, []);
+
   const login = useCallback(async (username: string, password: string) => {
     const res = await apiRequest("POST", "/api/auth/login", { username, password });
     const data = await res.json();
-    setUser(data);
+    setUser({ id: data.id, username: data.username, isPremium: data.isPremium ?? false });
     setIsGuest(false);
     await AsyncStorage.removeItem(GUEST_KEY);
   }, []);
@@ -63,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = useCallback(async (username: string, password: string) => {
     const res = await apiRequest("POST", "/api/auth/register", { username, password });
     const data = await res.json();
-    setUser(data);
+    setUser({ id: data.id, username: data.username, isPremium: data.isPremium ?? false });
     setIsGuest(false);
     await AsyncStorage.removeItem(GUEST_KEY);
   }, []);
@@ -88,8 +94,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, isGuest, loading, login, register, logout, deleteAccount, continueAsGuest }),
-    [user, isGuest, loading, login, register, logout, deleteAccount, continueAsGuest]
+    () => ({ user, isGuest, loading, login, register, logout, deleteAccount, continueAsGuest, setPremiumStatus }),
+    [user, isGuest, loading, login, register, logout, deleteAccount, continueAsGuest, setPremiumStatus]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

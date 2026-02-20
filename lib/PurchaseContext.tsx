@@ -1,0 +1,162 @@
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
+import { Platform, Alert } from "react-native";
+import Purchases, { type CustomerInfo, type PurchasesPackage } from "react-native-purchases";
+import { useAuth } from "./AuthContext";
+import { apiRequest } from "./query-client";
+
+const REVENUECAT_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY || "";
+const ENTITLEMENT_ID = "premium";
+
+interface PurchaseContextValue {
+  isPremium: boolean;
+  loading: boolean;
+  packages: PurchasesPackage[];
+  purchasePremium: () => Promise<boolean>;
+  restorePurchases: () => Promise<boolean>;
+}
+
+const PurchaseContext = createContext<PurchaseContextValue | null>(null);
+
+export function PurchaseProvider({ children }: { children: ReactNode }) {
+  const { user, setPremiumStatus } = useAuth();
+  const [isPremium, setIsPremium] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [packages, setPackages] = useState<PurchasesPackage[]>([]);
+  const [initialized, setInitialized] = useState(false);
+
+  useEffect(() => {
+    const initPurchases = async () => {
+      if (!REVENUECAT_API_KEY || initialized) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        if (Platform.OS === "ios") {
+          Purchases.configure({ apiKey: REVENUECAT_API_KEY });
+        } else if (Platform.OS === "android") {
+          Purchases.configure({ apiKey: REVENUECAT_API_KEY });
+        } else {
+          Purchases.configure({ apiKey: REVENUECAT_API_KEY });
+        }
+
+        setInitialized(true);
+
+        if (user) {
+          try {
+            await Purchases.logIn(user.id);
+          } catch {}
+        }
+
+        const customerInfo = await Purchases.getCustomerInfo();
+        const hasPremium = !!customerInfo.entitlements.active[ENTITLEMENT_ID];
+        setIsPremium(hasPremium);
+
+        if (hasPremium && user) {
+          syncPremiumToBackend();
+        }
+
+        try {
+          const offerings = await Purchases.getOfferings();
+          if (offerings.current && offerings.current.availablePackages.length > 0) {
+            setPackages(offerings.current.availablePackages);
+          }
+        } catch {}
+      } catch (e) {
+        console.log("RevenueCat init (preview mode in Expo Go is normal):", e);
+      }
+
+      setLoading(false);
+    };
+
+    initPurchases();
+  }, [user]);
+
+  const syncPremiumToBackend = useCallback(async () => {
+    if (!user) return;
+    try {
+      await apiRequest("POST", "/api/auth/upgrade-premium");
+      setPremiumStatus(true);
+    } catch {}
+  }, [user, setPremiumStatus]);
+
+  useEffect(() => {
+    if (user?.isPremium) {
+      setIsPremium(true);
+    }
+  }, [user]);
+
+  const purchasePremium = useCallback(async (): Promise<boolean> => {
+    try {
+      if (packages.length === 0) {
+        const offerings = await Purchases.getOfferings();
+        if (!offerings.current || offerings.current.availablePackages.length === 0) {
+          Alert.alert("Not Available", "The premium upgrade is not available right now. Please try again later.");
+          return false;
+        }
+        setPackages(offerings.current.availablePackages);
+      }
+
+      const targetPackage = packages[0];
+      if (!targetPackage) {
+        Alert.alert("Not Available", "The premium upgrade is not available right now.");
+        return false;
+      }
+
+      const { customerInfo } = await Purchases.purchasePackage(targetPackage);
+      const hasPremium = !!customerInfo.entitlements.active[ENTITLEMENT_ID];
+
+      if (hasPremium) {
+        setIsPremium(true);
+        await syncPremiumToBackend();
+        return true;
+      }
+      return false;
+    } catch (e: any) {
+      if (!e.userCancelled) {
+        Alert.alert("Purchase Failed", "Something went wrong. Please try again.");
+      }
+      return false;
+    }
+  }, [packages, syncPremiumToBackend]);
+
+  const restorePurchases = useCallback(async (): Promise<boolean> => {
+    try {
+      const customerInfo = await Purchases.restorePurchases();
+      const hasPremium = !!customerInfo.entitlements.active[ENTITLEMENT_ID];
+
+      if (hasPremium) {
+        setIsPremium(true);
+        await syncPremiumToBackend();
+        Alert.alert("Restored", "Your premium access has been restored.");
+        return true;
+      } else {
+        Alert.alert("No Purchases Found", "No previous purchases were found for this account.");
+        return false;
+      }
+    } catch {
+      Alert.alert("Restore Failed", "Could not restore purchases. Please try again.");
+      return false;
+    }
+  }, [syncPremiumToBackend]);
+
+  const value = useMemo(() => ({
+    isPremium,
+    loading,
+    packages,
+    purchasePremium,
+    restorePurchases,
+  }), [isPremium, loading, packages, purchasePremium, restorePurchases]);
+
+  return (
+    <PurchaseContext.Provider value={value}>
+      {children}
+    </PurchaseContext.Provider>
+  );
+}
+
+export function usePurchase() {
+  const ctx = useContext(PurchaseContext);
+  if (!ctx) throw new Error("usePurchase must be used within PurchaseProvider");
+  return ctx;
+}
