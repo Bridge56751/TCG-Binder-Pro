@@ -18,6 +18,7 @@ import { Image } from "expo-image";
 import { useTheme } from "@/lib/ThemeContext";
 import { useAuth } from "@/lib/AuthContext";
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "@/lib/legal-urls";
+import { router, useLocalSearchParams } from "expo-router";
 import * as AppleAuthentication from "expo-apple-authentication";
 
 type ScreenMode = "login" | "register" | "verify" | "forgot" | "reset";
@@ -25,8 +26,9 @@ type ScreenMode = "login" | "register" | "verify" | "forgot" | "reset";
 export default function AuthScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const { login, register, appleSignIn, continueAsGuest, needsVerification, verifyEmail, resendVerification, requestPasswordReset, resetPassword, clearVerification, user } = useAuth();
+  const { login, register, appleSignIn, continueAsGuest, needsVerification, verifyEmail, resendVerification, requestPasswordReset, resetPassword, clearVerification, user, isGuest } = useAuth();
   const [appleAuthAvailable, setAppleAuthAvailable] = useState(false);
+  const canDismiss = isGuest || !!user;
 
   useEffect(() => {
     if (Platform.OS === "ios") {
@@ -467,10 +469,18 @@ export default function AuthScreen() {
       keyboardVerticalOffset={0}
     >
       <ScrollView
-        contentContainerStyle={[styles.authContainer, { paddingTop: topInset + 60, paddingBottom: bottomInset + 20 }]}
+        contentContainerStyle={[styles.authContainer, { paddingTop: topInset + (canDismiss ? 20 : 60), paddingBottom: bottomInset + 20 }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {canDismiss && (
+          <View style={styles.modalCloseRow}>
+            <Pressable onPress={() => router.back()} hitSlop={12}>
+              <Ionicons name="close" size={28} color={colors.text} />
+            </Pressable>
+          </View>
+        )}
+
         <Image
           source={require("../assets/images/icon.png")}
           style={styles.logoImage}
@@ -627,6 +637,12 @@ const styles = StyleSheet.create({
   authContainer: {
     paddingHorizontal: 28,
     alignItems: "center",
+  },
+  modalCloseRow: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginBottom: 8,
   },
   logoImage: {
     width: 200,
