@@ -55,7 +55,11 @@ export default function ScanScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editCardNumber, setEditCardNumber] = useState("");
+  const [editSetName, setEditSetName] = useState("");
+  const [editGame, setEditGame] = useState<GameId>("pokemon");
   const [isCorrecting, setIsCorrecting] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 84 + 34 : 100;
@@ -191,54 +195,64 @@ export default function ScanScreen() {
     setIsEditing(false);
     setEditName("");
     setEditCardNumber("");
+    setEditSetName("");
+    setSearchResults([]);
+    setHasSearched(false);
   };
 
   const startEditing = () => {
     if (!scanResult) return;
     setEditName(scanResult.englishName || scanResult.name || "");
     setEditCardNumber(scanResult.cardNumber || "");
+    setEditSetName("");
+    setEditGame(scanResult.game);
+    setSearchResults([]);
+    setHasSearched(false);
     setIsEditing(true);
   };
 
-  const submitCorrection = async () => {
-    if (!scanResult) return;
+  const searchCards = async () => {
+    if (!editName.trim()) return;
     setIsCorrecting(true);
+    setSearchResults([]);
+    setHasSearched(false);
     try {
-      const res = await apiRequest("POST", "/api/correct-card", {
-        game: scanResult.game,
-        name: editName.trim(),
-        cardNumber: editCardNumber.trim(),
-        setId: scanResult.setId,
-        language: scanResult.language || "en",
+      const res = await apiRequest("POST", "/api/search-cards", {
+        game: editGame,
+        query: editName.trim(),
+        setName: editSetName.trim() || undefined,
       });
-      const data: CardIdentification = await res.json();
-      if (data.verified) {
-        const corrected: CardIdentification = {
-          ...scanResult,
-          ...data,
-        };
-        if (!data.englishName) {
-          corrected.englishName = undefined as any;
-        }
-        if (!data.englishSetName) {
-          corrected.englishSetName = undefined as any;
-        }
-        if (!data.rarity) {
-          corrected.rarity = scanResult.rarity;
-        }
-        setScanResult(corrected);
-        setIsEditing(false);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        showToast("Card found!");
-      } else {
-        Alert.alert("No match found", "We couldn't find a card matching those details. Try adjusting the name or number.");
+      const data = await res.json();
+      setSearchResults(data.results || []);
+      setHasSearched(true);
+      if (!data.results || data.results.length === 0) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     } catch (error) {
-      Alert.alert("Error", "Failed to search for the card. Please try again.");
+      Alert.alert("Error", "Failed to search for cards. Please try again.");
     } finally {
       setIsCorrecting(false);
     }
+  };
+
+  const selectSearchResult = (result: any) => {
+    const corrected: CardIdentification = {
+      game: result.game,
+      name: result.name,
+      setId: result.setId,
+      setName: result.setName,
+      cardNumber: result.localId || "",
+      verified: true,
+      verifiedCardId: result.cardId,
+      rarity: result.rarity || scanResult?.rarity || "",
+      language: "en",
+    };
+    setScanResult(corrected);
+    setIsEditing(false);
+    setSearchResults([]);
+    setHasSearched(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    showToast("Card selected!");
   };
 
   const dynamicStyles = getDynamicStyles(colors);
@@ -358,10 +372,36 @@ export default function ScanScreen() {
           {isEditing ? (
             <View style={{ gap: 12 }}>
               <View style={{ backgroundColor: colors.tint + "10", paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <Ionicons name="pencil" size={16} color={colors.tint} />
-                <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 13, color: colors.tint }}>Edit card details to find the right match</Text>
+                <Ionicons name="search" size={16} color={colors.tint} />
+                <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 13, color: colors.tint }}>Search for the correct card</Text>
               </View>
-              <View style={{ gap: 8 }}>
+
+              <View style={{ gap: 6 }}>
+                <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textSecondary }}>Game</Text>
+                <View style={{ flexDirection: "row", gap: 6 }}>
+                  {(["pokemon", "yugioh", "onepiece", "mtg"] as GameId[]).map((g) => (
+                    <Pressable
+                      key={g}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 8,
+                        borderRadius: 8,
+                        alignItems: "center" as const,
+                        backgroundColor: editGame === g ? colors.tint : colors.surfaceAlt,
+                        borderWidth: 1,
+                        borderColor: editGame === g ? colors.tint : colors.cardBorder,
+                      }}
+                      onPress={() => { setEditGame(g); setSearchResults([]); setHasSearched(false); }}
+                    >
+                      <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 11, color: editGame === g ? "#FFFFFF" : colors.textSecondary }}>
+                        {gameLabel(g)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              <View style={{ gap: 6 }}>
                 <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textSecondary }}>Card Name</Text>
                 <TextInput
                   style={{
@@ -376,15 +416,17 @@ export default function ScanScreen() {
                     borderColor: colors.cardBorder,
                   }}
                   value={editName}
-                  onChangeText={setEditName}
+                  onChangeText={(t) => { setEditName(t); setHasSearched(false); }}
                   placeholder="Enter card name"
                   placeholderTextColor={colors.textTertiary}
                   autoCapitalize="words"
-                  returnKeyType="next"
+                  returnKeyType="search"
+                  onSubmitEditing={searchCards}
                 />
               </View>
-              <View style={{ gap: 8 }}>
-                <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textSecondary }}>Card Number</Text>
+
+              <View style={{ gap: 6 }}>
+                <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textSecondary }}>Set Name (optional)</Text>
                 <TextInput
                   style={{
                     fontFamily: "DMSans_400Regular",
@@ -397,14 +439,16 @@ export default function ScanScreen() {
                     borderWidth: 1,
                     borderColor: colors.cardBorder,
                   }}
-                  value={editCardNumber}
-                  onChangeText={setEditCardNumber}
-                  placeholder="e.g. 198, TG05, 025"
+                  value={editSetName}
+                  onChangeText={(t) => { setEditSetName(t); setHasSearched(false); }}
+                  placeholder="e.g. Prismatic Evolutions, Scarlet & Violet"
                   placeholderTextColor={colors.textTertiary}
-                  returnKeyType="done"
-                  onSubmitEditing={submitCorrection}
+                  autoCapitalize="words"
+                  returnKeyType="search"
+                  onSubmitEditing={searchCards}
                 />
               </View>
+
               <View style={{ flexDirection: "row", gap: 10 }}>
                 <Pressable
                   style={({ pressed }) => ({
@@ -418,7 +462,7 @@ export default function ScanScreen() {
                     backgroundColor: colors.surfaceAlt,
                     opacity: pressed ? 0.8 : 1,
                   })}
-                  onPress={() => setIsEditing(false)}
+                  onPress={() => { setIsEditing(false); setSearchResults([]); setHasSearched(false); }}
                 >
                   <Ionicons name="close" size={18} color={colors.textSecondary} />
                   <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 14, color: colors.textSecondary }}>Cancel</Text>
@@ -433,10 +477,10 @@ export default function ScanScreen() {
                     paddingVertical: 12,
                     borderRadius: 10,
                     backgroundColor: colors.tint,
-                    opacity: pressed ? 0.9 : 1,
+                    opacity: (pressed ? 0.9 : 1) * ((!editName.trim() || isCorrecting) ? 0.6 : 1),
                   })}
-                  onPress={submitCorrection}
-                  disabled={isCorrecting || (!editName.trim() && !editCardNumber.trim())}
+                  onPress={searchCards}
+                  disabled={isCorrecting || !editName.trim()}
                 >
                   {isCorrecting ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
@@ -448,6 +492,77 @@ export default function ScanScreen() {
                   </Text>
                 </Pressable>
               </View>
+
+              {hasSearched && searchResults.length === 0 && (
+                <View style={{ alignItems: "center", paddingVertical: 16, gap: 6 }}>
+                  <Ionicons name="search-outline" size={28} color={colors.textTertiary} />
+                  <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 14, color: colors.textSecondary }}>No cards found</Text>
+                  <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 12, color: colors.textTertiary, textAlign: "center" }}>
+                    Try a different name, check the game selection, or remove the set filter.
+                  </Text>
+                </View>
+              )}
+
+              {searchResults.length > 0 && (
+                <View style={{ gap: 8 }}>
+                  <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textSecondary }}>
+                    {searchResults.length} result{searchResults.length !== 1 ? "s" : ""} — tap to select
+                  </Text>
+                  {searchResults.map((r: any, idx: number) => (
+                    <Pressable
+                      key={`${r.cardId}-${idx}`}
+                      style={({ pressed }) => ({
+                        flexDirection: "row" as const,
+                        gap: 10,
+                        padding: 10,
+                        borderRadius: 10,
+                        backgroundColor: pressed ? colors.tint + "12" : colors.surfaceAlt,
+                        borderWidth: 1,
+                        borderColor: pressed ? colors.tint + "40" : colors.cardBorder,
+                      })}
+                      onPress={() => selectSearchResult(r)}
+                    >
+                      {r.image ? (
+                        <Image
+                          source={{ uri: r.image }}
+                          style={{ width: 50, height: 70, borderRadius: 6 }}
+                          contentFit="cover"
+                        />
+                      ) : (
+                        <View style={{ width: 50, height: 70, borderRadius: 6, backgroundColor: colors.background, alignItems: "center", justifyContent: "center" }}>
+                          <MaterialCommunityIcons name="cards-outline" size={20} color={colors.textTertiary} />
+                        </View>
+                      )}
+                      <View style={{ flex: 1, justifyContent: "center", gap: 2 }}>
+                        <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 14, color: colors.text }} numberOfLines={1}>
+                          {r.name}
+                        </Text>
+                        <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 12, color: colors.textSecondary }} numberOfLines={1}>
+                          {r.setName}{r.localId ? ` #${r.localId}` : ""}
+                        </Text>
+                        <View style={{ flexDirection: "row", gap: 4, marginTop: 2 }}>
+                          <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: colors[r.game as GameId] + "20" }}>
+                            <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 10, color: colors[r.game as GameId] }}>
+                              {gameLabel(r.game)}
+                            </Text>
+                          </View>
+                          {r.rarity && (
+                            <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: colors.background }}>
+                              <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 10, color: colors.textTertiary }}>
+                                {r.rarity}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                      <View style={{ justifyContent: "center" }}>
+                        <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+
               <Pressable
                 style={({ pressed }) => ({
                   flexDirection: "row" as const,
