@@ -3,6 +3,7 @@ import { createServer, type Server } from "node:http";
 import OpenAI from "openai";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
+import { generateCode, sendVerificationEmail, sendPasswordResetEmail } from "./email";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -428,11 +429,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const hashed = await bcrypt.hash(password, 10);
       const user = await storage.createUser({ email: email.toLowerCase(), password: hashed });
+      const code = generateCode();
+      const expiry = new Date(Date.now() + 10 * 60 * 1000);
+      await storage.setVerificationCode(user.id, code, expiry);
+      sendVerificationEmail(email.toLowerCase(), code).catch(e => console.error("Verification email failed:", e));
       req.session.userId = user.id;
-      res.json({ id: user.id, email: user.email, isPremium: user.isPremium });
+      res.json({ id: user.id, email: user.email, isPremium: user.isPremium, isVerified: false, needsVerification: true });
     } catch (error) {
       console.error("Register error:", error);
       res.status(500).json({ error: "Registration failed" });
+    }
+  });
+
+  app.post("/api/auth/verify-email", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not logged in" });
+      }
+      const { code } = req.body;
+      if (!code) {
+        return res.status(400).json({ error: "Verification code is required" });
+      }
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      if (user.isVerified) {
+        return res.json({ ok: true, message: "Email already verified" });
+      }
+      if (!user.verificationCode || !user.verificationExpiry) {
+        return res.status(400).json({ error: "No verification code found. Please request a new one." });
+      }
+      if (new Date() > user.verificationExpiry) {
+        return res.status(400).json({ error: "Verification code has expired. Please request a new one." });
+      }
+      if (user.verificationCode !== code.trim()) {
+        return res.status(400).json({ error: "Invalid verification code" });
+      }
+      await storage.verifyUser(user.id);
+      res.json({ ok: true, message: "Email verified successfully" });
+    } catch (error) {
+      console.error("Verify email error:", error);
+      res.status(500).json({ error: "Verification failed" });
+    }
+  });
+
+  app.post("/api/auth/resend-verification", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not logged in" });
+      }
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      if (user.isVerified) {
+        return res.json({ ok: true, message: "Email already verified" });
+      }
+      const code = generateCode();
+      const expiry = new Date(Date.now() + 10 * 60 * 1000);
+      await storage.setVerificationCode(user.id, code, expiry);
+      const sent = await sendVerificationEmail(user.email, code);
+      if (!sent) {
+        return res.status(500).json({ error: "Failed to send verification email" });
+      }
+      res.json({ ok: true, message: "Verification code sent" });
+    } catch (error) {
+      console.error("Resend verification error:", error);
+      res.status(500).json({ error: "Failed to resend verification code" });
+    }
+  });
+
+  app.post("/api/auth/request-reset", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+      const user = await storage.getUserByEmail(email.toLowerCase());
+      if (!user) {
+        return res.json({ ok: true, message: "If an account with that email exists, a reset code has been sent." });
+      }
+      const code = generateCode();
+      const expiry = new Date(Date.now() + 10 * 60 * 1000);
+      await storage.setResetCode(user.id, code, expiry);
+      await sendPasswordResetEmail(user.email, code);
+      res.json({ ok: true, message: "If an account with that email exists, a reset code has been sent." });
+    } catch (error) {
+      console.error("Request reset error:", error);
+      res.status(500).json({ error: "Failed to send reset code" });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { email, code, newPassword } = req.body;
+      if (!email || !code || !newPassword) {
+        return res.status(400).json({ error: "Email, code, and new password are required" });
+      }
+      if (newPassword.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+      const user = await storage.getUserByEmail(email.toLowerCase());
+      if (!user) {
+        return res.status(400).json({ error: "Invalid reset code" });
+      }
+      if (!user.resetCode || !user.resetExpiry) {
+        return res.status(400).json({ error: "No reset code found. Please request a new one." });
+      }
+      if (new Date() > user.resetExpiry) {
+        return res.status(400).json({ error: "Reset code has expired. Please request a new one." });
+      }
+      if (user.resetCode !== code.trim()) {
+        return res.status(400).json({ error: "Invalid reset code" });
+      }
+      const hashed = await bcrypt.hash(newPassword, 10);
+      await storage.updatePassword(user.id, hashed);
+      res.json({ ok: true, message: "Password reset successfully" });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ error: "Failed to reset password" });
     }
   });
 
@@ -451,7 +567,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Invalid email or password" });
       }
       req.session.userId = user.id;
-      res.json({ id: user.id, email: user.email, isPremium: user.isPremium });
+      res.json({ id: user.id, email: user.email, isPremium: user.isPremium, isVerified: user.isVerified });
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ error: "Login failed" });
@@ -488,7 +604,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!user) {
       return res.status(401).json({ error: "User not found" });
     }
-    res.json({ id: user.id, email: user.email, isPremium: user.isPremium });
+    res.json({ id: user.id, email: user.email, isPremium: user.isPremium, isVerified: user.isVerified });
   });
 
   app.post("/api/auth/upgrade-premium", async (req, res) => {

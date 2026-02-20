@@ -9,18 +9,25 @@ interface AuthUser {
   id: string;
   email: string;
   isPremium: boolean;
+  isVerified: boolean;
 }
 
 interface AuthContextValue {
   user: AuthUser | null;
   isGuest: boolean;
   loading: boolean;
+  needsVerification: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   continueAsGuest: () => void;
   setPremiumStatus: (status: boolean) => void;
+  verifyEmail: (code: string) => Promise<void>;
+  resendVerification: () => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  resetPassword: (email: string, code: string, newPassword: string) => Promise<void>;
+  clearVerification: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -29,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isGuest, setIsGuest] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [needsVerification, setNeedsVerification] = useState(false);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -38,7 +46,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const res = await fetch(url.toString(), { credentials: "include" });
         if (res.ok) {
           const data = await res.json();
-          setUser({ id: data.id, email: data.email, isPremium: data.isPremium ?? false });
+          setUser({ id: data.id, email: data.email, isPremium: data.isPremium ?? false, isVerified: data.isVerified ?? false });
+          if (!data.isVerified) {
+            setNeedsVerification(true);
+          }
           setLoading(false);
           return;
         }
@@ -61,23 +72,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const res = await apiRequest("POST", "/api/auth/login", { email, password });
     const data = await res.json();
-    setUser({ id: data.id, email: data.email, isPremium: data.isPremium ?? false });
+    setUser({ id: data.id, email: data.email, isPremium: data.isPremium ?? false, isVerified: data.isVerified ?? false });
     setIsGuest(false);
     await AsyncStorage.removeItem(GUEST_KEY);
+    if (!data.isVerified) {
+      setNeedsVerification(true);
+    }
   }, []);
 
   const register = useCallback(async (email: string, password: string) => {
     const res = await apiRequest("POST", "/api/auth/register", { email, password });
     const data = await res.json();
-    setUser({ id: data.id, email: data.email, isPremium: data.isPremium ?? false });
+    setUser({ id: data.id, email: data.email, isPremium: data.isPremium ?? false, isVerified: false });
     setIsGuest(false);
     await AsyncStorage.removeItem(GUEST_KEY);
+    setNeedsVerification(true);
+  }, []);
+
+  const verifyEmail = useCallback(async (code: string) => {
+    await apiRequest("POST", "/api/auth/verify-email", { code });
+    setUser(prev => prev ? { ...prev, isVerified: true } : prev);
+    setNeedsVerification(false);
+  }, []);
+
+  const resendVerification = useCallback(async () => {
+    await apiRequest("POST", "/api/auth/resend-verification");
+  }, []);
+
+  const requestPasswordReset = useCallback(async (email: string) => {
+    await apiRequest("POST", "/api/auth/request-reset", { email });
+  }, []);
+
+  const resetPassword = useCallback(async (email: string, code: string, newPassword: string) => {
+    await apiRequest("POST", "/api/auth/reset-password", { email, code, newPassword });
+  }, []);
+
+  const clearVerification = useCallback(() => {
+    setNeedsVerification(false);
   }, []);
 
   const logout = useCallback(async () => {
     await apiRequest("POST", "/api/auth/logout");
     setUser(null);
     setIsGuest(false);
+    setNeedsVerification(false);
     await AsyncStorage.removeItem(GUEST_KEY);
   }, []);
 
@@ -85,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await apiRequest("POST", "/api/auth/delete-account");
     setUser(null);
     setIsGuest(false);
+    setNeedsVerification(false);
     await AsyncStorage.removeItem(GUEST_KEY);
   }, []);
 
@@ -94,8 +133,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, isGuest, loading, login, register, logout, deleteAccount, continueAsGuest, setPremiumStatus }),
-    [user, isGuest, loading, login, register, logout, deleteAccount, continueAsGuest, setPremiumStatus]
+    () => ({ user, isGuest, loading, needsVerification, login, register, logout, deleteAccount, continueAsGuest, setPremiumStatus, verifyEmail, resendVerification, requestPasswordReset, resetPassword, clearVerification }),
+    [user, isGuest, loading, needsVerification, login, register, logout, deleteAccount, continueAsGuest, setPremiumStatus, verifyEmail, resendVerification, requestPasswordReset, resetPassword, clearVerification]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
