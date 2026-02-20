@@ -418,30 +418,6 @@ export default function SettingsScreen() {
           </View>
         ) : null}
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-            TESTING
-          </Text>
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-            <Pressable
-              style={styles.menuItem}
-              onPress={() => router.push("/upgrade")}
-            >
-              <View style={[styles.menuIcon, { backgroundColor: "#FF9500" + "18" }]}>
-                <Ionicons name="flask" size={20} color="#FF9500" />
-              </View>
-              <View style={styles.menuContent}>
-                <Text style={[styles.menuLabel, { color: colors.text }]}>
-                  Test Upgrade Screen
-                </Text>
-                <Text style={[styles.menuHint, { color: colors.textSecondary }]}>
-                  Preview the premium upgrade flow
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-            </Pressable>
-          </View>
-        </View>
       </ScrollView>
 
       {confirmingAction && (

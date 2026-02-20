@@ -717,7 +717,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  async function nameSearchPokemon(name: string, lang: string): Promise<{ name: string; cardId: string; setId: string; localId: string } | null> {
+  async function nameSearchPokemon(name: string, lang: string): Promise<any[] | null> {
     const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
     try {
       const res = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(name)}`);
