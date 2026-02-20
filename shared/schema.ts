@@ -10,6 +10,11 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   isPremium: boolean("is_premium").notNull().default(false),
+  isVerified: boolean("is_verified").notNull().default(false),
+  verificationCode: text("verification_code"),
+  verificationExpiry: timestamp("verification_expiry"),
+  resetCode: text("reset_code"),
+  resetExpiry: timestamp("reset_expiry"),
 });
 
 export const userCollections = pgTable("user_collections", {
