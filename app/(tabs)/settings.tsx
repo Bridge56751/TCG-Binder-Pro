@@ -202,6 +202,30 @@ export default function SettingsScreen() {
           </View>
         )}
 
+        {isPremium && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+              SUBSCRIPTION
+            </Text>
+            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              <Pressable style={styles.menuItem} onPress={() => Linking.openURL("https://apps.apple.com/account/subscriptions")}>
+                <View style={[styles.menuIcon, { backgroundColor: colors.tint + "18" }]}>
+                  <Ionicons name="card" size={20} color={colors.tint} />
+                </View>
+                <View style={styles.menuContent}>
+                  <Text style={[styles.menuLabel, { color: colors.text }]}>
+                    Manage Subscription
+                  </Text>
+                  <Text style={[styles.menuHint, { color: colors.textSecondary }]}>
+                    Change or cancel in Apple Settings
+                  </Text>
+                </View>
+                <Ionicons name="open-outline" size={18} color={colors.textTertiary} />
+              </Pressable>
+            </View>
+          </View>
+        )}
+
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
             APPEARANCE

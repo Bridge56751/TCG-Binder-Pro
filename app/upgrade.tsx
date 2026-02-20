@@ -220,6 +220,13 @@ export default function UpgradeScreen() {
           </>
         )}
 
+        <Text style={[styles.cancelInfo, { color: colors.textTertiary }]}>
+          Subscription automatically renews monthly. You can cancel anytime in{" "}
+          <Text style={{ color: colors.textSecondary, textDecorationLine: "underline" }} onPress={() => Linking.openURL("https://apps.apple.com/account/subscriptions")}>
+            Settings → Apple ID → Subscriptions
+          </Text>.
+        </Text>
+
         <Text style={[styles.legalLinks, { color: colors.textTertiary }]}>
           <Text style={{ color: colors.textSecondary }} onPress={() => Linking.openURL(TERMS_OF_SERVICE_URL)}>Terms of Service (EULA)</Text>
           {"  |  "}
@@ -401,10 +408,18 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 22,
   },
+  cancelInfo: {
+    fontSize: 11,
+    fontFamily: "DMSans_400Regular",
+    textAlign: "center",
+    marginTop: 12,
+    lineHeight: 16,
+    paddingHorizontal: 16,
+  },
   legalLinks: {
     fontSize: 12,
     fontFamily: "DMSans_400Regular",
     textAlign: "center",
-    marginTop: 12,
+    marginTop: 8,
   },
 });
