@@ -16,7 +16,8 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useTheme } from "@/lib/ThemeContext";
 import { router } from "expo-router";
 import { useAuth } from "@/lib/AuthContext";
-import { useCollection, GUEST_CARD_LIMIT } from "@/lib/CollectionContext";
+import { usePurchase } from "@/lib/PurchaseContext";
+import { useCollection, FREE_CARD_LIMIT, GUEST_CARD_LIMIT } from "@/lib/CollectionContext";
 import { GAMES } from "@/lib/types";
 import type { GameId } from "@/lib/types";
 
@@ -31,6 +32,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { colors, toggle, isDark } = useTheme();
   const { user, isGuest, logout, deleteAccount } = useAuth();
+  const { isPremium, restorePurchases } = usePurchase();
   const { totalCards, syncCollection, syncStatus, lastSyncTime, enabledGames, toggleGame, isAtGuestLimit } = useCollection();
 
   const [submitting, setSubmitting] = useState(false);
@@ -104,27 +106,33 @@ export default function SettingsScreen() {
             {user ? user.username : "Guest"}
           </Text>
           <Text style={[styles.statsText, { color: colors.textSecondary }]}>
-            {isGuest && !user
-              ? `${totalCards()} / ${GUEST_CARD_LIMIT} cards (guest limit)`
-              : `${totalCards()} cards collected`}
+            {isPremium
+              ? `${totalCards()} cards collected`
+              : `${totalCards()} / ${FREE_CARD_LIMIT} cards (free limit)`}
           </Text>
+          {isPremium && (
+            <View style={[styles.premiumBadge, { backgroundColor: colors.tint + "18" }]}>
+              <Ionicons name="star" size={12} color={colors.tint} />
+              <Text style={[styles.premiumBadgeText, { color: colors.tint }]}>Premium</Text>
+            </View>
+          )}
         </View>
 
-        {isGuest && !user && (
+        {!isPremium && (
           <View style={styles.section}>
             <View style={[styles.upgradeCard, { backgroundColor: colors.tint + "12", borderColor: colors.tint + "30" }]}>
-              <Ionicons name="sparkles" size={22} color={colors.tint} />
+              <Ionicons name="star" size={22} color={colors.tint} />
               <View style={{ flex: 1 }}>
-                <Text style={[styles.menuLabel, { color: colors.text }]}>Create a Free Account</Text>
+                <Text style={[styles.menuLabel, { color: colors.text }]}>Unlock Premium</Text>
                 <Text style={[styles.menuHint, { color: colors.textSecondary }]}>
-                  Unlimited cards, cloud backup, and sync across devices
+                  Unlimited cards, cloud backup, and more for $2.99
                 </Text>
               </View>
               <Pressable
                 style={[styles.upgradeBtn, { backgroundColor: colors.tint }]}
-                onPress={() => router.push("/auth")}
+                onPress={() => router.push("/upgrade")}
               >
-                <Text style={styles.upgradeBtnText}>Sign Up</Text>
+                <Text style={styles.upgradeBtnText}>Upgrade</Text>
               </Pressable>
             </View>
           </View>
@@ -285,7 +293,10 @@ export default function SettingsScreen() {
             PURCHASES
           </Text>
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-            <Pressable style={styles.menuItem} onPress={() => Alert.alert("Restore Purchases", "No previous purchases found.")}>
+            <Pressable style={styles.menuItem} onPress={async () => {
+              setSubmitting(true);
+              try { await restorePurchases(); } finally { setSubmitting(false); }
+            }} disabled={submitting}>
               <View style={[styles.menuIcon, { backgroundColor: colors.tint + "18" }]}>
                 <Ionicons name="receipt-outline" size={20} color={colors.tint} />
               </View>
@@ -294,10 +305,14 @@ export default function SettingsScreen() {
                   Restore Purchases
                 </Text>
                 <Text style={[styles.menuHint, { color: colors.textSecondary }]}>
-                  Recover previous subscriptions
+                  Recover previous purchases
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+              {submitting ? (
+                <ActivityIndicator size="small" color={colors.tint} />
+              ) : (
+                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+              )}
             </Pressable>
           </View>
         </View>
@@ -444,6 +459,19 @@ const styles = StyleSheet.create({
   statsText: {
     fontSize: 14,
     fontFamily: "DMSans_400Regular",
+  },
+  premiumBadge: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  premiumBadgeText: {
+    fontSize: 12,
+    fontFamily: "DMSans_600SemiBold",
   },
   section: {
     paddingHorizontal: 20,

@@ -31,8 +31,9 @@ function useProtectedRoute() {
     if (loading) return;
 
     const inAuthScreen = segments[0] === "auth";
+    const inUpgradeScreen = segments[0] === "upgrade";
 
-    if (!user && !isGuest && !inAuthScreen) {
+    if (!user && !isGuest && !inAuthScreen && !inUpgradeScreen) {
       router.replace("/auth");
     } else if (user && inAuthScreen) {
       router.replace("/(tabs)");

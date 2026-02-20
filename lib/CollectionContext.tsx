@@ -16,6 +16,7 @@ import {
 import { getCachedSets, type CachedSet } from "./card-cache";
 import { apiRequest, getApiUrl } from "./query-client";
 import { useAuth } from "./AuthContext";
+import { usePurchase } from "./PurchaseContext";
 import { fetch } from "expo/fetch";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -70,6 +71,7 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
   const { user, isGuest } = useAuth();
+  const { isPremium: purchaseIsPremium } = usePurchase();
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevUserRef = useRef<string | null>(null);
   const syncRetryRef = useRef(0);
@@ -205,7 +207,7 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     setProgressToast(null);
   }, []);
 
-  const isPremium = user?.isPremium ?? false;
+  const isPremium = purchaseIsPremium || (user?.isPremium ?? false);
 
   const addCard = useCallback(async (game: GameId, setId: string, cardId: string, quantity: number = 1) => {
     if (!isPremium) {
