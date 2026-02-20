@@ -208,9 +208,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   logoImage: {
-    width: 90,
-    height: 90,
-    borderRadius: 22,
+    width: 120,
+    height: 120,
+    borderRadius: 28,
     marginBottom: 16,
   },
   appName: {
