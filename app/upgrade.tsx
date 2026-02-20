@@ -6,6 +6,7 @@ import {
   Pressable,
   ActivityIndicator,
   Platform,
+  Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,6 +15,7 @@ import { router } from "expo-router";
 import { useAuth } from "@/lib/AuthContext";
 import { usePurchase } from "@/lib/PurchaseContext";
 import { useCollection, FREE_CARD_LIMIT } from "@/lib/CollectionContext";
+import { getApiUrl } from "@/lib/query-client";
 
 const PREMIUM_FEATURES = [
   { icon: "infinite" as const, title: "Unlimited Cards", desc: "No more 20-card limit" },
@@ -168,6 +170,20 @@ export default function UpgradeScreen() {
               <Text style={styles.purchaseBtnText}>Create Free Account</Text>
               <Text style={styles.purchaseBtnSub}>Then upgrade to Premium</Text>
             </Pressable>
+
+            <Pressable
+              style={styles.restoreBtn}
+              onPress={handleRestore}
+              disabled={restoring}
+            >
+              {restoring ? (
+                <ActivityIndicator size="small" color={colors.textSecondary} />
+              ) : (
+                <Text style={[styles.restoreBtnText, { color: colors.textSecondary }]}>
+                  Restore Purchase
+                </Text>
+              )}
+            </Pressable>
           </>
         ) : (
           <>
@@ -201,6 +217,12 @@ export default function UpgradeScreen() {
             </Pressable>
           </>
         )}
+
+        <Text style={[styles.legalLinks, { color: colors.textTertiary }]}>
+          <Text style={{ color: colors.textSecondary }} onPress={() => Linking.openURL(`${getApiUrl()}terms`)}>Terms of Service</Text>
+          {"  |  "}
+          <Text style={{ color: colors.textSecondary }} onPress={() => Linking.openURL(`${getApiUrl()}privacy`)}>Privacy Policy</Text>
+        </Text>
       </View>
     </View>
   );
@@ -370,5 +392,11 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_400Regular",
     textAlign: "center",
     lineHeight: 22,
+  },
+  legalLinks: {
+    fontSize: 12,
+    fontFamily: "DMSans_400Regular",
+    textAlign: "center",
+    marginTop: 12,
   },
 });

@@ -10,12 +10,14 @@ import {
   Platform,
   KeyboardAvoidingView,
   Alert,
+  Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useTheme } from "@/lib/ThemeContext";
 import { useAuth } from "@/lib/AuthContext";
+import { getApiUrl } from "@/lib/query-client";
 import * as AppleAuthentication from "expo-apple-authentication";
 
 type ScreenMode = "login" | "register" | "verify" | "forgot" | "reset";
@@ -561,6 +563,15 @@ export default function AuthScreen() {
               </Text>
             )}
           </Pressable>
+
+          {mode === "register" && (
+            <Text style={[styles.legalText, { color: colors.textTertiary }]}>
+              By creating an account, you agree to our{" "}
+              <Text style={{ color: colors.tint }} onPress={() => Linking.openURL(`${getApiUrl()}terms`)}>Terms of Service</Text>
+              {" "}and{" "}
+              <Text style={{ color: colors.tint }} onPress={() => Linking.openURL(`${getApiUrl()}privacy`)}>Privacy Policy</Text>.
+            </Text>
+          )}
         </View>
 
         <Pressable
@@ -793,5 +804,12 @@ const styles = StyleSheet.create({
   },
   skipLink: {
     paddingVertical: 4,
+  },
+  legalText: {
+    fontSize: 12,
+    fontFamily: "DMSans_400Regular",
+    textAlign: "center",
+    lineHeight: 18,
+    marginTop: 12,
   },
 });

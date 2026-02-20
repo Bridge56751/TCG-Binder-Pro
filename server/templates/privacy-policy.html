@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy - CardVault</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #FAF8F5; color: #1a1a1a; line-height: 1.7; padding: 20px; }
+    .container { max-width: 720px; margin: 0 auto; padding: 40px 20px; }
+    h1 { font-size: 28px; margin-bottom: 8px; }
+    .updated { color: #888; font-size: 14px; margin-bottom: 32px; }
+    h2 { font-size: 20px; margin-top: 32px; margin-bottom: 12px; }
+    p, ul { margin-bottom: 16px; }
+    ul { padding-left: 24px; }
+    li { margin-bottom: 6px; }
+    a { color: #C4A46C; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: February 20, 2026</p>
+
+    <p>CardVault ("we", "our", or "us") respects your privacy and is committed to protecting your personal data. This Privacy Policy explains how we collect, use, and protect information when you use our mobile application.</p>
+
+    <h2>1. Information We Collect</h2>
+    <p>We collect the following types of information:</p>
+    <ul>
+      <li><strong>Account Information:</strong> When you create an account, we collect your email address and an encrypted password. If you sign in with Apple, we receive your Apple ID identifier and, optionally, your name and email.</li>
+      <li><strong>Collection Data:</strong> The trading cards you add to your collection are stored locally on your device. If you create an account, your collection data is synced to our servers for cloud backup.</li>
+      <li><strong>Card Images:</strong> When you use the card scanning feature, images are sent to OpenAI's API for identification. We do not store these images after processing.</li>
+      <li><strong>Purchase Information:</strong> In-app purchases are processed by Apple through RevenueCat. We do not collect or store payment information such as credit card numbers.</li>
+    </ul>
+
+    <h2>2. How We Use Your Information</h2>
+    <ul>
+      <li>To provide and maintain the app's functionality</li>
+      <li>To authenticate your account and enable cloud sync</li>
+      <li>To process card identification through AI</li>
+      <li>To verify premium purchase status</li>
+      <li>To send email verification codes and password reset codes</li>
+    </ul>
+
+    <h2>3. Data Storage and Security</h2>
+    <p>Your collection data is stored locally on your device using AsyncStorage. If you have an account, a copy is also stored in our PostgreSQL database hosted on Replit. Passwords are hashed using bcrypt and are never stored in plain text. We use HTTPS for all data transmission.</p>
+
+    <h2>4. Third-Party Services</h2>
+    <p>We use the following third-party services:</p>
+    <ul>
+      <li><strong>OpenAI:</strong> For AI-powered card identification from camera images. Images are processed in accordance with <a href="https://openai.com/privacy" target="_blank">OpenAI's Privacy Policy</a>.</li>
+      <li><strong>RevenueCat:</strong> For managing in-app purchases and subscriptions. See <a href="https://www.revenuecat.com/privacy" target="_blank">RevenueCat's Privacy Policy</a>.</li>
+      <li><strong>External TCG APIs:</strong> We fetch publicly available card data (names, images, prices) from TCGdex, YGOProDeck, OPTCG API, and Scryfall. No personal data is shared with these services.</li>
+    </ul>
+
+    <h2>5. Data Retention</h2>
+    <p>We retain your account data for as long as your account exists. You can delete your account at any time from the Settings screen, which will permanently remove your account data and cloud-synced collection from our servers. Local data on your device is not affected by account deletion.</p>
+
+    <h2>6. Children's Privacy</h2>
+    <p>CardVault does not knowingly collect personal information from children under 13. If you believe a child has provided us with personal information, please contact us so we can delete it.</p>
+
+    <h2>7. Your Rights</h2>
+    <p>You have the right to:</p>
+    <ul>
+      <li>Access your personal data</li>
+      <li>Delete your account and associated data</li>
+      <li>Export your collection data</li>
+      <li>Opt out of cloud sync by using guest mode</li>
+    </ul>
+
+    <h2>8. Changes to This Policy</h2>
+    <p>We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new policy in the app and updating the "Last updated" date.</p>
+
+    <h2>9. Contact Us</h2>
+    <p>If you have questions about this Privacy Policy, please contact us at <a href="mailto:protcgbinder@gmail.com">protcgbinder@gmail.com</a>.</p>
+  </div>
+</body>
+</html>

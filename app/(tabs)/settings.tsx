@@ -20,6 +20,7 @@ import { usePurchase } from "@/lib/PurchaseContext";
 import { useCollection, FREE_CARD_LIMIT, GUEST_CARD_LIMIT } from "@/lib/CollectionContext";
 import { GAMES } from "@/lib/types";
 import type { GameId } from "@/lib/types";
+import { getApiUrl } from "@/lib/query-client";
 
 const GAME_ICONS: Record<GameId, keyof typeof MaterialCommunityIcons.glyphMap> = {
   pokemon: "pokeball",
@@ -262,25 +263,25 @@ export default function SettingsScreen() {
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             </Pressable>
             <View style={[styles.separator, { backgroundColor: colors.cardBorder }]} />
-            <Pressable style={styles.menuItem} onPress={() => Linking.openURL("https://example.com")}>
-              <View style={[styles.menuIcon, { backgroundColor: colors.tint + "18" }]}>
-                <Ionicons name="globe-outline" size={20} color={colors.tint} />
-              </View>
-              <View style={styles.menuContent}>
-                <Text style={[styles.menuLabel, { color: colors.text }]}>
-                  Website
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-            </Pressable>
-            <View style={[styles.separator, { backgroundColor: colors.cardBorder }]} />
-            <Pressable style={styles.menuItem} onPress={() => Linking.openURL("https://example.com/privacy")}>
+            <Pressable style={styles.menuItem} onPress={() => Linking.openURL(`${getApiUrl()}privacy`)}>
               <View style={[styles.menuIcon, { backgroundColor: colors.tint + "18" }]}>
                 <Ionicons name="shield-checkmark-outline" size={20} color={colors.tint} />
               </View>
               <View style={styles.menuContent}>
                 <Text style={[styles.menuLabel, { color: colors.text }]}>
                   Privacy Policy
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </Pressable>
+            <View style={[styles.separator, { backgroundColor: colors.cardBorder }]} />
+            <Pressable style={styles.menuItem} onPress={() => Linking.openURL(`${getApiUrl()}terms`)}>
+              <View style={[styles.menuIcon, { backgroundColor: colors.tint + "18" }]}>
+                <Ionicons name="document-text-outline" size={20} color={colors.tint} />
+              </View>
+              <View style={styles.menuContent}>
+                <Text style={[styles.menuLabel, { color: colors.text }]}>
+                  Terms of Service
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
