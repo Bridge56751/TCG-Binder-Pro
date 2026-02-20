@@ -411,24 +411,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const { username, password } = req.body;
-      if (!username || !password) {
-        return res.status(400).json({ error: "Username and password are required" });
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email and password are required" });
       }
-      if (username.length < 3) {
-        return res.status(400).json({ error: "Username must be at least 3 characters" });
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: "Please enter a valid email address" });
       }
       if (password.length < 6) {
         return res.status(400).json({ error: "Password must be at least 6 characters" });
       }
-      const existing = await storage.getUserByUsername(username);
+      const existing = await storage.getUserByEmail(email.toLowerCase());
       if (existing) {
-        return res.status(409).json({ error: "Username already taken" });
+        return res.status(409).json({ error: "An account with this email already exists" });
       }
       const hashed = await bcrypt.hash(password, 10);
-      const user = await storage.createUser({ username, password: hashed });
+      const user = await storage.createUser({ email: email.toLowerCase(), password: hashed });
       req.session.userId = user.id;
-      res.json({ id: user.id, username: user.username, isPremium: user.isPremium });
+      res.json({ id: user.id, email: user.email, isPremium: user.isPremium });
     } catch (error) {
       console.error("Register error:", error);
       res.status(500).json({ error: "Registration failed" });
@@ -437,20 +438,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { username, password } = req.body;
-      if (!username || !password) {
-        return res.status(400).json({ error: "Username and password are required" });
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email and password are required" });
       }
-      const user = await storage.getUserByUsername(username);
+      const user = await storage.getUserByEmail(email.toLowerCase());
       if (!user) {
-        return res.status(401).json({ error: "Invalid username or password" });
+        return res.status(401).json({ error: "Invalid email or password" });
       }
       const valid = await bcrypt.compare(password, user.password);
       if (!valid) {
-        return res.status(401).json({ error: "Invalid username or password" });
+        return res.status(401).json({ error: "Invalid email or password" });
       }
       req.session.userId = user.id;
-      res.json({ id: user.id, username: user.username, isPremium: user.isPremium });
+      res.json({ id: user.id, email: user.email, isPremium: user.isPremium });
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ error: "Login failed" });
@@ -487,7 +488,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!user) {
       return res.status(401).json({ error: "User not found" });
     }
-    res.json({ id: user.id, username: user.username, isPremium: user.isPremium });
+    res.json({ id: user.id, email: user.email, isPremium: user.isPremium });
   });
 
   app.post("/api/auth/upgrade-premium", async (req, res) => {

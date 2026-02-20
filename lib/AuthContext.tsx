@@ -7,7 +7,7 @@ const GUEST_KEY = "cardvault_guest_mode";
 
 interface AuthUser {
   id: string;
-  username: string;
+  email: string;
   isPremium: boolean;
 }
 
@@ -15,8 +15,8 @@ interface AuthContextValue {
   user: AuthUser | null;
   isGuest: boolean;
   loading: boolean;
-  login: (username: string, password: string) => Promise<void>;
-  register: (username: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   continueAsGuest: () => void;
@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const res = await fetch(url.toString(), { credentials: "include" });
         if (res.ok) {
           const data = await res.json();
-          setUser({ id: data.id, username: data.username, isPremium: data.isPremium ?? false });
+          setUser({ id: data.id, email: data.email, isPremium: data.isPremium ?? false });
           setLoading(false);
           return;
         }
@@ -58,18 +58,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(prev => prev ? { ...prev, isPremium: status } : prev);
   }, []);
 
-  const login = useCallback(async (username: string, password: string) => {
-    const res = await apiRequest("POST", "/api/auth/login", { username, password });
+  const login = useCallback(async (email: string, password: string) => {
+    const res = await apiRequest("POST", "/api/auth/login", { email, password });
     const data = await res.json();
-    setUser({ id: data.id, username: data.username, isPremium: data.isPremium ?? false });
+    setUser({ id: data.id, email: data.email, isPremium: data.isPremium ?? false });
     setIsGuest(false);
     await AsyncStorage.removeItem(GUEST_KEY);
   }, []);
 
-  const register = useCallback(async (username: string, password: string) => {
-    const res = await apiRequest("POST", "/api/auth/register", { username, password });
+  const register = useCallback(async (email: string, password: string) => {
+    const res = await apiRequest("POST", "/api/auth/register", { email, password });
     const data = await res.json();
-    setUser({ id: data.id, username: data.username, isPremium: data.isPremium ?? false });
+    setUser({ id: data.id, email: data.email, isPremium: data.isPremium ?? false });
     setIsGuest(false);
     await AsyncStorage.removeItem(GUEST_KEY);
   }, []);

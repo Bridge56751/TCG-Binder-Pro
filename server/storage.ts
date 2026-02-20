@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   deleteUser(id: string): Promise<void>;
   getCollection(userId: string): Promise<Record<string, any>>;
@@ -18,8 +18,8 @@ export const storage: IStorage = {
     return user;
   },
 
-  async getUserByUsername(username: string) {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
+  async getUserByEmail(email: string) {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
     return user;
   },
 

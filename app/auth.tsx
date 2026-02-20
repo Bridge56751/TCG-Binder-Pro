@@ -22,7 +22,7 @@ export default function AuthScreen() {
   const { login, register, continueAsGuest } = useAuth();
 
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -34,7 +34,7 @@ export default function AuthScreen() {
 
   const handleSubmit = async () => {
     setError("");
-    if (!username.trim() || !password.trim()) {
+    if (!email.trim() || !password.trim()) {
       setError("Please fill in all fields");
       return;
     }
@@ -45,9 +45,9 @@ export default function AuthScreen() {
     setSubmitting(true);
     try {
       if (mode === "login") {
-        await login(username.trim(), password);
+        await login(email.trim(), password);
       } else {
-        await register(username.trim(), password);
+        await register(email.trim(), password);
       }
     } catch (err: any) {
       const msg = err?.message || "Something went wrong";
@@ -101,15 +101,17 @@ export default function AuthScreen() {
 
         <View style={styles.formSection}>
           <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-            <Ionicons name="person-outline" size={20} color={colors.textTertiary} style={styles.inputIcon} />
+            <Ionicons name="mail-outline" size={20} color={colors.textTertiary} style={styles.inputIcon} />
             <TextInput
               style={[styles.input, { color: colors.text }]}
-              placeholder="Username"
+              placeholder="Email"
               placeholderTextColor={colors.textTertiary}
-              value={username}
-              onChangeText={setUsername}
+              value={email}
+              onChangeText={setEmail}
               autoCapitalize="none"
               autoCorrect={false}
+              keyboardType="email-address"
+              textContentType="emailAddress"
             />
           </View>
 
@@ -192,7 +194,7 @@ export default function AuthScreen() {
           <Text style={[styles.guestButtonText, { color: colors.text }]}>Continue as Guest</Text>
         </Pressable>
         <Text style={[styles.guestHint, { color: colors.textTertiary }]}>
-          Limited to 20 cards. Create an account anytime for unlimited cards and cloud backup.
+          Limited to 20 cards. Create an account anytime for cloud backup.
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>

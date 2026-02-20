@@ -99,11 +99,11 @@ export default function SettingsScreen() {
         <View style={styles.profileSection}>
           <View style={[styles.avatar, { backgroundColor: isGuest && !user ? colors.textTertiary : colors.tint }]}>
             <Text style={styles.avatarText}>
-              {user ? user.username.charAt(0).toUpperCase() : "G"}
+              {user ? user.email.charAt(0).toUpperCase() : "G"}
             </Text>
           </View>
           <Text style={[styles.usernameDisplay, { color: colors.text }]}>
-            {user ? user.username : "Guest"}
+            {user ? user.email : "Guest"}
           </Text>
           <Text style={[styles.statsText, { color: colors.textSecondary }]}>
             {isPremium
