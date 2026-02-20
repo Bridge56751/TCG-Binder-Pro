@@ -99,7 +99,7 @@ export default function UpgradeScreen() {
         </Pressable>
       </View>
 
-      <ScrollView style={styles.scrollContent} contentContainerStyle={styles.scrollContentContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollContent} contentContainerStyle={[styles.scrollContentContainer, { paddingBottom: bottomInset + 24 }]} showsVerticalScrollIndicator={false}>
         <View style={styles.heroSection}>
           <View style={[styles.heroBadge, { backgroundColor: colors.tint + "14" }]}>
             <Ionicons name="star" size={48} color={colors.tint} />
@@ -144,95 +144,95 @@ export default function UpgradeScreen() {
             ))}
           </View>
         )}
+
+        <View style={styles.ctaSection}>
+          {needsAccount ? (
+            <>
+              <View style={[styles.stepIndicator, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardBorder }]}>
+                <View style={styles.stepRow}>
+                  <View style={[styles.stepBadge, { backgroundColor: colors.tint }]}>
+                    <Text style={styles.stepNumber}>1</Text>
+                  </View>
+                  <Text style={[styles.stepText, { color: colors.text }]}>Create a free account</Text>
+                </View>
+                <View style={[styles.stepDivider, { backgroundColor: colors.cardBorder }]} />
+                <View style={styles.stepRow}>
+                  <View style={[styles.stepBadge, { backgroundColor: colors.textTertiary }]}>
+                    <Text style={styles.stepNumber}>2</Text>
+                  </View>
+                  <Text style={[styles.stepText, { color: colors.textSecondary }]}>Subscribe to Premium for $2.99/mo</Text>
+                </View>
+              </View>
+
+              <Pressable
+                style={[styles.purchaseBtn, { backgroundColor: colors.tint }]}
+                onPress={() => router.push("/auth")}
+              >
+                <Text style={styles.purchaseBtnText}>Create Free Account</Text>
+                <Text style={styles.purchaseBtnSub}>Then upgrade to Premium</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.restoreBtn}
+                onPress={handleRestore}
+                disabled={restoring}
+              >
+                {restoring ? (
+                  <ActivityIndicator size="small" color={colors.textSecondary} />
+                ) : (
+                  <Text style={[styles.restoreBtnText, { color: colors.textSecondary }]}>
+                    Restore Purchase
+                  </Text>
+                )}
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <Pressable
+                style={[styles.purchaseBtn, { backgroundColor: colors.tint }]}
+                onPress={handlePurchase}
+                disabled={purchasing}
+              >
+                {purchasing ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Text style={styles.purchaseBtnText}>Unlock Premium - $2.99/mo</Text>
+                    <Text style={styles.purchaseBtnSub}>Monthly subscription</Text>
+                  </>
+                )}
+              </Pressable>
+
+              <Pressable
+                style={styles.restoreBtn}
+                onPress={handleRestore}
+                disabled={restoring}
+              >
+                {restoring ? (
+                  <ActivityIndicator size="small" color={colors.textSecondary} />
+                ) : (
+                  <Text style={[styles.restoreBtnText, { color: colors.textSecondary }]}>
+                    Restore Purchase
+                  </Text>
+                )}
+              </Pressable>
+            </>
+          )}
+
+          <Text style={[styles.cancelInfo, { color: colors.textTertiary }]}>
+            Subscription automatically renews monthly. You can cancel anytime in{" "}
+            <Text style={{ color: colors.textSecondary, textDecorationLine: "underline" }} onPress={() => Linking.openURL("https://apps.apple.com/account/subscriptions")}>
+              Settings → Apple ID → Subscriptions
+            </Text>.
+          </Text>
+
+          <Text style={[styles.legalLinks, { color: colors.textTertiary }]}>
+            <Text style={{ color: colors.textSecondary }} onPress={() => Linking.openURL(TERMS_OF_SERVICE_URL)}>Terms of Service (EULA)</Text>
+            {"  |  "}
+            <Text style={{ color: colors.textSecondary }} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>Privacy Policy</Text>
+          </Text>
+        </View>
       </ScrollView>
-
-      <View style={[styles.ctaSection, { paddingBottom: bottomInset + 16 }]}>
-        {needsAccount ? (
-          <>
-            <View style={[styles.stepIndicator, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardBorder }]}>
-              <View style={styles.stepRow}>
-                <View style={[styles.stepBadge, { backgroundColor: colors.tint }]}>
-                  <Text style={styles.stepNumber}>1</Text>
-                </View>
-                <Text style={[styles.stepText, { color: colors.text }]}>Create a free account</Text>
-              </View>
-              <View style={[styles.stepDivider, { backgroundColor: colors.cardBorder }]} />
-              <View style={styles.stepRow}>
-                <View style={[styles.stepBadge, { backgroundColor: colors.textTertiary }]}>
-                  <Text style={styles.stepNumber}>2</Text>
-                </View>
-                <Text style={[styles.stepText, { color: colors.textSecondary }]}>Subscribe to Premium for $2.99/mo</Text>
-              </View>
-            </View>
-
-            <Pressable
-              style={[styles.purchaseBtn, { backgroundColor: colors.tint }]}
-              onPress={() => router.push("/auth")}
-            >
-              <Text style={styles.purchaseBtnText}>Create Free Account</Text>
-              <Text style={styles.purchaseBtnSub}>Then upgrade to Premium</Text>
-            </Pressable>
-
-            <Pressable
-              style={styles.restoreBtn}
-              onPress={handleRestore}
-              disabled={restoring}
-            >
-              {restoring ? (
-                <ActivityIndicator size="small" color={colors.textSecondary} />
-              ) : (
-                <Text style={[styles.restoreBtnText, { color: colors.textSecondary }]}>
-                  Restore Purchase
-                </Text>
-              )}
-            </Pressable>
-          </>
-        ) : (
-          <>
-            <Pressable
-              style={[styles.purchaseBtn, { backgroundColor: colors.tint }]}
-              onPress={handlePurchase}
-              disabled={purchasing}
-            >
-              {purchasing ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <>
-                  <Text style={styles.purchaseBtnText}>Unlock Premium - $2.99/mo</Text>
-                  <Text style={styles.purchaseBtnSub}>Monthly subscription</Text>
-                </>
-              )}
-            </Pressable>
-
-            <Pressable
-              style={styles.restoreBtn}
-              onPress={handleRestore}
-              disabled={restoring}
-            >
-              {restoring ? (
-                <ActivityIndicator size="small" color={colors.textSecondary} />
-              ) : (
-                <Text style={[styles.restoreBtnText, { color: colors.textSecondary }]}>
-                  Restore Purchase
-                </Text>
-              )}
-            </Pressable>
-          </>
-        )}
-
-        <Text style={[styles.cancelInfo, { color: colors.textTertiary }]}>
-          Subscription automatically renews monthly. You can cancel anytime in{" "}
-          <Text style={{ color: colors.textSecondary, textDecorationLine: "underline" }} onPress={() => Linking.openURL("https://apps.apple.com/account/subscriptions")}>
-            Settings → Apple ID → Subscriptions
-          </Text>.
-        </Text>
-
-        <Text style={[styles.legalLinks, { color: colors.textTertiary }]}>
-          <Text style={{ color: colors.textSecondary }} onPress={() => Linking.openURL(TERMS_OF_SERVICE_URL)}>Terms of Service (EULA)</Text>
-          {"  |  "}
-          <Text style={{ color: colors.textSecondary }} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>Privacy Policy</Text>
-        </Text>
-      </View>
     </View>
   );
 }
@@ -319,9 +319,8 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   ctaSection: {
-    marginTop: "auto",
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 12,
   },
   stepIndicator: {
     borderRadius: 14,
