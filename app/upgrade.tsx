@@ -42,7 +42,7 @@ export default function UpgradeScreen() {
 
   const handlePurchase = async () => {
     if (!user && isGuest) {
-      router.push("/auth");
+      router.push("/auth?modal=1");
       return;
     }
     setPurchasing(true);
@@ -166,7 +166,7 @@ export default function UpgradeScreen() {
 
               <Pressable
                 style={[styles.purchaseBtn, { backgroundColor: colors.tint }]}
-                onPress={() => router.push("/auth")}
+                onPress={() => router.push("/auth?modal=1")}
               >
                 <Text style={styles.purchaseBtnText}>Create Free Account</Text>
                 <Text style={styles.purchaseBtnSub}>Then upgrade to Premium</Text>

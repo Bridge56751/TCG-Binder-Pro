@@ -27,8 +27,9 @@ export default function AuthScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { login, register, appleSignIn, continueAsGuest, needsVerification, verifyEmail, resendVerification, requestPasswordReset, resetPassword, clearVerification, user, isGuest } = useAuth();
+  const params = useLocalSearchParams<{ modal?: string }>();
   const [appleAuthAvailable, setAppleAuthAvailable] = useState(false);
-  const canDismiss = isGuest || !!user;
+  const canDismiss = params.modal === "1";
 
   useEffect(() => {
     if (Platform.OS === "ios") {

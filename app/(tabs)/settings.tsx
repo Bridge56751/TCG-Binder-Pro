@@ -122,7 +122,7 @@ export default function SettingsScreen() {
         {isGuest && !user && (
           <View style={styles.section}>
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-              <Pressable style={styles.menuItem} onPress={() => router.push("/auth")}>
+              <Pressable style={styles.menuItem} onPress={() => router.push("/auth?modal=1")}>
                 <View style={[styles.menuIcon, { backgroundColor: colors.tint + "18" }]}>
                   <Ionicons name="person-add" size={20} color={colors.tint} />
                 </View>
