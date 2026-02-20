@@ -161,6 +161,17 @@ export default function SetDetailScreen() {
       try {
         await addCard(gameId, id || "", cardId);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch (err: any) {
+        if (err?.message === "GUEST_LIMIT") {
+          Alert.alert(
+            "Guest Limit Reached",
+            "You've hit the 50-card limit for guest accounts. Create a free account for unlimited cards and cloud backup.",
+            [
+              { text: "OK", style: "cancel" },
+              { text: "Sign Up", onPress: () => router.push("/auth") },
+            ]
+          );
+        }
       } finally {
         setTimeout(() => {
           isAddingRef.current = false;

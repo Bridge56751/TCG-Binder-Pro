@@ -287,18 +287,31 @@ export default function CardDetailScreen() {
             <Pressable
               style={[styles.addBinderBtn, { backgroundColor: colors.tint }]}
               onPress={async () => {
-                await addCard(gameId, card.setId, cardId || "");
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                setJustAdded(true);
-                addScale.value = withSequence(
-                  withTiming(1.08, { duration: 150 }),
-                  withSpring(1, { damping: 8, stiffness: 200 })
-                );
-                glowOpacity.value = withSequence(
-                  withTiming(1, { duration: 200 }),
-                  withDelay(400, withTiming(0, { duration: 500 }))
-                );
-                badgeScale.value = withDelay(100, withSpring(1, { damping: 6, stiffness: 300 }));
+                try {
+                  await addCard(gameId, card.setId, cardId || "");
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  setJustAdded(true);
+                  addScale.value = withSequence(
+                    withTiming(1.08, { duration: 150 }),
+                    withSpring(1, { damping: 8, stiffness: 200 })
+                  );
+                  glowOpacity.value = withSequence(
+                    withTiming(1, { duration: 200 }),
+                    withDelay(400, withTiming(0, { duration: 500 }))
+                  );
+                  badgeScale.value = withDelay(100, withSpring(1, { damping: 6, stiffness: 300 }));
+                } catch (err: any) {
+                  if (err?.message === "GUEST_LIMIT") {
+                    Alert.alert(
+                      "Guest Limit Reached",
+                      "You've hit the 50-card limit for guest accounts. Create a free account for unlimited cards and cloud backup.",
+                      [
+                        { text: "OK", style: "cancel" },
+                        { text: "Sign Up", onPress: () => router.push("/auth") },
+                      ]
+                    );
+                  }
+                }
               }}
             >
               <Ionicons name="add-circle" size={20} color="#FFFFFF" />

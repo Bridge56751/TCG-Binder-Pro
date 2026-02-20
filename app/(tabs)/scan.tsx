@@ -121,12 +121,27 @@ export default function ScanScreen() {
   const handleAddToCollection = async () => {
     if (!scanResult) return;
     const cardId = scanResult.verifiedCardId || `${scanResult.setId}-${scanResult.cardNumber}`;
-    await addCard(
-      scanResult.game,
-      scanResult.setId,
-      cardId,
-      addQuantity
-    );
+    try {
+      await addCard(
+        scanResult.game,
+        scanResult.setId,
+        cardId,
+        addQuantity
+      );
+    } catch (err: any) {
+      if (err?.message === "GUEST_LIMIT") {
+        Alert.alert(
+          "Guest Limit Reached",
+          "You've hit the 50-card limit for guest accounts. Create a free account for unlimited cards and cloud backup.",
+          [
+            { text: "OK", style: "cancel" },
+            { text: "Sign Up", onPress: () => router.push("/auth") },
+          ]
+        );
+        return;
+      }
+      throw err;
+    }
     await addToScanHistory(scanResult, true);
     cacheCard({
       id: scanResult.verifiedCardId || `${scanResult.setId}-${scanResult.cardNumber}`,
