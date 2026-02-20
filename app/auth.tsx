@@ -471,7 +471,7 @@ export default function AuthScreen() {
       >
         <Image
           source={require("../assets/images/icon.png")}
-          style={[styles.logoImage, { marginTop: -40 }]}
+          style={styles.logoImage}
           contentFit="contain"
         />
         <Text style={[styles.appName, { color: colors.text }]}>CardVault</Text>
@@ -618,28 +618,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   logoImage: {
-    width: 340,
-    height: 340,
-    borderRadius: 74,
-    marginBottom: 24,
+    width: 200,
+    height: 200,
+    borderRadius: 44,
+    marginBottom: 8,
   },
   appName: {
-    fontSize: 30,
+    fontSize: 28,
     fontFamily: "DMSans_700Bold",
-    marginBottom: 24,
+    marginBottom: 12,
   },
   authTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontFamily: "DMSans_700Bold",
-    marginBottom: 8,
+    marginBottom: 4,
     textAlign: "center",
   },
   authSubtitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: "DMSans_400Regular",
     textAlign: "center",
-    lineHeight: 22,
-    marginBottom: 32,
+    lineHeight: 20,
+    marginBottom: 18,
   },
   errorBanner: {
     flexDirection: "row",
@@ -703,8 +703,8 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   switchMode: {
-    marginTop: 24,
-    paddingVertical: 8,
+    marginTop: 14,
+    paddingVertical: 4,
   },
   switchText: {
     fontSize: 15,
@@ -715,8 +715,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    marginTop: 24,
-    marginBottom: 20,
+    marginTop: 14,
+    marginBottom: 14,
     alignSelf: "stretch",
   },
   dividerLine: {
