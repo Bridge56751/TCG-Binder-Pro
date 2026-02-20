@@ -471,7 +471,7 @@ export default function AuthScreen() {
       >
         <Image
           source={require("../assets/images/icon.png")}
-          style={styles.logoImage}
+          style={[styles.logoImage, { marginTop: -40 }]}
           contentFit="contain"
         />
         <Text style={[styles.appName, { color: colors.text }]}>CardVault</Text>
