@@ -5,7 +5,10 @@ import { eq } from "drizzle-orm";
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByAppleId(appleId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  createAppleUser(appleId: string, email: string): Promise<User>;
+  linkAppleId(userId: string, appleId: string): Promise<void>;
   deleteUser(id: string): Promise<void>;
   getCollection(userId: string): Promise<Record<string, any>>;
   saveCollection(userId: string, data: Record<string, any>): Promise<void>;
@@ -28,9 +31,30 @@ export const storage: IStorage = {
     return user;
   },
 
+  async getUserByAppleId(appleId: string) {
+    const [user] = await db.select().from(users).where(eq(users.appleId, appleId));
+    return user;
+  },
+
   async createUser(insertUser: InsertUser) {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
+  },
+
+  async createAppleUser(appleId: string, email: string) {
+    const [user] = await db.insert(users).values({
+      email,
+      password: "",
+      appleId,
+      isVerified: true,
+    }).returning();
+    return user;
+  },
+
+  async linkAppleId(userId: string, appleId: string) {
+    await db.update(users)
+      .set({ appleId })
+      .where(eq(users.id, userId));
   },
 
   async deleteUser(id: string) {

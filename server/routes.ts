@@ -574,6 +574,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/auth/apple", async (req, res) => {
+    try {
+      const { identityToken, fullName, email: appleEmail } = req.body;
+      if (!identityToken) {
+        return res.status(400).json({ error: "Identity token is required" });
+      }
+
+      const parts = identityToken.split(".");
+      if (parts.length !== 3) {
+        return res.status(400).json({ error: "Invalid identity token" });
+      }
+      let payload: any;
+      try {
+        payload = JSON.parse(Buffer.from(parts[1], "base64url").toString());
+      } catch {
+        return res.status(400).json({ error: "Invalid identity token payload" });
+      }
+
+      if (payload.iss !== "https://appleid.apple.com") {
+        return res.status(401).json({ error: "Invalid token issuer" });
+      }
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        return res.status(401).json({ error: "Token expired" });
+      }
+
+      const appleUserId = payload.sub;
+      if (!appleUserId) {
+        return res.status(400).json({ error: "Missing user ID in token" });
+      }
+
+      const tokenEmail = payload.email || appleEmail;
+      const displayName = fullName
+        ? [fullName.givenName, fullName.familyName].filter(Boolean).join(" ")
+        : undefined;
+
+      console.log(`[AppleAuth] sub=${appleUserId} email=${tokenEmail} name=${displayName || "none"}`);
+
+      let user = await storage.getUserByAppleId(appleUserId);
+
+      if (!user && tokenEmail) {
+        const existingByEmail = await storage.getUserByEmail(tokenEmail.toLowerCase());
+        if (existingByEmail) {
+          await storage.linkAppleId(existingByEmail.id, appleUserId);
+          user = { ...existingByEmail, appleId: appleUserId };
+          console.log(`[AppleAuth] Linked Apple ID to existing account: ${user.id}`);
+        }
+      }
+
+      if (!user) {
+        const email = tokenEmail?.toLowerCase() || `apple_${appleUserId.slice(0, 8)}@private.appleid.com`;
+        user = await storage.createAppleUser(appleUserId, email);
+        console.log(`[AppleAuth] Created new Apple user: ${user.id}`);
+      }
+
+      req.session.userId = user.id;
+      res.json({
+        id: user.id,
+        email: user.email,
+        isPremium: user.isPremium,
+        isVerified: true,
+      });
+    } catch (error) {
+      console.error("Apple auth error:", error);
+      res.status(500).json({ error: "Apple sign-in failed" });
+    }
+  });
+
   app.post("/api/auth/logout", (req, res) => {
     req.session.destroy((err) => {
       if (err) {
