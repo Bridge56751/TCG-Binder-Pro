@@ -14,7 +14,8 @@ Preferred communication style: Simple, everyday language.
 
 - **Framework**: Expo SDK 54 with expo-router for file-based routing
 - **Navigation structure**: Tab-based layout with four tabs (Collection, Scan, Sets, Settings) plus modal/card presentation screens for set details and card details
-- **State management**: React Context (`CollectionProvider`, `AuthProvider`) for collection and auth state, TanStack React Query for server data fetching and caching
+- **State management**: React Context (`CollectionProvider`, `AuthProvider`, `PurchaseProvider`) for collection, auth, and premium state, TanStack React Query for server data fetching and caching
+- **In-App Purchases**: RevenueCat SDK (`react-native-purchases`) for iOS in-app purchases. `PurchaseContext` wraps the app and manages premium status. Entitlement ID: `premium`. API key via `EXPO_PUBLIC_REVENUECAT_API_KEY` env var. Works in Expo Go via Preview API Mode.
 - **Local storage**: `@react-native-async-storage/async-storage` stores the user's card collection as a JSON structure keyed by game → set → card IDs. Cloud sync available for logged-in users via `/api/collection/sync`.
 - **Offline mode**: Card metadata (names, images, prices, set info) cached locally via `lib/card-cache.ts` using AsyncStorage. Card images cached on disk via expo-image `cachePolicy="disk"`. When API calls fail, the app falls back to cached data for prices, sets, and card names. An "Offline mode" banner appears when the API is unreachable.
 - **Authentication**: `AuthContext` manages user sessions (login/register/logout). Settings tab provides login/register UI and account management.
@@ -33,7 +34,8 @@ Preferred communication style: Simple, everyday language.
   - `/api/auth/register` — user registration
   - `/api/auth/login` — user login
   - `/api/auth/logout` — user logout
-  - `/api/auth/me` — get current user session
+  - `/api/auth/me` — get current user session (returns isPremium)
+  - `/api/auth/upgrade-premium` — mark user as premium after RevenueCat purchase verification
   - `/api/collection/sync` — GET/POST collection sync for logged-in users
 - **AI Integration**: OpenAI API (via Replit AI Integrations proxy) for card identification using vision model (gpt-5.2). Configured via `AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL` environment variables.
 - **CORS**: Dynamic origin allowlist based on Replit environment variables, plus localhost for Expo web dev
@@ -42,7 +44,7 @@ Preferred communication style: Simple, everyday language.
 
 - **ORM**: Drizzle ORM configured for PostgreSQL (`drizzle.config.ts`)
 - **Schema location**: `shared/schema.ts` (users table, user_collections table) and `shared/models/chat.ts` (conversations and messages tables for chat integration)
-- **Current schema**: Users table (id, username, password) and user_collections table (userId FK, collection JSONB, updatedAt) and chat-related tables (conversations, messages). The TCG card/set data appears to come from external APIs rather than the database.
+- **Current schema**: Users table (id, username, password, isPremium) and user_collections table (userId FK, collection JSONB, updatedAt) and chat-related tables (conversations, messages). The TCG card/set data appears to come from external APIs rather than the database.
 - **Migration management**: Drizzle Kit with `db:push` script for schema sync
 - **Connection**: `DATABASE_URL` environment variable required
 
