@@ -618,10 +618,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   logoImage: {
-    width: 160,
-    height: 160,
-    borderRadius: 36,
-    marginBottom: 20,
+    width: 240,
+    height: 240,
+    borderRadius: 52,
+    marginBottom: 24,
   },
   appName: {
     fontSize: 30,
