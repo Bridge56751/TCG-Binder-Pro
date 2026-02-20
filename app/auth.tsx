@@ -189,7 +189,7 @@ export default function AuthScreen() {
           <Text style={[styles.guestButtonText, { color: colors.text }]}>Continue as Guest</Text>
         </Pressable>
         <Text style={[styles.guestHint, { color: colors.textTertiary }]}>
-          Limited to 50 cards. Create an account anytime for unlimited cards and cloud backup.
+          Limited to 20 cards. Create an account anytime for unlimited cards and cloud backup.
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>

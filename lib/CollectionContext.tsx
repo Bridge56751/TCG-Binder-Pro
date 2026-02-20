@@ -30,7 +30,7 @@ export interface ProgressToastData {
   game: GameId;
 }
 
-export const GUEST_CARD_LIMIT = 50;
+export const GUEST_CARD_LIMIT = 20;
 
 interface CollectionContextValue {
   collection: CollectionData;

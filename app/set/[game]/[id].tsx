@@ -165,7 +165,7 @@ export default function SetDetailScreen() {
         if (err?.message === "GUEST_LIMIT") {
           Alert.alert(
             "Guest Limit Reached",
-            "You've hit the 50-card limit for guest accounts. Create a free account for unlimited cards and cloud backup.",
+            "You've hit the 20-card limit for guest accounts. Create a free account for unlimited cards and cloud backup.",
             [
               { text: "OK", style: "cancel" },
               { text: "Sign Up", onPress: () => router.push("/auth") },
