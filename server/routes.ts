@@ -1404,26 +1404,44 @@ Return ONLY valid JSON with your corrected identification:
 
   app.post("/api/search-cards", async (req, res) => {
     try {
-      const { game, query, setName } = req.body;
-      if (!query || !game) {
-        return res.status(400).json({ error: "Game and search query are required" });
+      const { game, query, setName, cardNumber } = req.body;
+      if (!game) {
+        return res.status(400).json({ error: "Game is required" });
+      }
+      if (!query && !cardNumber) {
+        return res.status(400).json({ error: "Card name or card number is required" });
       }
 
-      console.log(`[SearchCards] game=${game} query="${query}" setName="${setName || ""}"`);
+      const cleanNumber = cardNumber ? cardNumber.replace(/^0+/, "").split("/")[0].replace(/^0+/, "") : "";
+
+      console.log(`[SearchCards] game=${game} query="${query || ""}" setName="${setName || ""}" cardNumber="${cardNumber || ""}"`);
       const results: any[] = [];
       const limit = 20;
+
+      const matchesNumber = (localId: string) => {
+        if (!cleanNumber) return true;
+        const cleanLocal = (localId || "").replace(/^0+/, "");
+        return cleanLocal === cleanNumber;
+      };
 
       if (game === "pokemon") {
         const lang = "en";
         let cards: any[] = [];
-        try {
-          const r = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(query)}`);
-          if (r.ok) cards = await r.json();
-        } catch {}
-        if ((!cards || cards.length === 0) && query.split(/\s+/).length > 1) {
-          const partial = query.split(/\s+/).slice(0, -1).join(" ");
+        if (query) {
           try {
-            const r = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(partial)}`);
+            const r = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(query)}`);
+            if (r.ok) cards = await r.json();
+          } catch {}
+          if ((!cards || cards.length === 0) && query.split(/\s+/).length > 1) {
+            const partial = query.split(/\s+/).slice(0, -1).join(" ");
+            try {
+              const r = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(partial)}`);
+              if (r.ok) cards = await r.json();
+            } catch {}
+          }
+        } else if (cleanNumber) {
+          try {
+            const r = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?localId=${encodeURIComponent(cardNumber.split("/")[0])}`);
             if (r.ok) cards = await r.json();
           } catch {}
         }
@@ -1432,7 +1450,8 @@ Return ONLY valid JSON with your corrected identification:
           const setMap: Record<string, string> = {};
           for (const s of sets) setMap[s.id] = s.name;
 
-          for (const c of cards.slice(0, limit)) {
+          for (const c of cards.slice(0, 100)) {
+            if (!matchesNumber(c.localId)) continue;
             const cardSetId = extractPokemonSetId(c.id, "");
             const cardSetName = setMap[cardSetId] || cardSetId;
             if (setName) {
@@ -1448,17 +1467,20 @@ Return ONLY valid JSON with your corrected identification:
               setName: cardSetName,
               image: c.image ? `${c.image}/high.png` : null,
             });
+            if (results.length >= limit) break;
           }
         }
       } else if (game === "yugioh") {
         let cards: any[] = [];
-        try {
-          const r = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}&num=20&offset=0`);
-          if (r.ok) {
-            const data = await r.json();
-            if (data?.data) cards = data.data;
-          }
-        } catch {}
+        if (query) {
+          try {
+            const r = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}&num=20&offset=0`);
+            if (r.ok) {
+              const data = await r.json();
+              if (data?.data) cards = data.data;
+            }
+          } catch {}
+        }
         const sets = await fetchSetsForGame("yugioh");
         const setMap: Record<string, string> = {};
         for (const s of sets) setMap[s.set_code] = s.set_name;
@@ -1468,6 +1490,8 @@ Return ONLY valid JSON with your corrected identification:
             const seenSets = new Set<string>();
             for (const cs of card.card_sets) {
               const setCode = cs.set_code?.split("-")[0] || "";
+              const localId = cs.set_code?.split("-").pop() || "";
+              if (!matchesNumber(localId)) continue;
               if (seenSets.has(setCode)) continue;
               seenSets.add(setCode);
               const cardSetName = setMap[setCode] || cs.set_name || setCode;
@@ -1479,7 +1503,7 @@ Return ONLY valid JSON with your corrected identification:
                 game: "yugioh",
                 name: card.name,
                 cardId: cs.set_code,
-                localId: cs.set_code?.split("-").pop() || "",
+                localId,
                 setId: setCode,
                 setName: cardSetName,
                 rarity: cs.set_rarity,
@@ -1501,20 +1525,23 @@ Return ONLY valid JSON with your corrected identification:
           if (results.length >= limit) break;
         }
       } else if (game === "onepiece") {
-        const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
         let found: any[] = [];
-        try {
-          const r = await fetch(`https://optcgapi.com/api/cards/search/${encodeURIComponent(query)}/`);
-          if (r.ok) {
-            const data = await r.json();
-            if (Array.isArray(data)) found = data;
-          }
-        } catch {}
+        if (query) {
+          try {
+            const r = await fetch(`https://optcgapi.com/api/cards/search/${encodeURIComponent(query)}/`);
+            if (r.ok) {
+              const data = await r.json();
+              if (Array.isArray(data)) found = data;
+            }
+          } catch {}
+        }
         const sets = await fetchSetsForGame("onepiece");
         const setMap: Record<string, string> = {};
         for (const s of sets) setMap[s.id] = s.name;
 
         for (const c of found.slice(0, limit)) {
+          const localId = c.card_set_id?.split("-").pop() || "";
+          if (!matchesNumber(localId)) continue;
           const cardSetId = c.set_id || c.card_set_id?.split("-").slice(0, -1).join("-") || "";
           const cardSetName = setMap[cardSetId] || cardSetId;
           if (setName) {
@@ -1525,7 +1552,7 @@ Return ONLY valid JSON with your corrected identification:
             game: "onepiece",
             name: c.card_name,
             cardId: c.card_set_id,
-            localId: c.card_set_id?.split("-").pop() || "",
+            localId,
             setId: cardSetId,
             setName: cardSetName,
             image: c.image_url || null,
@@ -1533,13 +1560,20 @@ Return ONLY valid JSON with your corrected identification:
         }
       } else if (game === "mtg") {
         let cards: any[] = [];
-        try {
-          const r = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&unique=prints&order=released&dir=desc`);
-          if (r.ok) {
-            const data = await r.json();
-            if (data?.data) cards = data.data;
-          }
-        } catch {}
+        let scryfallQuery = query || "";
+        if (cleanNumber) {
+          scryfallQuery += ` number:${cardNumber.split("/")[0]}`;
+        }
+        scryfallQuery = scryfallQuery.trim();
+        if (scryfallQuery) {
+          try {
+            const r = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(scryfallQuery)}&unique=prints&order=released&dir=desc`);
+            if (r.ok) {
+              const data = await r.json();
+              if (data?.data) cards = data.data;
+            }
+          } catch {}
+        }
         for (const card of cards.slice(0, limit)) {
           const cardSetName = card.set_name || card.set || "";
           if (setName) {
