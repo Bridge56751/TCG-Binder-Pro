@@ -31,13 +31,6 @@ import Animated, {
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/lib/ThemeContext";
 import { useCollection } from "@/lib/CollectionContext";
-import {
-  getTradeList,
-  addToTradeList,
-  removeFromTradeList,
-  isOnTradeList,
-} from "@/lib/trade-list-storage";
-import type { TradeItem } from "@/lib/trade-list-storage";
 import type { CardDetail, GameId } from "@/lib/types";
 import { GAMES } from "@/lib/types";
 
@@ -108,16 +101,11 @@ export default function CardDetailScreen() {
 
   const gameInfo = GAMES.find((g) => g.id === gameId);
 
-  const [tradeList, setTradeList] = useState<TradeItem[]>([]);
   const [justAdded, setJustAdded] = useState(false);
   const flipAnim = useSharedValue(90);
   const addScale = useSharedValue(1);
   const glowOpacity = useSharedValue(0);
   const badgeScale = useSharedValue(0);
-
-  useEffect(() => {
-    getTradeList().then(setTradeList);
-  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -149,19 +137,6 @@ export default function CardDetailScreen() {
   const { data: card, isLoading } = useQuery<CardDetail>({
     queryKey: [cardQueryPath],
   });
-
-  const onTrade = card ? isOnTradeList(tradeList, gameId, card.id) : false;
-
-  const handleTradeToggle = async () => {
-    if (!card) return;
-    if (onTrade) {
-      const updated = await removeFromTradeList(gameId, card.id);
-      setTradeList(updated);
-    } else {
-      const updated = await addToTradeList(gameId, card.setId, card.id);
-      setTradeList(updated);
-    }
-  };
 
   const isInCollection = card ? hasCard(gameId, card.setId, cardId || "") : false;
 
@@ -237,16 +212,6 @@ export default function CardDetailScreen() {
               <Ionicons name="trash-outline" size={22} color={colors.error} />
             </Pressable>
           )}
-          <Pressable style={styles.actionButton} onPress={handleTradeToggle}>
-            <Ionicons
-              name="swap-horizontal"
-              size={22}
-              color={onTrade ? colors.tint : colors.textTertiary}
-            />
-            {onTrade && (
-              <View style={[styles.actionDot, { backgroundColor: colors.tint }]} />
-            )}
-          </Pressable>
         </View>
 
         <View style={styles.imageSection}>
@@ -262,12 +227,6 @@ export default function CardDetailScreen() {
             ) : (
               <View style={[styles.cardImage, styles.noImage, { backgroundColor: colors.surfaceAlt }]}>
                 <Ionicons name="image-outline" size={48} color={colors.textTertiary} />
-              </View>
-            )}
-            {onTrade && (
-              <View style={[styles.tradeBadge, { backgroundColor: colors.tint }]}>
-                <Ionicons name="swap-horizontal" size={10} color="#FFFFFF" />
-                <Text style={styles.tradeBadgeText}>For Trade</Text>
               </View>
             )}
             <Animated.View
@@ -506,22 +465,6 @@ const styles = StyleSheet.create({
   noImage: {
     alignItems: "center",
     justifyContent: "center",
-  },
-  tradeBadge: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  tradeBadgeText: {
-    fontFamily: "DMSans_600SemiBold",
-    fontSize: 10,
-    color: "#FFFFFF",
   },
   addGlow: {
     ...StyleSheet.absoluteFillObject,
