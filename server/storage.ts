@@ -9,6 +9,7 @@ export interface IStorage {
   deleteUser(id: string): Promise<void>;
   getCollection(userId: string): Promise<Record<string, any>>;
   saveCollection(userId: string, data: Record<string, any>): Promise<void>;
+  upgradeToPremium(userId: string): Promise<void>;
 }
 
 export const storage: IStorage = {
@@ -46,5 +47,11 @@ export const storage: IStorage = {
     } else {
       await db.insert(userCollections).values({ userId, data });
     }
+  },
+
+  async upgradeToPremium(userId: string) {
+    await db.update(users)
+      .set({ isPremium: true })
+      .where(eq(users.id, userId));
   },
 };

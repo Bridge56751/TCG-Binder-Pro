@@ -428,7 +428,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hashed = await bcrypt.hash(password, 10);
       const user = await storage.createUser({ username, password: hashed });
       req.session.userId = user.id;
-      res.json({ id: user.id, username: user.username });
+      res.json({ id: user.id, username: user.username, isPremium: user.isPremium });
     } catch (error) {
       console.error("Register error:", error);
       res.status(500).json({ error: "Registration failed" });
@@ -450,7 +450,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Invalid username or password" });
       }
       req.session.userId = user.id;
-      res.json({ id: user.id, username: user.username });
+      res.json({ id: user.id, username: user.username, isPremium: user.isPremium });
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ error: "Login failed" });
@@ -487,7 +487,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!user) {
       return res.status(401).json({ error: "User not found" });
     }
-    res.json({ id: user.id, username: user.username });
+    res.json({ id: user.id, username: user.username, isPremium: user.isPremium });
+  });
+
+  app.post("/api/auth/upgrade-premium", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Not logged in" });
+    }
+    try {
+      await storage.upgradeToPremium(req.session.userId);
+      res.json({ ok: true, isPremium: true });
+    } catch (err) {
+      console.error("Upgrade error:", err);
+      res.status(500).json({ error: "Failed to upgrade" });
+    }
   });
 
   app.get("/api/collection/sync", async (req, res) => {
