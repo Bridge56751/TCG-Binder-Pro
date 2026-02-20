@@ -78,7 +78,7 @@ export default function AuthScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Image
-          source={require("@assets/tcg_binder_logo_1771567507706.png")}
+          source={require("../assets/images/icon.png")}
           style={styles.logoImage}
           contentFit="contain"
         />
