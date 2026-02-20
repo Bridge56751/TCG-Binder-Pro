@@ -212,15 +212,16 @@ export default function ScanScreen() {
   };
 
   const searchCards = async () => {
-    if (!editName.trim()) return;
+    if (!editName.trim() && !editCardNumber.trim()) return;
     setIsCorrecting(true);
     setSearchResults([]);
     setHasSearched(false);
     try {
       const res = await apiRequest("POST", "/api/search-cards", {
         game: editGame,
-        query: editName.trim(),
+        query: editName.trim() || undefined,
         setName: editSetName.trim() || undefined,
+        cardNumber: editCardNumber.trim() || undefined,
       });
       const data = await res.json();
       setSearchResults(data.results || []);
@@ -426,6 +427,30 @@ export default function ScanScreen() {
               </View>
 
               <View style={{ gap: 6 }}>
+                <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textSecondary }}>Card Number (optional)</Text>
+                <TextInput
+                  style={{
+                    fontFamily: "DMSans_400Regular",
+                    fontSize: 15,
+                    color: colors.text,
+                    backgroundColor: colors.surfaceAlt,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: colors.cardBorder,
+                  }}
+                  value={editCardNumber}
+                  onChangeText={(t) => { setEditCardNumber(t); setHasSearched(false); }}
+                  placeholder="e.g. 022/132 or 022"
+                  placeholderTextColor={colors.textTertiary}
+                  autoCapitalize="none"
+                  returnKeyType="search"
+                  onSubmitEditing={searchCards}
+                />
+              </View>
+
+              <View style={{ gap: 6 }}>
                 <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textSecondary }}>Set Name (optional)</Text>
                 <TextInput
                   style={{
@@ -477,10 +502,10 @@ export default function ScanScreen() {
                     paddingVertical: 12,
                     borderRadius: 10,
                     backgroundColor: colors.tint,
-                    opacity: (pressed ? 0.9 : 1) * ((!editName.trim() || isCorrecting) ? 0.6 : 1),
+                    opacity: (pressed ? 0.9 : 1) * ((!editName.trim() && !editCardNumber.trim()) || isCorrecting ? 0.6 : 1),
                   })}
                   onPress={searchCards}
-                  disabled={isCorrecting || !editName.trim()}
+                  disabled={isCorrecting || (!editName.trim() && !editCardNumber.trim())}
                 >
                   {isCorrecting ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
