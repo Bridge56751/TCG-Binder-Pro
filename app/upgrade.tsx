@@ -106,12 +106,12 @@ export default function UpgradeScreen() {
         <Text style={[styles.heroTitle, { color: colors.text }]}>Unlock Premium</Text>
         <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
           You've used {totalCards()} of {FREE_CARD_LIMIT} free cards.{"\n"}
-          Go unlimited for just $2.99.
+          Go unlimited for just $2.99/month.
         </Text>
       </View>
 
       <View style={styles.featuresSection}>
-        <Text style={[styles.sectionLabel, { color: colors.tint }]}>PREMIUM - $2.99 ONE-TIME</Text>
+        <Text style={[styles.sectionLabel, { color: colors.tint }]}>PREMIUM - $2.99/MONTH</Text>
         {PREMIUM_FEATURES.map((f, i) => (
           <View key={i} style={[styles.featureRow, { borderColor: colors.cardBorder }]}>
             <View style={[styles.featureIcon, { backgroundColor: colors.tint + "14" }]}>
@@ -159,7 +159,7 @@ export default function UpgradeScreen() {
                 <View style={[styles.stepBadge, { backgroundColor: colors.textTertiary }]}>
                   <Text style={styles.stepNumber}>2</Text>
                 </View>
-                <Text style={[styles.stepText, { color: colors.textSecondary }]}>Purchase Premium for $2.99</Text>
+                <Text style={[styles.stepText, { color: colors.textSecondary }]}>Subscribe to Premium for $2.99/mo</Text>
               </View>
             </View>
 
@@ -196,8 +196,8 @@ export default function UpgradeScreen() {
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <>
-                  <Text style={styles.purchaseBtnText}>Unlock Premium - $2.99</Text>
-                  <Text style={styles.purchaseBtnSub}>One-time purchase</Text>
+                  <Text style={styles.purchaseBtnText}>Unlock Premium - $2.99/mo</Text>
+                  <Text style={styles.purchaseBtnSub}>Monthly subscription</Text>
                 </>
               )}
             </Pressable>

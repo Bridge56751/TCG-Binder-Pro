@@ -304,7 +304,7 @@ export default function CardDetailScreen() {
                   if (err?.message === "FREE_LIMIT" || err?.message === "GUEST_LIMIT") {
                     Alert.alert(
                       "Card Limit Reached",
-                      "You've reached the 20-card free limit. Upgrade to Premium ($2.99) for unlimited cards.",
+                      "You've reached the 20-card free limit. Upgrade to Premium ($2.99/mo) for unlimited cards.",
                       [
                         { text: "OK", style: "cancel" },
                         { text: "Upgrade", onPress: () => router.push("/upgrade") },

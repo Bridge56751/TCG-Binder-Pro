@@ -126,7 +126,7 @@ export default function SettingsScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.menuLabel, { color: colors.text }]}>Unlock Premium</Text>
                 <Text style={[styles.menuHint, { color: colors.textSecondary }]}>
-                  Unlimited cards, cloud backup, and more for $2.99
+                  Unlimited cards, cloud backup, and more for $2.99/mo
                 </Text>
               </View>
               <Pressable
