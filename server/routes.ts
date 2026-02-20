@@ -1335,6 +1335,170 @@ Return ONLY valid JSON with your corrected identification:
     }
   });
 
+  app.post("/api/search-cards", async (req, res) => {
+    try {
+      const { game, query, setName } = req.body;
+      if (!query || !game) {
+        return res.status(400).json({ error: "Game and search query are required" });
+      }
+
+      console.log(`[SearchCards] game=${game} query="${query}" setName="${setName || ""}"`);
+      const results: any[] = [];
+      const limit = 20;
+
+      if (game === "pokemon") {
+        const lang = "en";
+        let cards: any[] = [];
+        try {
+          const r = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(query)}`);
+          if (r.ok) cards = await r.json();
+        } catch {}
+        if ((!cards || cards.length === 0) && query.split(/\s+/).length > 1) {
+          const partial = query.split(/\s+/).slice(0, -1).join(" ");
+          try {
+            const r = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(partial)}`);
+            if (r.ok) cards = await r.json();
+          } catch {}
+        }
+        if (Array.isArray(cards)) {
+          const sets = await fetchSetsForGame("pokemon", lang);
+          const setMap: Record<string, string> = {};
+          for (const s of sets) setMap[s.id] = s.name;
+
+          for (const c of cards.slice(0, limit)) {
+            const cardSetId = extractPokemonSetId(c.id, "");
+            const cardSetName = setMap[cardSetId] || cardSetId;
+            if (setName) {
+              const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+              if (!norm(cardSetName).includes(norm(setName)) && !norm(setName).includes(norm(cardSetName))) continue;
+            }
+            results.push({
+              game: "pokemon",
+              name: c.name,
+              cardId: c.id,
+              localId: c.localId,
+              setId: cardSetId,
+              setName: cardSetName,
+              image: c.image ? `${c.image}/high.png` : null,
+            });
+          }
+        }
+      } else if (game === "yugioh") {
+        let cards: any[] = [];
+        try {
+          const r = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}&num=20&offset=0`);
+          if (r.ok) {
+            const data = await r.json();
+            if (data?.data) cards = data.data;
+          }
+        } catch {}
+        const sets = await fetchSetsForGame("yugioh");
+        const setMap: Record<string, string> = {};
+        for (const s of sets) setMap[s.set_code] = s.set_name;
+
+        for (const card of cards.slice(0, limit)) {
+          if (card.card_sets && card.card_sets.length > 0) {
+            const seenSets = new Set<string>();
+            for (const cs of card.card_sets) {
+              const setCode = cs.set_code?.split("-")[0] || "";
+              if (seenSets.has(setCode)) continue;
+              seenSets.add(setCode);
+              const cardSetName = setMap[setCode] || cs.set_name || setCode;
+              if (setName) {
+                const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+                if (!norm(cardSetName).includes(norm(setName)) && !norm(setName).includes(norm(cardSetName))) continue;
+              }
+              results.push({
+                game: "yugioh",
+                name: card.name,
+                cardId: cs.set_code,
+                localId: cs.set_code?.split("-").pop() || "",
+                setId: setCode,
+                setName: cardSetName,
+                rarity: cs.set_rarity,
+                image: card.card_images?.[0]?.image_url_small || null,
+              });
+              if (results.length >= limit) break;
+            }
+          } else {
+            results.push({
+              game: "yugioh",
+              name: card.name,
+              cardId: card.id?.toString(),
+              localId: "",
+              setId: "",
+              setName: "Unknown Set",
+              image: card.card_images?.[0]?.image_url_small || null,
+            });
+          }
+          if (results.length >= limit) break;
+        }
+      } else if (game === "onepiece") {
+        const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+        let found: any[] = [];
+        try {
+          const r = await fetch(`https://optcgapi.com/api/cards/search/${encodeURIComponent(query)}/`);
+          if (r.ok) {
+            const data = await r.json();
+            if (Array.isArray(data)) found = data;
+          }
+        } catch {}
+        const sets = await fetchSetsForGame("onepiece");
+        const setMap: Record<string, string> = {};
+        for (const s of sets) setMap[s.id] = s.name;
+
+        for (const c of found.slice(0, limit)) {
+          const cardSetId = c.set_id || c.card_set_id?.split("-").slice(0, -1).join("-") || "";
+          const cardSetName = setMap[cardSetId] || cardSetId;
+          if (setName) {
+            const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+            if (!norm(cardSetName).includes(norm(setName)) && !norm(setName).includes(norm(cardSetName))) continue;
+          }
+          results.push({
+            game: "onepiece",
+            name: c.card_name,
+            cardId: c.card_set_id,
+            localId: c.card_set_id?.split("-").pop() || "",
+            setId: cardSetId,
+            setName: cardSetName,
+            image: c.image_url || null,
+          });
+        }
+      } else if (game === "mtg") {
+        let cards: any[] = [];
+        try {
+          const r = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&unique=prints&order=released&dir=desc`);
+          if (r.ok) {
+            const data = await r.json();
+            if (data?.data) cards = data.data;
+          }
+        } catch {}
+        for (const card of cards.slice(0, limit)) {
+          const cardSetName = card.set_name || card.set || "";
+          if (setName) {
+            const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+            if (!norm(cardSetName).includes(norm(setName)) && !norm(setName).includes(norm(cardSetName))) continue;
+          }
+          results.push({
+            game: "mtg",
+            name: card.name,
+            cardId: card.id,
+            localId: card.collector_number || "",
+            setId: card.set,
+            setName: cardSetName,
+            image: card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small || null,
+          });
+        }
+      }
+
+      console.log(`[SearchCards] Returning ${results.length} results`);
+      res.json({ results: results.slice(0, limit) });
+    } catch (error) {
+      console.error("Search cards error:", error);
+      res.status(500).json({ error: "Failed to search for cards" });
+    }
+  });
+
   // ───── POKEMON (TCGdex API) ─────
 
   app.get("/api/tcg/pokemon/sets", async (req, res) => {
