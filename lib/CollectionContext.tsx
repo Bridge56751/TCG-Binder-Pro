@@ -177,17 +177,72 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     await loadCollection();
   }, [loadCollection]);
 
+  const mergeAndSyncAfterLogin = useCallback(async () => {
+    const localData = await getCollection();
+    const localHasCards = Object.values(localData).some(
+      (game) => game && Object.values(game).some((set) => set && Object.keys(set).length > 0)
+    );
+
+    try {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/collection/sync", baseUrl);
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        const cloudData = data.collection || {};
+        const cloudHasCards = Object.values(cloudData).some(
+          (game: any) => game && Object.values(game).some((set: any) => set && Object.keys(set).length > 0)
+        );
+
+        if (localHasCards && !cloudHasCards) {
+          setCollection(localData);
+          performSync(localData);
+          return;
+        } else if (cloudHasCards && !localHasCards) {
+          await saveCollection(cloudData);
+          setCollection(cloudData);
+          return;
+        } else if (localHasCards && cloudHasCards) {
+          const merged: CollectionData = {};
+          const allGames = new Set([...Object.keys(localData), ...Object.keys(cloudData)]);
+          for (const gameKey of allGames) {
+            merged[gameKey] = {};
+            const localGame = localData[gameKey] || {};
+            const cloudGame = (cloudData as CollectionData)[gameKey] || {};
+            const allSets = new Set([...Object.keys(localGame), ...Object.keys(cloudGame)]);
+            for (const setKey of allSets) {
+              const localCards = localGame[setKey] || [];
+              const cloudCards = cloudGame[setKey] || [];
+              merged[gameKey][setKey] = [...new Set([...localCards, ...cloudCards])];
+            }
+          }
+          await saveCollection(merged);
+          setCollection(merged);
+          performSync(merged);
+          return;
+        }
+      }
+    } catch {}
+
+    if (localHasCards) {
+      setCollection(localData);
+      performSync(localData);
+    } else {
+      await loadCollection();
+    }
+  }, [performSync, loadCollection]);
+
   useEffect(() => {
     if (user && prevUserRef.current !== user.id) {
       prevUserRef.current = user.id;
-      loadFromCloud();
+      mergeAndSyncAfterLogin();
     } else if (!user && prevUserRef.current) {
       prevUserRef.current = null;
       loadCollection();
     } else {
       loadCollection();
     }
-  }, [user, loadCollection, loadFromCloud]);
+  }, [user, loadCollection, mergeAndSyncAfterLogin]);
 
   const showProgressToast = useCallback(async (game: GameId, setId: string, updatedCollection: CollectionData) => {
     try {
