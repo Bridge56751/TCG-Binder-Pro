@@ -48,16 +48,8 @@ function getMarketplaceLinks(card: CardDetail) {
     onepiece: "one-piece-card-game",
     mtg: "magic",
   };
-  const cardmarketGames: Record<GameId, string> = {
-    pokemon: "Pokemon",
-    yugioh: "YuGiOh",
-    onepiece: "OnePiece",
-    mtg: "Magic",
-  };
-
   const tcgQuery = encodeURIComponent(`${cardName} ${setName}`);
   const ebayQuery = encodeURIComponent(`${cardName} ${localId} ${setName}`);
-  const cmQuery = encodeURIComponent(`${cardName}`);
 
   const links = [
     {
@@ -72,21 +64,7 @@ function getMarketplaceLinks(card: CardDetail) {
       icon: "pricetag-outline",
       color: "#E53238",
     },
-    {
-      name: "Cardmarket",
-      url: `https://www.cardmarket.com/en/${cardmarketGames[game]}/Cards?searchString=${cmQuery}`,
-      icon: "globe-outline",
-      color: "#0F766E",
-    },
   ];
-  if (game === "mtg") {
-    links.push({
-      name: "Card Kingdom",
-      url: `https://www.cardkingdom.com/catalog/search?search=header&filter%5Bname%5D=${encodeURIComponent(cardName)}`,
-      icon: "shield-outline",
-      color: "#7C3AED",
-    });
-  }
   return links;
 }
 
