@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { useTheme } from "@/lib/ThemeContext";
 import { useAuth } from "@/lib/AuthContext";
 
@@ -76,9 +77,11 @@ export default function AuthScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={[styles.logoContainer, { backgroundColor: colors.tint }]}>
-          <Ionicons name="layers" size={40} color="#FFFFFF" />
-        </View>
+        <Image
+          source={require("@assets/tcg_binder_logo_1771567507706.png")}
+          style={styles.logoImage}
+          contentFit="contain"
+        />
         <Text style={[styles.appName, { color: colors.text }]}>CardVault</Text>
         <Text style={[styles.authTitle, { color: colors.text }]}>
           {mode === "login" ? "Welcome Back" : "Create Account"}
@@ -204,12 +207,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     alignItems: "center",
   },
-  logoContainer: {
-    width: 80,
-    height: 80,
+  logoImage: {
+    width: 90,
+    height: 90,
     borderRadius: 22,
-    justifyContent: "center",
-    alignItems: "center",
     marginBottom: 16,
   },
   appName: {
