@@ -131,7 +131,10 @@ export default function AuthScreen() {
       setError("");
       await appleSignIn(
         credential.identityToken,
-        credential.fullName,
+        credential.fullName ? {
+          givenName: credential.fullName.givenName ?? undefined,
+          familyName: credential.fullName.familyName ?? undefined,
+        } : null,
         credential.email
       );
     } catch (err: any) {
