@@ -15,11 +15,15 @@ import { useAuth } from "@/lib/AuthContext";
 import { usePurchase } from "@/lib/PurchaseContext";
 import { useCollection, FREE_CARD_LIMIT } from "@/lib/CollectionContext";
 
-const FEATURES = [
+const PREMIUM_FEATURES = [
   { icon: "infinite" as const, title: "Unlimited Cards", desc: "No more 20-card limit" },
   { icon: "scan" as const, title: "Unlimited Scanning", desc: "Scan as many cards as you want" },
-  { icon: "cloud-upload" as const, title: "Cloud Backup", desc: "Sync across all your devices" },
   { icon: "shield-checkmark" as const, title: "Priority Support", desc: "Get help when you need it" },
+];
+
+const FREE_ACCOUNT_FEATURES = [
+  { icon: "cloud-upload" as const, title: "Cloud Backup", desc: "Sync your collection across devices" },
+  { icon: "person" as const, title: "Save Your Progress", desc: "Keep your collection safe with an account" },
 ];
 
 export default function UpgradeScreen() {
@@ -83,6 +87,8 @@ export default function UpgradeScreen() {
     );
   }
 
+  const needsAccount = !user && isGuest;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: topInset }]}>
       <View style={styles.closeRow}>
@@ -98,12 +104,13 @@ export default function UpgradeScreen() {
         <Text style={[styles.heroTitle, { color: colors.text }]}>Unlock Premium</Text>
         <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
           You've used {totalCards()} of {FREE_CARD_LIMIT} free cards.{"\n"}
-          Go unlimited with a one-time purchase.
+          Go unlimited for just $2.99.
         </Text>
       </View>
 
       <View style={styles.featuresSection}>
-        {FEATURES.map((f, i) => (
+        <Text style={[styles.sectionLabel, { color: colors.tint }]}>PREMIUM - $2.99 ONE-TIME</Text>
+        {PREMIUM_FEATURES.map((f, i) => (
           <View key={i} style={[styles.featureRow, { borderColor: colors.cardBorder }]}>
             <View style={[styles.featureIcon, { backgroundColor: colors.tint + "14" }]}>
               <Ionicons name={f.icon} size={22} color={colors.tint} />
@@ -117,42 +124,83 @@ export default function UpgradeScreen() {
         ))}
       </View>
 
-      <View style={[styles.ctaSection, { paddingBottom: bottomInset + 16 }]}>
-        {!user && isGuest && (
-          <Text style={[styles.guestNote, { color: colors.textSecondary }]}>
-            You'll need to create an account first
-          </Text>
-        )}
-        <Pressable
-          style={[styles.purchaseBtn, { backgroundColor: colors.tint }]}
-          onPress={handlePurchase}
-          disabled={purchasing}
-        >
-          {purchasing ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <>
-              <Text style={styles.purchaseBtnText}>
-                {!user && isGuest ? "Create Account to Unlock" : "Unlock Premium - $2.99"}
-              </Text>
-              <Text style={styles.purchaseBtnSub}>One-time purchase</Text>
-            </>
-          )}
-        </Pressable>
+      {needsAccount && (
+        <View style={styles.featuresSection}>
+          <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>FREE ACCOUNT</Text>
+          {FREE_ACCOUNT_FEATURES.map((f, i) => (
+            <View key={i} style={[styles.featureRow, { borderColor: colors.cardBorder }]}>
+              <View style={[styles.featureIcon, { backgroundColor: colors.textSecondary + "14" }]}>
+                <Ionicons name={f.icon} size={22} color={colors.textSecondary} />
+              </View>
+              <View style={styles.featureText}>
+                <Text style={[styles.featureTitle, { color: colors.text }]}>{f.title}</Text>
+                <Text style={[styles.featureDesc, { color: colors.textSecondary }]}>{f.desc}</Text>
+              </View>
+              <Ionicons name="checkmark-circle" size={22} color={colors.textSecondary} />
+            </View>
+          ))}
+        </View>
+      )}
 
-        <Pressable
-          style={styles.restoreBtn}
-          onPress={handleRestore}
-          disabled={restoring}
-        >
-          {restoring ? (
-            <ActivityIndicator size="small" color={colors.textSecondary} />
-          ) : (
-            <Text style={[styles.restoreBtnText, { color: colors.textSecondary }]}>
-              Restore Purchase
-            </Text>
-          )}
-        </Pressable>
+      <View style={[styles.ctaSection, { paddingBottom: bottomInset + 16 }]}>
+        {needsAccount ? (
+          <>
+            <View style={[styles.stepIndicator, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardBorder }]}>
+              <View style={styles.stepRow}>
+                <View style={[styles.stepBadge, { backgroundColor: colors.tint }]}>
+                  <Text style={styles.stepNumber}>1</Text>
+                </View>
+                <Text style={[styles.stepText, { color: colors.text }]}>Create a free account</Text>
+              </View>
+              <View style={[styles.stepDivider, { backgroundColor: colors.cardBorder }]} />
+              <View style={styles.stepRow}>
+                <View style={[styles.stepBadge, { backgroundColor: colors.textTertiary }]}>
+                  <Text style={styles.stepNumber}>2</Text>
+                </View>
+                <Text style={[styles.stepText, { color: colors.textSecondary }]}>Purchase Premium for $2.99</Text>
+              </View>
+            </View>
+
+            <Pressable
+              style={[styles.purchaseBtn, { backgroundColor: colors.tint }]}
+              onPress={() => router.push("/auth")}
+            >
+              <Text style={styles.purchaseBtnText}>Create Free Account</Text>
+              <Text style={styles.purchaseBtnSub}>Then upgrade to Premium</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <Pressable
+              style={[styles.purchaseBtn, { backgroundColor: colors.tint }]}
+              onPress={handlePurchase}
+              disabled={purchasing}
+            >
+              {purchasing ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <>
+                  <Text style={styles.purchaseBtnText}>Unlock Premium - $2.99</Text>
+                  <Text style={styles.purchaseBtnSub}>One-time purchase</Text>
+                </>
+              )}
+            </Pressable>
+
+            <Pressable
+              style={styles.restoreBtn}
+              onPress={handleRestore}
+              disabled={restoring}
+            >
+              {restoring ? (
+                <ActivityIndicator size="small" color={colors.textSecondary} />
+              ) : (
+                <Text style={[styles.restoreBtnText, { color: colors.textSecondary }]}>
+                  Restore Purchase
+                </Text>
+              )}
+            </Pressable>
+          </>
+        )}
       </View>
     </View>
   );
@@ -197,6 +245,15 @@ const styles = StyleSheet.create({
   featuresSection: {
     paddingHorizontal: 20,
     gap: 1,
+    marginBottom: 8,
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontFamily: "DMSans_700Bold",
+    letterSpacing: 0.8,
+    marginBottom: 4,
+    marginTop: 8,
+    paddingHorizontal: 4,
   },
   featureRow: {
     flexDirection: "row",
@@ -229,11 +286,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
   },
-  guestNote: {
+  stepIndicator: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 16,
+  },
+  stepRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  stepBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  stepNumber: {
     fontSize: 13,
-    fontFamily: "DMSans_400Regular",
-    textAlign: "center",
-    marginBottom: 10,
+    fontFamily: "DMSans_700Bold",
+    color: "#FFFFFF",
+  },
+  stepText: {
+    fontSize: 15,
+    fontFamily: "DMSans_500Medium",
+  },
+  stepDivider: {
+    width: 1,
+    height: 12,
+    marginLeft: 12,
+    marginVertical: 4,
   },
   purchaseBtn: {
     height: 56,
