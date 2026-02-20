@@ -293,19 +293,19 @@ export default function SettingsScreen() {
             SUPPORT
           </Text>
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-            <Pressable style={styles.menuItem} onPress={() => Linking.openURL("mailto:protcgbinder@gmail.com")}>
+            <Pressable style={styles.menuItem} onPress={() => Linking.openURL("https://tcgbinderpro.com")}>
               <View style={[styles.menuIcon, { backgroundColor: colors.tint + "18" }]}>
-                <Ionicons name="mail" size={20} color={colors.tint} />
+                <Ionicons name="globe-outline" size={20} color={colors.tint} />
               </View>
               <View style={styles.menuContent}>
                 <Text style={[styles.menuLabel, { color: colors.text }]}>
-                  Contact Support
+                  Support
                 </Text>
                 <Text style={[styles.menuHint, { color: colors.textSecondary }]}>
-                  protcgbinder@gmail.com
+                  tcgbinderpro.com
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+              <Ionicons name="open-outline" size={18} color={colors.textTertiary} />
             </Pressable>
             <View style={[styles.separator, { backgroundColor: colors.cardBorder }]} />
             <Pressable style={styles.menuItem} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
