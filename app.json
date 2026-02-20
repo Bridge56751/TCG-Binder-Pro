@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "CardVault",
-    "slug": "card-vault",
+    "name": "TCG Binder",
+    "slug": "tcg-binder",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -17,7 +17,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.cardvault",
       "infoPlist": {
-        "NSCameraUsageDescription": "CardVault needs camera access to scan your trading cards"
+        "NSCameraUsageDescription": "TCG Binder needs camera access to scan your trading cards"
       }
     },
     "android": {
@@ -44,7 +44,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow CardVault to use your camera to scan trading cards"
+          "cameraPermission": "Allow TCG Binder to use your camera to scan trading cards"
         }
       ]
     ],

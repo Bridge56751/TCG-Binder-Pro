@@ -486,7 +486,7 @@ export default function AuthScreen() {
           style={styles.logoImage}
           contentFit="contain"
         />
-        <Text style={[styles.appName, { color: colors.text }]}>CardVault</Text>
+        <Text style={[styles.appName, { color: colors.text }]}>TCG Binder</Text>
         <Text style={[styles.authTitle, { color: colors.text }]}>
           {mode === "login" ? "Welcome Back" : "Create Account"}
         </Text>

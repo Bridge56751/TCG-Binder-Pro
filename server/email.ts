@@ -53,7 +53,7 @@ export async function sendVerificationEmail(to: string, code: string): Promise<b
     await client.emails.send({
       from: fromEmail,
       to,
-      subject: "CardVault - Verify Your Email",
+      subject: "TCG Binder - Verify Your Email",
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
           <h2 style="color: #1a1a1a; margin-bottom: 8px;">Verify your email</h2>
@@ -61,7 +61,7 @@ export async function sendVerificationEmail(to: string, code: string): Promise<b
           <div style="background: #f5f5f0; border-radius: 12px; padding: 24px; text-align: center; margin: 24px 0;">
             <span style="font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #1a1a1a;">${code}</span>
           </div>
-          <p style="color: #999; font-size: 13px;">This code expires in 10 minutes. If you didn't create a CardVault account, you can ignore this email.</p>
+          <p style="color: #999; font-size: 13px;">This code expires in 10 minutes. If you didn't create a TCG Binder account, you can ignore this email.</p>
         </div>
       `,
     });
@@ -78,7 +78,7 @@ export async function sendPasswordResetEmail(to: string, code: string): Promise<
     await client.emails.send({
       from: fromEmail,
       to,
-      subject: "CardVault - Reset Your Password",
+      subject: "TCG Binder - Reset Your Password",
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
           <h2 style="color: #1a1a1a; margin-bottom: 8px;">Reset your password</h2>
