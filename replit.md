@@ -18,7 +18,7 @@ Preferred communication style: Simple, everyday language.
 - **In-App Purchases**: RevenueCat SDK (`react-native-purchases`) for iOS in-app purchases. `PurchaseContext` wraps the app and manages premium status. Entitlement ID: `premium`. API key via `EXPO_PUBLIC_REVENUECAT_API_KEY` env var. Works in Expo Go via Preview API Mode.
 - **Local storage**: `@react-native-async-storage/async-storage` stores the user's card collection as a JSON structure keyed by game → set → card IDs. Cloud sync available for logged-in users via `/api/collection/sync`.
 - **Offline mode**: Card metadata (names, images, prices, set info) cached locally via `lib/card-cache.ts` using AsyncStorage. Card images cached on disk via expo-image `cachePolicy="disk"`. When API calls fail, the app falls back to cached data for prices, sets, and card names. An "Offline mode" banner appears when the API is unreachable.
-- **Authentication**: `AuthContext` manages user sessions (login/register/logout). Settings tab provides login/register UI and account management.
+- **Authentication**: `AuthContext` manages user sessions (login/register/logout/verify/reset). Settings tab provides login/register UI and account management. Email verification via 6-digit code after registration (with skip option). Forgot password flow with email reset codes.
 - **Styling**: Plain React Native `StyleSheet` with a custom color system in `constants/colors.ts`. Uses DM Sans font family loaded via `@expo-google-fonts/dm-sans`.
 - **Key libraries**: expo-image for optimized image rendering, expo-haptics for tactile feedback, expo-camera/expo-image-picker for card scanning, react-native-reanimated for animations, react-native-chart-kit for card detail charts
 
@@ -35,6 +35,10 @@ Preferred communication style: Simple, everyday language.
   - `/api/auth/login` — user login
   - `/api/auth/logout` — user logout
   - `/api/auth/me` — get current user session (returns isPremium)
+  - `/api/auth/verify-email` — verify email with 6-digit code
+  - `/api/auth/resend-verification` — resend verification email
+  - `/api/auth/request-reset` — request password reset code via email
+  - `/api/auth/reset-password` — reset password with code
   - `/api/auth/upgrade-premium` — mark user as premium after RevenueCat purchase verification
   - `/api/collection/sync` — GET/POST collection sync for logged-in users
 - **AI Integration**: OpenAI API (via Replit AI Integrations proxy) for card identification using vision model (gpt-5.2). Configured via `AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL` environment variables.
@@ -44,7 +48,7 @@ Preferred communication style: Simple, everyday language.
 
 - **ORM**: Drizzle ORM configured for PostgreSQL (`drizzle.config.ts`)
 - **Schema location**: `shared/schema.ts` (users table, user_collections table) and `shared/models/chat.ts` (conversations and messages tables for chat integration)
-- **Current schema**: Users table (id, email, password, isPremium) and user_collections table (userId FK, collection JSONB, updatedAt) and chat-related tables (conversations, messages). The TCG card/set data appears to come from external APIs rather than the database.
+- **Current schema**: Users table (id, email, password, isPremium, isVerified, verificationCode, verificationExpiry, resetCode, resetExpiry) and user_collections table (userId FK, collection JSONB, updatedAt) and chat-related tables (conversations, messages). The TCG card/set data appears to come from external APIs rather than the database.
 - **Migration management**: Drizzle Kit with `db:push` script for schema sync
 - **Connection**: `DATABASE_URL` environment variable required
 
