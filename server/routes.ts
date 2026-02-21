@@ -475,6 +475,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const existing = await storage.getUserByEmail(email.toLowerCase());
       if (existing) {
+        if (existing.appleId) {
+          return res.status(409).json({ error: "This email is linked to an Apple Sign-In account. Please use Apple to sign in." });
+        }
         return res.status(409).json({ error: "An account with this email already exists" });
       }
       const hashed = await bcrypt.hash(password, 10);
@@ -614,6 +617,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUserByEmail(email.toLowerCase());
       if (!user) {
         return res.status(401).json({ error: "Invalid email or password" });
+      }
+      if (user.appleId && !user.password) {
+        return res.status(400).json({ error: "This account uses Apple Sign-In. Please use Apple to sign in." });
       }
       const valid = await bcrypt.compare(password, user.password);
       if (!valid) {
