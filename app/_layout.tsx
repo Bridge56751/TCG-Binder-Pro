@@ -60,7 +60,6 @@ function RootLayoutNav() {
 
   return (
     <>
-      <CollectionProgressToast />
       <Stack screenOptions={{ headerBackTitle: "Back" }}>
         <Stack.Screen name="auth" options={{ headerShown: false, presentation: "modal" }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -107,6 +106,7 @@ function RootLayoutNav() {
           }}
         />
       </Stack>
+      <CollectionProgressToast />
     </>
   );
 }
