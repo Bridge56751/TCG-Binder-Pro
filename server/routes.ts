@@ -1211,11 +1211,11 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
                 type: "image_url",
                 image_url: { url: `data:image/jpeg;base64,${image}`, detail: "high" },
               },
-              { type: "text", text: "Identify this trading card. Carefully read the card name at the top and the collector number at the bottom. This may be a full art, special art rare, or holographic card — look closely at the edges and corners for small text. Tell me exactly what is printed on the card." },
+              { type: "text", text: "Identify this trading card. Read the name at top and collector number at bottom. May be full art/SAR/holographic — check edges for small text." },
             ],
           },
         ],
-        max_completion_tokens: 600,
+        max_completion_tokens: 400,
       });
 
       const content = response.choices[0]?.message?.content || "{}";
@@ -1324,40 +1324,20 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
             messages: [
               {
                 role: "system",
-                content: `You are an expert TCG card identifier. A previous attempt to identify this card produced: name="${result.name}", game="${result.game}", setId="${result.setId}", cardNumber="${result.cardNumber}". However, this could NOT be verified in the card database.
-
-The card might be a special variant (full art, SAR, alt art, secret rare, mega, ex, GX, V, VMAX, VSTAR, etc.) where the name or number was misread.
-
-LOOK AGAIN very carefully:
-1. RE-READ THE CARD NAME at the top — look at every letter. For full art cards, the name box is small and may be at the very top edge. Include any suffix (ex, EX, GX, V, VMAX, VSTAR, etc.)
-2. RE-READ THE COLLECTOR NUMBER at the bottom — zoom in mentally on the bottom-left or bottom-right area. The number might be hard to see against the art. Read ALL digits exactly.
-3. RECONSIDER THE SET — could the set code be different? Look for any set marking near the collector number.
-4. Check if you may have confused similar-looking characters (e.g., 8 vs 6, 1 vs 7, 5 vs S)
-
-Return ONLY valid JSON with your corrected identification:
-{
-  "game": "pokemon" | "yugioh" | "onepiece" | "mtg",
-  "name": "corrected card name",
-  "setName": "set name",
-  "setId": "corrected set code",
-  "cardNumber": "corrected collector number",
-  "rarity": "rarity",
-  "estimatedValue": number,
-  "language": "en" or "ja"
-}`,
+                content: `Expert TCG identifier retry. Previous read: name="${result.name}", game="${result.game}", setId="${result.setId}", cardNumber="${result.cardNumber}" — NOT found in database. Possibly misread name/number/set. Re-read carefully: 1) Card name at top (include ex/EX/GX/V/VMAX/VSTAR suffix) 2) Collector number at bottom (exact digits) 3) Set code near collector number. Check confused chars (8/6, 1/7, 5/S). Return ONLY JSON: {"game":"pokemon"|"yugioh"|"onepiece"|"mtg","name":"corrected name","setName":"set name","setId":"corrected set code","cardNumber":"corrected number","rarity":"rarity","estimatedValue":number,"language":"en"|"ja"}`,
               },
               {
                 role: "user",
                 content: [
                   {
                     type: "image_url",
-                    image_url: { url: `data:image/jpeg;base64,${image}`, detail: "high" },
+                    image_url: { url: `data:image/jpeg;base64,${image}`, detail: "auto" },
                   },
-                  { type: "text", text: `Re-examine this card. The first read got name="${result.name}" number="${result.cardNumber}" set="${result.setId}" but it could not be verified. Please look again very carefully at the name, collector number, and set code. Pay special attention to any text that might be obscured by artwork or holographic effects.` },
+                  { type: "text", text: `Re-examine this card. First read: name="${result.name}" num="${result.cardNumber}" set="${result.setId}" — could not verify. Look again at the name, number, and set code.` },
                 ],
               },
             ],
-            max_completion_tokens: 600,
+            max_completion_tokens: 300,
           });
 
           const retryContent = retryResponse.choices[0]?.message?.content || "{}";
