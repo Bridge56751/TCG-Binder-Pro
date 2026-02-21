@@ -28,6 +28,37 @@ function countCollectionCards(collection: any): number {
 }
 
 const setsCache: Record<string, any[]> = {};
+const pokemonReleaseDateCache: Record<string, string | null> = {};
+let pokemonReleaseDatesFetched = false;
+
+async function fetchPokemonReleaseDates(setIds: string[], lang: string = "en"): Promise<Record<string, string | null>> {
+  if (pokemonReleaseDatesFetched) return pokemonReleaseDateCache;
+  const batchSize = 20;
+  for (let i = 0; i < setIds.length; i += batchSize) {
+    const batch = setIds.slice(i, i + batchSize);
+    const results = await Promise.allSettled(
+      batch.map(async (id) => {
+        try {
+          const res = await fetch(`https://api.tcgdex.net/v2/${lang}/sets/${id}`);
+          if (res.ok) {
+            const data = await res.json();
+            return { id, releaseDate: data.releaseDate || null };
+          }
+          return { id, releaseDate: null };
+        } catch {
+          return { id, releaseDate: null };
+        }
+      })
+    );
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        pokemonReleaseDateCache[result.value.id] = result.value.releaseDate;
+      }
+    }
+  }
+  pokemonReleaseDatesFetched = true;
+  return pokemonReleaseDateCache;
+}
 
 async function fetchSetsForGame(game: string, lang: string = "en"): Promise<any[]> {
   const cacheKey = game === "pokemon" ? `${game}_${lang}` : game;
@@ -1688,6 +1719,15 @@ Return ONLY valid JSON with your corrected identification:
           seen.add(s.id);
           return true;
         });
+
+      const setIds = formatted.map((s: any) => s.id);
+      const releaseDates = await fetchPokemonReleaseDates(setIds, lang);
+      for (const s of formatted) {
+        if (!s.releaseDate && releaseDates[s.id]) {
+          s.releaseDate = releaseDates[s.id];
+        }
+      }
+
       formatted.sort((a: any, b: any) => (b.releaseDate || "").localeCompare(a.releaseDate || ""));
       res.json(formatted);
     } catch (error) {
