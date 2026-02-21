@@ -480,7 +480,7 @@ export default function AuthScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {canDismiss && (
+        {canDismiss && !needsVerification && (
           <View style={styles.modalCloseRow}>
             <Pressable onPress={() => router.back()} hitSlop={12}>
               <Ionicons name="close" size={28} color={colors.text} />
