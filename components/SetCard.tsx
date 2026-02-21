@@ -53,7 +53,14 @@ export function SetCard({ set, collectedCount, onPress }: SetCardProps) {
               <Ionicons name="checkmark-circle" size={18} color={colors.success} />
             )}
           </View>
-          <Text style={[styles.setId, { color: colors.textTertiary }]}>{set.id}</Text>
+          <View style={styles.metaRow}>
+            <Text style={[styles.setId, { color: colors.textTertiary }]}>{set.id}</Text>
+            {set.releaseDate ? (
+              <Text style={[styles.setId, { color: colors.textTertiary }]}>
+                {new Date(set.releaseDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+              </Text>
+            ) : null}
+          </View>
         </View>
         <View style={styles.footer}>
           <View style={[styles.progressBarBg, { backgroundColor: colors.surfaceAlt }]}>
@@ -120,6 +127,11 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: 2,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   titleRow: {
     flexDirection: "row",
