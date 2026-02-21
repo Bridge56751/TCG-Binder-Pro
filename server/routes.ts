@@ -10,6 +10,23 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
+const FREE_CARD_LIMIT = 20;
+
+function countCollectionCards(collection: any): number {
+  if (!collection || typeof collection !== "object") return 0;
+  let total = 0;
+  for (const game of Object.values(collection)) {
+    if (game && typeof game === "object") {
+      for (const cards of Object.values(game as Record<string, any>)) {
+        if (Array.isArray(cards)) {
+          total += cards.length;
+        }
+      }
+    }
+  }
+  return total;
+}
+
 const setsCache: Record<string, any[]> = {};
 
 async function fetchSetsForGame(game: string, lang: string = "en"): Promise<any[]> {
@@ -715,6 +732,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!collection || typeof collection !== "object") {
         return res.status(400).json({ error: "Collection data is required" });
       }
+
+      const user = await storage.getUser(req.session.userId);
+      if (user && !user.isPremium) {
+        const cardCount = countCollectionCards(collection);
+        if (cardCount > FREE_CARD_LIMIT) {
+          return res.status(403).json({ error: `Free accounts are limited to ${FREE_CARD_LIMIT} cards. Upgrade to Premium for unlimited cards.` });
+        }
+      }
+
       await storage.saveCollection(req.session.userId, collection);
       res.json({ ok: true });
     } catch (error) {
