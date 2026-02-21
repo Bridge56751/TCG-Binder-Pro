@@ -1,0 +1,54 @@
+3. Trademark & Intellectual Property Notices
+
+TCG Binder is an independent, unofficial collection tracking and reference application. This App is not produced, endorsed, sponsored, supported, or affiliated with any trading card game publisher, brand owner, or intellectual property holder referenced within the App.
+
+⸻
+
+Pokémon
+
+Pokémon®, Pokémon Trading Card Game®, and all related names, characters, images, artwork, logos, and trademarks are the property of The Pokémon Company, Nintendo, Game Freak, and Creatures Inc.
+
+Pokémon card data displayed in this App is provided by TCGdex (https://www.tcgdex.dev), an open-source, community-maintained project licensed under the MIT License.
+
+⸻
+
+Yu-Gi-Oh!
+
+Yu-Gi-Oh!®, Yu-Gi-Oh! Trading Card Game®, and all related names, characters, images, artwork, logos, and trademarks are the property of Konami Holdings Corporation and the late Kazuki Takahashi.
+
+Yu-Gi-Oh! card data displayed in this App is provided by YGOProDeck (https://ygoprodeck.com), a community-maintained database.
+
+⸻
+
+Magic: The Gathering
+
+Magic: The Gathering®, and all related names, characters, images, artwork, logos, and trademarks are the property of Wizards of the Coast LLC, a subsidiary of Hasbro, Inc.
+
+Magic: The Gathering card data is provided by Scryfall (https://scryfall.com). Card images are displayed in accordance with publicly available API terms and applicable fan content guidelines. This App is not approved or endorsed by Wizards of the Coast.
+
+⸻
+
+One Piece Card Game
+
+One Piece®, One Piece Card Game®, and all related names, characters, images, artwork, logos, and trademarks are the property of Eiichiro Oda, Bandai Co., Ltd., Shueisha Inc., Toei Animation Co., Ltd., and Viz Media, LLC.
+
+One Piece card data displayed in this App is provided by OPTCG API (https://optcgapi.com), a community-maintained database.
+
+⸻
+
+General Disclaimer
+
+All card names, card images, card artwork, set names, set symbols, and other game-related content displayed in this App are the intellectual property of their respective owners.
+
+TCG Binder is a collection tracking, reference, and portfolio management tool. Card images and related content are displayed solely for identification, reference, and personal collection management purposes as part of the App’s functionality.
+
+This App does not claim ownership of any card images, artwork, trademarks, or other copyrighted materials.
+All card images are fetched dynamically from third-party API services and are not hosted, stored, modified, or redistributed by this App.
+
+No content is sold, licensed, or monetized as intellectual property. Any fees charged for use of the App relate exclusively to software features, tools, and services, not to access to copyrighted content.
+
+⸻
+
+Rights Holder Notice
+
+If you are a rights holder and believe that your intellectual property is being referenced or displayed in a manner that constitutes infringement, please contact us at [your support email]. We take intellectual property concerns seriously and will promptly review and address all legitimate requests

@@ -307,7 +307,14 @@ export default function SettingsScreen() {
               </View>
               <Ionicons name="open-outline" size={18} color={colors.textTertiary} />
             </Pressable>
-            <View style={[styles.separator, { backgroundColor: colors.cardBorder }]} />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+            LEGAL
+          </Text>
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
             <Pressable style={styles.menuItem} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
               <View style={[styles.menuIcon, { backgroundColor: colors.tint + "18" }]}>
                 <Ionicons name="shield-checkmark-outline" size={20} color={colors.tint} />
@@ -330,6 +337,18 @@ export default function SettingsScreen() {
                 </Text>
               </View>
               <Ionicons name="open-outline" size={18} color={colors.textTertiary} />
+            </Pressable>
+            <View style={[styles.separator, { backgroundColor: colors.cardBorder }]} />
+            <Pressable style={styles.menuItem} onPress={() => router.push("/legal")}>
+              <View style={[styles.menuIcon, { backgroundColor: colors.tint + "18" }]}>
+                <Ionicons name="briefcase-outline" size={20} color={colors.tint} />
+              </View>
+              <View style={styles.menuContent}>
+                <Text style={[styles.menuLabel, { color: colors.text }]}>
+                  Trademark & IP Notices
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             </Pressable>
           </View>
         </View>
