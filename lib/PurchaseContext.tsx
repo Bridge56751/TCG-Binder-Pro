@@ -3,6 +3,7 @@ import { Platform, Alert } from "react-native";
 import Purchases, { type CustomerInfo, type PurchasesPackage } from "react-native-purchases";
 import { useAuth } from "./AuthContext";
 import { apiRequest } from "./query-client";
+import { router } from "expo-router";
 
 const REVENUECAT_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY || "";
 const ENTITLEMENT_ID = "premium";
@@ -18,7 +19,7 @@ interface PurchaseContextValue {
 const PurchaseContext = createContext<PurchaseContextValue | null>(null);
 
 export function PurchaseProvider({ children }: { children: ReactNode }) {
-  const { user, setPremiumStatus } = useAuth();
+  const { user, isGuest, setPremiumStatus } = useAuth();
   const [isPremium, setIsPremium] = useState(false);
   const [loading, setLoading] = useState(true);
   const [packages, setPackages] = useState<PurchasesPackage[]>([]);
@@ -127,8 +128,21 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
 
       if (hasPremium) {
         setIsPremium(true);
-        await syncPremiumToBackend();
-        Alert.alert("Restored", "Your premium access has been restored.");
+        if (user) {
+          await syncPremiumToBackend();
+          Alert.alert("Restored", "Your premium access has been restored.");
+        } else if (isGuest) {
+          Alert.alert(
+            "Premium Restored!",
+            "Create a free account to enable cloud backup and keep your premium subscription linked.",
+            [
+              { text: "Later", style: "cancel" },
+              { text: "Create Account", onPress: () => router.push("/auth?modal=1") },
+            ]
+          );
+        } else {
+          Alert.alert("Restored", "Your premium access has been restored.");
+        }
         return true;
       } else {
         Alert.alert("No Purchases Found", "No previous purchases were found for this account.");
@@ -138,7 +152,7 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
       Alert.alert("Restore Failed", "Could not restore purchases. Please try again.");
       return false;
     }
-  }, [syncPremiumToBackend]);
+  }, [syncPremiumToBackend, user, isGuest]);
 
   const value = useMemo(() => ({
     isPremium,
