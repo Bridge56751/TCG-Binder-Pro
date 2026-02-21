@@ -16,8 +16,8 @@ import {
 import { getCachedSets, type CachedSet } from "./card-cache";
 import { apiRequest, getApiUrl, queryClient } from "./query-client";
 import { useAuth } from "./AuthContext";
-import { usePurchase } from "./PurchaseContext";
-import { fetch } from "expo/fetch";
+import { usePremiumStatus } from "./PremiumContext";
+import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const ENABLED_GAMES_KEY = "cardvault_enabled_games";
@@ -93,7 +93,7 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
   const { user, isGuest } = useAuth();
-  const { isPremium: purchaseIsPremium } = usePurchase();
+  const purchaseIsPremium = usePremiumStatus();
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevUserRef = useRef<string | null>(null);
   const syncRetryRef = useRef(0);

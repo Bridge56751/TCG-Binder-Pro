@@ -4,6 +4,7 @@ import Purchases, { type CustomerInfo, type PurchasesPackage } from "react-nativ
 import { useAuth } from "./AuthContext";
 import { apiRequest } from "./query-client";
 import { router } from "expo-router";
+import { PremiumContext } from "./PremiumContext";
 
 const REVENUECAT_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY || "";
 const ENTITLEMENT_ID = "premium";
@@ -16,7 +17,7 @@ interface PurchaseContextValue {
   restorePurchases: () => Promise<boolean>;
 }
 
-const PurchaseContext = createContext<PurchaseContextValue | null>(null);
+export const PurchaseContext = createContext<PurchaseContextValue | null>(null);
 
 export function PurchaseProvider({ children }: { children: ReactNode }) {
   const { user, isGuest, setPremiumStatus } = useAuth();
@@ -166,7 +167,9 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
 
   return (
     <PurchaseContext.Provider value={value}>
-      {children}
+      <PremiumContext.Provider value={isPremium}>
+        {children}
+      </PremiumContext.Provider>
     </PurchaseContext.Provider>
   );
 }
