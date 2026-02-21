@@ -72,10 +72,10 @@ function getMarketplaceLinks(card: CardDetail) {
 export default function CardDetailScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
-  const { game, cardId, lang, galleryCards: galleryCardsParam } = useLocalSearchParams<{ game: string; cardId: string; lang?: string; galleryCards?: string }>();
+  const { game, cardId, lang } = useLocalSearchParams<{ game: string; cardId: string; lang?: string }>();
   const gameId = game as GameId;
   const { hasCard, removeCard, addCard, cardQuantity } = useCollection();
-  const { openGallery } = useGallery();
+  const { openGallery, galleryCardsRef } = useGallery();
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
 
@@ -209,18 +209,13 @@ export default function CardDetailScreen() {
           style={styles.imageSection}
           onPress={() => {
             if (!card.image) return;
-            let galleryCardsList: { id: string; name: string; image: string | null; localId?: string; setName?: string }[] = [];
+            let galleryCardsList = galleryCardsRef.current;
             let startIdx = 0;
-            try {
-              if (galleryCardsParam) {
-                galleryCardsList = JSON.parse(galleryCardsParam);
-                startIdx = galleryCardsList.findIndex((c) => c.id === cardId);
-                if (startIdx < 0) startIdx = 0;
-              }
-            } catch {}
-            if (galleryCardsList.length === 0) {
+            if (galleryCardsList.length > 0) {
+              startIdx = galleryCardsList.findIndex((c) => c.id === cardId);
+              if (startIdx < 0) startIdx = 0;
+            } else {
               galleryCardsList = [{ id: cardId || "", name: card.name, image: card.image, localId: card.localId, setName: card.setName }];
-              startIdx = 0;
             }
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             openGallery(galleryCardsList, startIdx);

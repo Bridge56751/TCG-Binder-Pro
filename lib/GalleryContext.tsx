@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useRef } from "react";
 import type { GalleryCard } from "@/components/CardGallery";
 
 interface GalleryState {
@@ -11,12 +11,16 @@ interface GalleryContextValue {
   gallery: GalleryState;
   openGallery: (cards: GalleryCard[], startIndex: number) => void;
   closeGallery: () => void;
+  setGalleryCards: (cards: GalleryCard[]) => void;
+  galleryCardsRef: React.MutableRefObject<GalleryCard[]>;
 }
 
 const GalleryContext = createContext<GalleryContextValue>({
   gallery: { cards: [], initialIndex: 0, visible: false },
   openGallery: () => {},
   closeGallery: () => {},
+  setGalleryCards: () => {},
+  galleryCardsRef: { current: [] },
 });
 
 export function GalleryProvider({ children }: { children: React.ReactNode }) {
@@ -25,6 +29,7 @@ export function GalleryProvider({ children }: { children: React.ReactNode }) {
     initialIndex: 0,
     visible: false,
   });
+  const galleryCardsRef = useRef<GalleryCard[]>([]);
 
   const openGallery = useCallback((cards: GalleryCard[], startIndex: number) => {
     setGallery({ cards, initialIndex: startIndex, visible: true });
@@ -34,8 +39,12 @@ export function GalleryProvider({ children }: { children: React.ReactNode }) {
     setGallery((prev) => ({ ...prev, visible: false }));
   }, []);
 
+  const setGalleryCards = useCallback((cards: GalleryCard[]) => {
+    galleryCardsRef.current = cards;
+  }, []);
+
   return (
-    <GalleryContext.Provider value={{ gallery, openGallery, closeGallery }}>
+    <GalleryContext.Provider value={{ gallery, openGallery, closeGallery, setGalleryCards, galleryCardsRef }}>
       {children}
     </GalleryContext.Provider>
   );

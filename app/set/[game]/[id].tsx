@@ -21,6 +21,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { CardCell } from "@/components/CardCell";
 import { useCollection } from "@/lib/CollectionContext";
 import { useTheme } from "@/lib/ThemeContext";
+import { useGallery } from "@/lib/GalleryContext";
 import { getApiUrl, queryClient } from "@/lib/query-client";
 import { cacheCards, getCachedSetCards, getCachedSets, type CachedCard } from "@/lib/card-cache";
 import type { GameId, SetDetail, TCGCard } from "@/lib/types";
@@ -37,6 +38,7 @@ export default function SetDetailScreen() {
   const gameId = game as GameId;
   const { collection, hasCard, setCards, removeCard, removeOneCard, addCard, cardQuantity } = useCollection();
   const { colors } = useTheme();
+  const { setGalleryCards } = useGallery();
 
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const [sortMode, setSortMode] = useState<SortMode>("number");
@@ -589,6 +591,16 @@ export default function SetDetailScreen() {
                     toggleCardSelection(item.id);
                     return;
                   }
+                  const galleryList = filteredAndSortedCards
+                    .filter((c) => c.image)
+                    .map((c) => ({
+                      id: c.id,
+                      name: c.englishName || c.name,
+                      image: c.image,
+                      localId: c.localId,
+                      setName: activeData?.name,
+                    }));
+                  setGalleryCards(galleryList);
                   router.push(`/card/${game}/${item.id}`);
                 }}
                 onLongPress={collected && !trashMode ? () => {

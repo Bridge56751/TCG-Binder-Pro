@@ -17,6 +17,7 @@ import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/lib/ThemeContext";
 import { useCollection } from "@/lib/CollectionContext";
+import { useGallery } from "@/lib/GalleryContext";
 import { apiRequest } from "@/lib/query-client";
 import { cachePrices, getCachedPrices } from "@/lib/card-cache";
 import type { GameId } from "@/lib/types";
@@ -134,6 +135,7 @@ export default function AllCardsScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { collection, removeOneCard } = useCollection();
+  const { setGalleryCards } = useGallery();
   const { game: initialGame } = useLocalSearchParams<{ game?: string }>();
   const validGames = GAMES.map((g) => g.id as string);
   const [filterGame, setFilterGame] = useState<GameId | "all">(
@@ -306,11 +308,23 @@ export default function AllCardsScreen() {
   );
 
   const handleCardPress = useCallback((card: CardWithMeta) => {
+    const galleryList = sortedCards
+      .map((c) => {
+        const m = metaMap.get(c.cardId);
+        return m && m.image ? {
+          id: c.cardId,
+          name: m.name,
+          image: m.image,
+          setName: m.setName,
+        } : null;
+      })
+      .filter(Boolean) as { id: string; name: string; image: string; setName?: string }[];
+    setGalleryCards(galleryList);
     router.push({
       pathname: "/card/[game]/[cardId]",
       params: { game: card.game, cardId: card.cardId },
     });
-  }, []);
+  }, [sortedCards, metaMap, setGalleryCards]);
 
   const currentSort = SORT_OPTIONS.find((s) => s.id === sortBy)!;
 
