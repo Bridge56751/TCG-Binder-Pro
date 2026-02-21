@@ -261,9 +261,9 @@ export default function AuthScreen() {
           onChangeText={text => handleCodeChange(text, i)}
           onKeyPress={({ nativeEvent }) => handleCodeKeyPress(nativeEvent.key, i)}
           keyboardType="number-pad"
-          maxLength={Platform.OS === "web" ? 6 : 1}
-          textContentType="oneTimeCode"
-          autoComplete="one-time-code"
+          maxLength={6}
+          textContentType={i === 0 ? "oneTimeCode" : "none"}
+          autoComplete={i === 0 ? "one-time-code" : "off"}
           selectTextOnFocus
         />
       ))}
@@ -536,6 +536,9 @@ export default function AuthScreen() {
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
+              textContentType={mode === "register" ? "newPassword" : "password"}
+              autoComplete={mode === "register" ? "new-password" : "current-password"}
+              passwordRules="minlength: 6;"
             />
             <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={8}>
               <Ionicons
@@ -557,6 +560,9 @@ export default function AuthScreen() {
                 onChangeText={setConfirmPassword}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
+                textContentType="newPassword"
+                autoComplete="new-password"
+                passwordRules="minlength: 6;"
               />
             </View>
           )}
