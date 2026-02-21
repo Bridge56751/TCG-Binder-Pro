@@ -10,8 +10,6 @@ import Animated, {
   withSequence,
   withDelay,
   Easing,
-  SlideInUp,
-  SlideOutUp,
   runOnJS,
 } from "react-native-reanimated";
 import { PanResponder } from "react-native";
@@ -102,8 +100,10 @@ export function CollectionProgressToast() {
   const { progressToast, clearProgressToast } = useCollection();
   const insets = useSafeAreaInsets();
   const topInset = Platform.OS === "web" ? 67 : insets.top;
+  const [visibleData, setVisibleData] = React.useState<ProgressToastData | null>(null);
+  const [modalVisible, setModalVisible] = React.useState(false);
 
-  const translateY = useSharedValue(0);
+  const translateY = useSharedValue(-200);
 
   const panResponder = React.useRef(
     PanResponder.create({
@@ -130,7 +130,17 @@ export function CollectionProgressToast() {
 
   useEffect(() => {
     if (progressToast) {
-      translateY.value = 0;
+      setVisibleData(progressToast);
+      setModalVisible(true);
+      translateY.value = -200;
+      requestAnimationFrame(() => {
+        translateY.value = withSpring(0, { damping: 15, stiffness: 120 });
+      });
+    } else {
+      translateY.value = withTiming(-200, { duration: 250 }, () => {
+        runOnJS(setModalVisible)(false);
+        runOnJS(setVisibleData)(null);
+      });
     }
   }, [progressToast]);
 
@@ -138,18 +148,16 @@ export function CollectionProgressToast() {
     transform: [{ translateY: translateY.value }],
   }));
 
-  if (!progressToast) return null;
+  if (!modalVisible || !visibleData) return null;
 
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent>
       <View style={styles.modalOverlay} pointerEvents="box-none">
         <Animated.View
-          entering={SlideInUp.duration(350).springify()}
-          exiting={SlideOutUp.duration(250)}
           style={[styles.container, { top: topInset + 4 }, animatedStyle]}
           {...panResponder.panHandlers}
         >
-          <ProgressContent data={progressToast} />
+          <ProgressContent data={visibleData} />
         </Animated.View>
       </View>
     </Modal>
