@@ -6,7 +6,7 @@ import { router } from "expo-router";
 import { PremiumContext } from "./PremiumContext";
 
 const REVENUECAT_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY || "";
-const ENTITLEMENT_ID = "unlimited";
+const ENTITLEMENT_ID = "TCG Binder Pro Unlimited";
 
 let Purchases: any = null;
 if (Platform.OS !== "web") {
