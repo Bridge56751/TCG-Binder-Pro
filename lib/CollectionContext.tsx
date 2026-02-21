@@ -22,6 +22,28 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const ENABLED_GAMES_KEY = "cardvault_enabled_games";
 
+function truncateToLimit(data: CollectionData, limit: number): CollectionData {
+  const count = getCollectedCount(data);
+  if (count <= limit) return data;
+  const truncated: CollectionData = {};
+  let remaining = limit;
+  for (const gameKey of Object.keys(data)) {
+    if (remaining <= 0) break;
+    truncated[gameKey] = {};
+    const gameData = data[gameKey] || {};
+    for (const setKey of Object.keys(gameData)) {
+      if (remaining <= 0) break;
+      const cards = gameData[setKey] || [];
+      if (Array.isArray(cards)) {
+        const take = cards.slice(0, remaining);
+        truncated[gameKey][setKey] = take;
+        remaining -= take.length;
+      }
+    }
+  }
+  return truncated;
+}
+
 type SyncStatus = "idle" | "syncing" | "error" | "success";
 
 export interface ProgressToastData {
@@ -177,28 +199,6 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     await loadCollection();
   }, [loadCollection]);
 
-  const truncateToLimit = useCallback((data: CollectionData, limit: number): CollectionData => {
-    const count = getCollectedCount(data);
-    if (count <= limit) return data;
-    const truncated: CollectionData = {};
-    let remaining = limit;
-    for (const gameKey of Object.keys(data)) {
-      if (remaining <= 0) break;
-      truncated[gameKey] = {};
-      const gameData = data[gameKey] || {};
-      for (const setKey of Object.keys(gameData)) {
-        if (remaining <= 0) break;
-        const cards = gameData[setKey] || [];
-        if (Array.isArray(cards)) {
-          const take = cards.slice(0, remaining);
-          truncated[gameKey][setKey] = take;
-          remaining -= take.length;
-        }
-      }
-    }
-    return truncated;
-  }, []);
-
   const mergeAndSyncAfterLogin = useCallback(async () => {
     const localData = await getCollection();
     const localHasCards = Object.values(localData).some(
@@ -261,7 +261,7 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     } else {
       await loadCollection();
     }
-  }, [performSync, loadCollection, isPremium, truncateToLimit]);
+  }, [performSync, loadCollection, isPremium]);
 
   useEffect(() => {
     if (user && prevUserRef.current !== user.id) {
