@@ -708,6 +708,26 @@ export default function CollectionScreen() {
           </View>
         </View>
       )}
+
+      {totalCards() > 0 && (
+        <View style={styles.binderSection}>
+          <Pressable
+            style={[styles.binderBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+            onPress={() => router.push({ pathname: "/all-cards", params: { game: selectedGame } })}
+          >
+            <View style={[styles.binderBtnIcon, { backgroundColor: colors.tint + "18" }]}>
+              <Ionicons name="albums" size={22} color={colors.tint} />
+            </View>
+            <View style={styles.binderBtnInfo}>
+              <Text style={[styles.binderBtnTitle, { color: colors.text }]}>View My Binder</Text>
+              <Text style={[styles.binderBtnSub, { color: colors.textSecondary }]}>
+                See all {totalCards()} cards with images, sorted by value
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+          </Pressable>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -980,6 +1000,38 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_600SemiBold",
     fontSize: 15,
     color: "#FFFFFF",
+  },
+  binderSection: {
+    marginTop: 24,
+    paddingHorizontal: 20,
+    marginBottom: 8,
+  },
+  binderBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 14,
+  },
+  binderBtnIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  binderBtnInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  binderBtnTitle: {
+    fontFamily: "DMSans_700Bold",
+    fontSize: 16,
+  },
+  binderBtnSub: {
+    fontFamily: "DMSans_400Regular",
+    fontSize: 13,
   },
   reorderRow: {
     flexDirection: "row",
