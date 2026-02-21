@@ -222,32 +222,13 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
           (game: any) => game && Object.values(game).some((set: any) => set && Object.keys(set).length > 0)
         );
 
-        if (localHasCards && !cloudHasCards) {
-          const limited = applyLimit(localData);
-          setCollection(limited);
-          performSync(limited);
-          return;
-        } else if (cloudHasCards && !localHasCards) {
+        if (cloudHasCards) {
           const limited = applyLimit(cloudData);
           await saveCollection(limited);
           setCollection(limited);
           return;
-        } else if (localHasCards && cloudHasCards) {
-          const merged: CollectionData = {};
-          const allGames = new Set([...Object.keys(localData), ...Object.keys(cloudData)]);
-          for (const gameKey of allGames) {
-            merged[gameKey] = {};
-            const localGame = localData[gameKey] || {};
-            const cloudGame = (cloudData as CollectionData)[gameKey] || {};
-            const allSets = new Set([...Object.keys(localGame), ...Object.keys(cloudGame)]);
-            for (const setKey of allSets) {
-              const localCards = localGame[setKey] || [];
-              const cloudCards = cloudGame[setKey] || [];
-              merged[gameKey][setKey] = [...new Set([...localCards, ...cloudCards])];
-            }
-          }
-          const limited = applyLimit(merged);
-          await saveCollection(limited);
+        } else if (localHasCards && !cloudHasCards) {
+          const limited = applyLimit(localData);
           setCollection(limited);
           performSync(limited);
           return;
