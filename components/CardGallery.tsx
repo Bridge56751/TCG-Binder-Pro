@@ -29,7 +29,7 @@ interface CardGalleryProps {
   visible: boolean;
   cards: GalleryCard[];
   initialIndex: number;
-  onClose: () => void;
+  onClose: (lastIndex: number) => void;
 }
 
 export function CardGallery({ visible, cards, initialIndex, onClose }: CardGalleryProps) {
@@ -88,12 +88,12 @@ export function CardGallery({ visible, cards, initialIndex, onClose }: CardGalle
       animationType="fade"
       transparent={false}
       statusBarTranslucent
-      onRequestClose={onClose}
+      onRequestClose={() => onClose(currentIndex)}
     >
       <View style={styles.overlay}>
         <StatusBar barStyle="light-content" />
         <View style={[styles.header, { paddingTop: topInset + 8 }]}>
-          <Pressable style={styles.closeButton} onPress={onClose} hitSlop={12}>
+          <Pressable style={styles.closeButton} onPress={() => onClose(currentIndex)} hitSlop={12}>
             <Ionicons name="close" size={28} color="#FFFFFF" />
           </Pressable>
           <View style={styles.headerCenter}>

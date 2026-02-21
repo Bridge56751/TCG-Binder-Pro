@@ -1,7 +1,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Stack, useRouter, useSegments, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useCallback } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -46,13 +46,26 @@ function useProtectedRoute() {
 }
 
 function GalleryOverlay() {
-  const { gallery, closeGallery } = useGallery();
+  const { gallery, closeGallery, gameIdRef } = useGallery();
+  const handleClose = useCallback((lastIndex: number) => {
+    const lastCard = gallery.cards[lastIndex];
+    closeGallery(lastIndex);
+    if (lastCard) {
+      const game = gameIdRef.current;
+      if (game && lastCard.id) {
+        setTimeout(() => {
+          router.replace(`/card/${game}/${lastCard.id}`);
+        }, 100);
+      }
+    }
+  }, [gallery.cards, closeGallery, gameIdRef]);
+
   return (
     <CardGallery
       visible={gallery.visible}
       cards={gallery.cards}
       initialIndex={gallery.initialIndex}
-      onClose={closeGallery}
+      onClose={handleClose}
     />
   );
 }

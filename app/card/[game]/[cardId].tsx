@@ -218,7 +218,7 @@ export default function CardDetailScreen() {
               galleryCardsList = [{ id: cardId || "", name: card.name, image: card.image, localId: card.localId, setName: card.setName }];
             }
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            openGallery(galleryCardsList, startIdx);
+            openGallery(galleryCardsList, startIdx, gameId);
           }}
         >
           <Animated.View style={flipStyle}>
