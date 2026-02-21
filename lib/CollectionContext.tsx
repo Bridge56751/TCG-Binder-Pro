@@ -361,6 +361,13 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      if (!isPremium) {
+        const importCount = getCollectedCount(collectionData);
+        if (importCount > FREE_CARD_LIMIT) {
+          return { success: false, error: `Free accounts are limited to ${FREE_CARD_LIMIT} cards. This backup contains ${importCount} cards. Upgrade to Premium for unlimited cards.` };
+        }
+      }
+
       await saveCollection(collectionData);
       setCollection(collectionData);
       debouncedSync(collectionData);
@@ -368,7 +375,7 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     } catch {
       return { success: false, error: "Could not parse backup file" };
     }
-  }, [debouncedSync]);
+  }, [debouncedSync, isPremium]);
 
   const isAtGuestLimit = isGuest && !user && getCollectedCount(collection) >= FREE_CARD_LIMIT;
   const isAtFreeLimit = !isPremium && getCollectedCount(collection) >= FREE_CARD_LIMIT;
