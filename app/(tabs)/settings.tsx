@@ -37,7 +37,7 @@ export default function SettingsScreen() {
   const { totalCards, syncCollection, syncStatus, lastSyncTime, enabledGames, toggleGame, isAtGuestLimit } = useCollection();
 
   const [submitting, setSubmitting] = useState(false);
-  const [confirmingAction, setConfirmingAction] = useState<"logout" | "delete" | null>(null);
+  const [confirmingAction, setConfirmingAction] = useState<"logout" | "delete" | "clear_data" | null>(null);
 
   const formatTimeAgo = (timestamp: number) => {
     const seconds = Math.floor((Date.now() - timestamp) / 1000);
@@ -60,6 +60,25 @@ export default function SettingsScreen() {
     setConfirmingAction("delete");
   };
 
+  const clearAllLocalData = async () => {
+    try {
+      const AsyncStorage = (await import("@react-native-async-storage/async-storage")).default;
+      await AsyncStorage.multiRemove([
+        "cardvault_collection",
+        "cardvault_scan_history",
+        "cardvault_card_cache",
+        "cardvault_set_cache",
+        "cardvault_price_cache",
+        "cardvault_enabled_games",
+        "cardvault_set_order_pokemon",
+        "cardvault_set_order_yugioh",
+        "cardvault_set_order_onepiece",
+        "cardvault_set_order_mtg",
+        "cardvault_guest_mode",
+      ]);
+    } catch {}
+  };
+
   const executeConfirmedAction = async () => {
     const action = confirmingAction;
     setConfirmingAction(null);
@@ -70,6 +89,11 @@ export default function SettingsScreen() {
     } else if (action === "delete") {
       try {
         await deleteAccount();
+      } catch {}
+    } else if (action === "clear_data") {
+      try {
+        await clearAllLocalData();
+        await logout();
       } catch {}
     }
   };
@@ -433,6 +457,21 @@ export default function SettingsScreen() {
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
               </Pressable>
+              <View style={[styles.separator, { backgroundColor: colors.cardBorder }]} />
+              <Pressable style={styles.menuItem} onPress={() => setConfirmingAction("clear_data")}>
+                <View style={[styles.menuIcon, { backgroundColor: colors.error + "18" }]}>
+                  <Ionicons name="trash" size={20} color={colors.error} />
+                </View>
+                <View style={styles.menuContent}>
+                  <Text style={[styles.menuLabel, { color: colors.error }]}>
+                    Clear All Data
+                  </Text>
+                  <Text style={[styles.menuHint, { color: colors.textSecondary }]}>
+                    Remove all cards and local data
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+              </Pressable>
             </View>
           </View>
         ) : null}
@@ -443,11 +482,13 @@ export default function SettingsScreen() {
         <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
           <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
-              {confirmingAction === "logout" ? "Log Out" : "Delete Account"}
+              {confirmingAction === "logout" ? "Log Out" : confirmingAction === "clear_data" ? "Clear All Data" : "Delete Account"}
             </Text>
             <Text style={[styles.modalMessage, { color: colors.textSecondary }]}>
               {confirmingAction === "logout"
                 ? "Are you sure you want to log out?"
+                : confirmingAction === "clear_data"
+                ? "This will permanently remove your entire card collection, scan history, and all cached data from this device. This cannot be undone."
                 : "This will permanently delete your account and all cloud data. This cannot be undone."}
             </Text>
             <View style={styles.modalButtons}>
@@ -462,7 +503,7 @@ export default function SettingsScreen() {
                 onPress={executeConfirmedAction}
               >
                 <Text style={[styles.modalButtonText, { color: "#FFFFFF" }]}>
-                  {confirmingAction === "logout" ? "Log Out" : "Delete"}
+                  {confirmingAction === "logout" ? "Log Out" : confirmingAction === "clear_data" ? "Clear Data" : "Delete"}
                 </Text>
               </Pressable>
             </View>
