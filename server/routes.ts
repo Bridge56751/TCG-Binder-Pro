@@ -560,6 +560,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return res.json({ ok: true, message: "If an account with that email exists, a reset code has been sent." });
       }
+      if (user.appleId && !user.password) {
+        return res.status(400).json({ error: "This account uses Apple Sign-In. Please sign in with Apple instead." });
+      }
       const code = generateCode();
       const expiry = new Date(Date.now() + 10 * 60 * 1000);
       await storage.setResetCode(user.id, code, expiry);
