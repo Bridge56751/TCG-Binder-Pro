@@ -90,12 +90,12 @@ export default function LegalScreen() {
 
           <Text style={[styles.heading, { color: colors.text }]}>Acceptance of Terms</Text>
           <Text style={[styles.body, { color: colors.textSecondary }]}>
-            By downloading, installing, or using CardVault ("the App"), you agree to be bound by these terms. If you do not agree to these terms, do not use the App.
+            By downloading, installing, or using TCG Binder ("the App"), you agree to be bound by these terms. If you do not agree to these terms, do not use the App.
           </Text>
 
           <Text style={[styles.heading, { color: colors.text }]}>Description of Service</Text>
           <Text style={[styles.body, { color: colors.textSecondary }]}>
-            CardVault is a digital collection tracking tool for trading card games. The App allows users to browse card sets, track owned cards, view market pricing information, and scan physical cards using AI-powered image recognition. The App does not facilitate the buying, selling, or trading of physical or digital cards.
+            TCG Binder is a digital collection tracking tool for trading card games. The App allows users to browse card sets, track owned cards, view market pricing information, and scan physical cards using AI-powered image recognition. The App does not facilitate the buying, selling, or trading of physical or digital cards.
           </Text>
 
           <Text style={[styles.heading, { color: colors.text }]}>User Accounts</Text>
@@ -105,7 +105,7 @@ export default function LegalScreen() {
 
           <Text style={[styles.heading, { color: colors.text }]}>Subscriptions & Purchases</Text>
           <Text style={[styles.body, { color: colors.textSecondary }]}>
-            CardVault offers a free tier with a limited number of cards in your collection, and a premium subscription for unlimited collection tracking. Premium subscriptions are billed monthly through Apple's App Store. Payment is charged to your Apple ID account at confirmation of purchase. Subscriptions automatically renew unless cancelled at least 24 hours before the end of the current billing period. You can manage and cancel your subscription in your Apple ID account settings.{"\n\n"}
+            TCG Binder offers a free tier with a limited number of cards in your collection, and a premium subscription for unlimited collection tracking. Premium subscriptions are billed monthly through Apple's App Store. Payment is charged to your Apple ID account at confirmation of purchase. Subscriptions automatically renew unless cancelled at least 24 hours before the end of the current billing period. You can manage and cancel your subscription in your Apple ID account settings.{"\n\n"}
             Prices are in USD and may vary by region. All purchases are subject to Apple's standard terms and conditions.
           </Text>
 
@@ -146,7 +146,7 @@ export default function LegalScreen() {
           <Text style={[styles.sectionTitle, { color: colors.text }]}>3. Trademark & IP Notices</Text>
 
           <Text style={[styles.body, { color: colors.textSecondary }]}>
-            CardVault is an unofficial, fan-made collection tracking tool. This App is not produced, endorsed, supported, or affiliated with any of the following companies or their subsidiaries.
+            TCG Binder is an unofficial, fan-made collection tracking tool. This App is not produced, endorsed, supported, or affiliated with any of the following companies or their subsidiaries.
           </Text>
 
           <Text style={[styles.heading, { color: colors.text }]}>Pokemon</Text>
@@ -194,6 +194,7 @@ export default function LegalScreen() {
           <Text style={[styles.sectionTitle, { color: colors.text }]}>5. Contact</Text>
 
           <Text style={[styles.body, { color: colors.textSecondary }]}>
+            TCG Binder is operated by Integrated Sales Solutions LLC.{"\n\n"}
             If you have any questions or concerns about this Privacy Policy, Terms of Use, or any legal matter, please contact us at:{"\n\n"}
             tcgbinderpro.com
           </Text>
