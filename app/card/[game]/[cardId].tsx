@@ -151,8 +151,18 @@ export default function CardDetailScreen() {
   if (!card) {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
-        <Ionicons name="alert-circle-outline" size={48} color={colors.textTertiary} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Card not found</Text>
+        <View style={{ paddingTop: topInset }} />
+        <Pressable style={styles.notFoundBack} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={24} color={colors.text} />
+        </Pressable>
+        <Ionicons name="search-outline" size={48} color={colors.textTertiary} />
+        <Text style={[styles.notFoundTitle, { color: colors.text }]}>Hard to Find</Text>
+        <Text style={[styles.notFoundDesc, { color: colors.textSecondary }]}>
+          This card's info is hard to come by right now. It may be a rare or newly released card that hasn't been cataloged yet.
+        </Text>
+        <Pressable style={[styles.notFoundBtn, { backgroundColor: colors.tint }]} onPress={() => router.back()}>
+          <Text style={styles.notFoundBtnText}>Go Back</Text>
+        </Pressable>
       </View>
     );
   }
@@ -382,7 +392,7 @@ export default function CardDetailScreen() {
         {!hasPrice && (
           <View style={styles.noPriceSection}>
             <Ionicons name="pricetag-outline" size={32} color={colors.textTertiary} />
-            <Text style={[styles.noPriceText, { color: colors.textTertiary }]}>Price data not available for this card</Text>
+            <Text style={[styles.noPriceText, { color: colors.textTertiary }]}>Pricing info for this card is hard to come by right now</Text>
           </View>
         )}
 
@@ -631,6 +641,41 @@ const styles = StyleSheet.create({
   noPriceText: {
     fontFamily: "DMSans_400Regular",
     fontSize: 14,
+    textAlign: "center",
+    paddingHorizontal: 40,
+  },
+  notFoundBack: {
+    position: "absolute",
+    top: 0,
+    left: 12,
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 8,
+  },
+  notFoundTitle: {
+    fontFamily: "DMSans_700Bold",
+    fontSize: 20,
+    marginTop: 8,
+  },
+  notFoundDesc: {
+    fontFamily: "DMSans_400Regular",
+    fontSize: 14,
+    textAlign: "center",
+    paddingHorizontal: 40,
+    lineHeight: 21,
+  },
+  notFoundBtn: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  notFoundBtnText: {
+    fontFamily: "DMSans_600SemiBold",
+    fontSize: 15,
+    color: "#FFFFFF",
   },
   marketplaceSection: {
     paddingHorizontal: 20,
