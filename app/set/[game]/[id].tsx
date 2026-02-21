@@ -497,28 +497,26 @@ export default function SetDetailScreen() {
         </View>
       </View>
 
-      <View style={styles.filterBar}>
-        <View style={styles.filterChips}>
-          {filterOptions.map((opt) => {
-            const isActive = filterMode === opt.key;
-            return (
-              <Pressable
-                key={opt.key}
-                style={[dynamicStyles.filterChip, isActive && dynamicStyles.filterChipActive]}
-                onPress={() => setFilterMode(opt.key)}
-              >
-                <Ionicons
-                  name={opt.icon}
-                  size={14}
-                  color={isActive ? "#FFFFFF" : colors.textSecondary}
-                />
-                <Text style={[dynamicStyles.filterChipText, isActive && dynamicStyles.filterChipTextActive]}>
-                  {opt.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterBar}>
+        {filterOptions.map((opt) => {
+          const isActive = filterMode === opt.key;
+          return (
+            <Pressable
+              key={opt.key}
+              style={[dynamicStyles.filterChip, isActive && dynamicStyles.filterChipActive]}
+              onPress={() => setFilterMode(opt.key)}
+            >
+              <Ionicons
+                name={opt.icon}
+                size={14}
+                color={isActive ? "#FFFFFF" : colors.textSecondary}
+              />
+              <Text style={[dynamicStyles.filterChipText, isActive && dynamicStyles.filterChipTextActive]}>
+                {opt.label}
+              </Text>
+            </Pressable>
+          );
+        })}
         <Pressable
           style={dynamicStyles.sortButton}
           onPress={() => setSortMode((prev) => {
@@ -543,7 +541,7 @@ export default function SetDetailScreen() {
             </Text>
           )}
         </Pressable>
-      </View>
+      </ScrollView>
 
       {filterMode !== "all" && (
         <Text style={dynamicStyles.filterCountText}>
@@ -791,13 +789,8 @@ const styles = StyleSheet.create({
   filterBar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-  },
-  filterChips: {
-    flexDirection: "row",
     gap: 8,
-    flex: 1,
+    paddingHorizontal: 20,
   },
   gridContent: {
     paddingHorizontal: 16,
