@@ -34,7 +34,7 @@ export default function SettingsScreen() {
   const { colors, toggle, isDark } = useTheme();
   const { user, isGuest, logout, deleteAccount } = useAuth();
   const { isPremium, restorePurchases } = usePurchase();
-  const { totalCards, syncCollection, syncStatus, lastSyncTime, enabledGames, toggleGame, isAtGuestLimit } = useCollection();
+  const { totalCards, syncCollection, syncStatus, lastSyncTime, enabledGames, toggleGame, isAtGuestLimit, refresh } = useCollection();
 
   const [submitting, setSubmitting] = useState(false);
   const [confirmingAction, setConfirmingAction] = useState<"logout" | "delete" | "clear_data" | null>(null);
@@ -94,7 +94,10 @@ export default function SettingsScreen() {
     } else if (action === "clear_data") {
       try {
         await clearAllLocalData();
-        await logout();
+        await refresh();
+        if (user) {
+          await logout();
+        }
       } catch {}
     }
   };
