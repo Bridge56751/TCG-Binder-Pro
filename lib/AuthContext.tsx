@@ -142,8 +142,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setIsGuest(false);
     setNeedsVerification(false);
-    await AsyncStorage.removeItem(GUEST_KEY);
-    await AsyncStorage.removeItem("cardvault_collection");
+    await AsyncStorage.multiRemove([
+      GUEST_KEY,
+      "cardvault_collection",
+      "cardvault_scan_history",
+      "cardvault_card_cache",
+      "cardvault_set_cache",
+      "cardvault_price_cache",
+      "cardvault_enabled_games",
+      "cardvault_set_order_pokemon",
+      "cardvault_set_order_yugioh",
+      "cardvault_set_order_onepiece",
+      "cardvault_set_order_mtg",
+    ]);
   }, []);
 
   const continueAsGuest = useCallback(() => {
