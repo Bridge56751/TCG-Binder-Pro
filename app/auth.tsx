@@ -236,14 +236,14 @@ export default function AuthScreen() {
     setSubmitting(true);
     try {
       await resetPassword(resetEmail.trim(), fullCode, newPassword);
-      setSuccess("Password reset! You can now sign in.");
-      setTimeout(() => {
-        setMode("login");
-        setSuccess("");
-        setCode(["", "", "", "", "", ""]);
-        setNewPassword("");
-        setResetEmail("");
-      }, 2000);
+      setCode(["", "", "", "", "", ""]);
+      setNewPassword("");
+      setResetEmail("");
+      setMode("login");
+      setEmail(resetEmail.trim());
+      setPassword("");
+      setError("");
+      setSuccess("Password reset successful! Please sign in.");
     } catch (err: any) {
       setError(parseError(err));
     }
@@ -507,6 +507,12 @@ export default function AuthScreen() {
           <View style={[styles.errorBanner, { backgroundColor: colors.error + "18" }]}>
             <Ionicons name="alert-circle" size={16} color={colors.error} />
             <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+          </View>
+        ) : null}
+        {success ? (
+          <View style={[styles.successBanner, { backgroundColor: "#22c55e18" }]}>
+            <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+            <Text style={[styles.errorText, { color: "#22c55e" }]}>{success}</Text>
           </View>
         ) : null}
 
