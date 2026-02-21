@@ -238,7 +238,7 @@ export default function ScanScreen() {
     }
   };
 
-  const selectSearchResult = (result: any) => {
+  const selectSearchResult = async (result: any) => {
     const corrected: CardIdentification = {
       game: result.game,
       name: result.name,
@@ -250,12 +250,43 @@ export default function ScanScreen() {
       rarity: result.rarity || scanResult?.rarity || "",
       language: "en",
     };
-    setScanResult(corrected);
-    setIsEditing(false);
+    const cardId = corrected.verifiedCardId || `${corrected.setId}-${corrected.cardNumber}`;
+    try {
+      await addCard(corrected.game, corrected.setId, cardId, addQuantity);
+    } catch (err: any) {
+      if (err?.message === "FREE_LIMIT" || err?.message === "GUEST_LIMIT") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        router.push("/upgrade");
+        return;
+      }
+    }
+    await addToScanHistory(corrected, true);
+    cacheCard({
+      id: cardId,
+      localId: corrected.cardNumber,
+      name: corrected.name,
+      image: result.image || null,
+      game: corrected.game,
+      setId: corrected.setId,
+      setName: corrected.setName,
+      rarity: corrected.rarity,
+      cachedAt: Date.now(),
+    });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setSearchResults([]);
     setHasSearched(false);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    showToast("Card selected!");
+    setIsEditing(false);
+
+    const qtyLabel = addQuantity > 1 ? `${addQuantity} copies of ` : "";
+    if (batchMode) {
+      setBatchCount((c) => c + addQuantity);
+      showToast(`${qtyLabel}${corrected.name} added!`);
+      resetScan();
+    } else {
+      setScanResult(null);
+      resetScan();
+      showToast(`${qtyLabel}${corrected.name} added to collection!`);
+    }
   };
 
   const dynamicStyles = getDynamicStyles(colors);
