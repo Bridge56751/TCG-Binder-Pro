@@ -80,6 +80,7 @@ export default function CardDetailScreen() {
   const gameInfo = GAMES.find((g) => g.id === gameId);
 
   const [justAdded, setJustAdded] = useState(false);
+  const [limitReached, setLimitReached] = useState(false);
   const flipAnim = useSharedValue(90);
   const addScale = useSharedValue(1);
   const glowOpacity = useSharedValue(0);
@@ -261,7 +262,7 @@ export default function CardDetailScreen() {
             })()}
           </View>
 
-          {!isInCollection && (
+          {!isInCollection && !limitReached && (
             <Pressable
               style={[styles.addBinderBtn, { backgroundColor: colors.tint }]}
               onPress={async () => {
@@ -280,20 +281,36 @@ export default function CardDetailScreen() {
                   badgeScale.value = withDelay(100, withSpring(1, { damping: 6, stiffness: 300 }));
                 } catch (err: any) {
                   if (err?.message === "FREE_LIMIT" || err?.message === "GUEST_LIMIT") {
-                    Alert.alert(
-                      "Card Limit Reached",
-                      "You've reached the 20-card free limit. Upgrade to Premium ($2.99/mo) for unlimited cards.",
-                      [
-                        { text: "OK", style: "cancel" },
-                        { text: "Upgrade", onPress: () => router.push("/upgrade") },
-                      ]
-                    );
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                    setLimitReached(true);
                   }
                 }
               }}
             >
               <Ionicons name="add-circle" size={20} color="#FFFFFF" />
               <Text style={styles.addBinderBtnText}>Add to Binder</Text>
+            </Pressable>
+          )}
+
+          {limitReached && !isInCollection && (
+            <View style={[styles.limitCard, { backgroundColor: colors.error + "12", borderColor: colors.error + "30" }]}>
+              <Ionicons name="lock-closed" size={20} color={colors.error} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.limitTitle, { color: colors.text }]}>Card Limit Reached</Text>
+                <Text style={[styles.limitDesc, { color: colors.textSecondary }]}>
+                  You've used all 20 free cards. Upgrade to Premium for unlimited cards.
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {limitReached && !isInCollection && (
+            <Pressable
+              style={[styles.addBinderBtn, { backgroundColor: colors.tint }]}
+              onPress={() => router.push("/upgrade")}
+            >
+              <Ionicons name="star" size={20} color="#FFFFFF" />
+              <Text style={styles.addBinderBtnText}>Upgrade to Premium — $2.99/mo</Text>
             </Pressable>
           )}
 
@@ -497,6 +514,24 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_700Bold",
     fontSize: 15,
     color: "#FFFFFF",
+  },
+  limitCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  limitTitle: {
+    fontFamily: "DMSans_600SemiBold",
+    fontSize: 15,
+  },
+  limitDesc: {
+    fontFamily: "DMSans_400Regular",
+    fontSize: 13,
+    marginTop: 2,
   },
   artistRow: {
     flexDirection: "row",
