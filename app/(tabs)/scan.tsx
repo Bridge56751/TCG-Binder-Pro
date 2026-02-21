@@ -115,7 +115,7 @@ export default function ScanScreen() {
     setIsScanning(true);
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000);
+      const timeout = setTimeout(() => controller.abort(), 20000);
       const res = await apiRequest("POST", "/api/identify-card", { image: base64 }, controller.signal);
       clearTimeout(timeout);
       const data: CardIdentification = await res.json();
