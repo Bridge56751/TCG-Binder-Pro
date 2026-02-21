@@ -271,7 +271,8 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     } else if (!user && prevUserRef.current) {
       prevUserRef.current = null;
       queryClient.clear();
-      loadCollection();
+      setCollection({});
+      setTimeout(() => loadCollection(), 500);
     } else {
       loadCollection();
     }
