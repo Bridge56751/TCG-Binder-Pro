@@ -339,9 +339,10 @@ export default function SetDetailScreen() {
         progressSection: {
           marginHorizontal: 20,
           backgroundColor: colors.surface,
-          borderRadius: 14,
-          padding: 16,
-          gap: 10,
+          borderRadius: 12,
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          gap: 8,
           borderWidth: 1,
           borderColor: colors.cardBorder,
         },
@@ -440,53 +441,10 @@ export default function SetDetailScreen() {
             {activeData?.name || id}
           </Text>
           <Text style={dynamicStyles.setMeta}>
-            {id} - {gameInfo?.name}
+            {id} · {gameInfo?.name}
           </Text>
         </View>
-        <Pressable
-          style={dynamicStyles.scanButton}
-          onPress={() => router.push("/(tabs)/scan")}
-        >
-          <Ionicons name="scan" size={18} color="#FFFFFF" />
-        </Pressable>
-      </View>
-
-      {isOffline && (
-        <View style={{ backgroundColor: "#F59E0B", paddingVertical: 6, paddingHorizontal: 14, borderRadius: 8, marginHorizontal: 16, marginBottom: 8, alignItems: "center" }}>
-          <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 12, color: "#FFFFFF" }}>Offline Mode - Showing cached data</Text>
-        </View>
-      )}
-
-      <View style={dynamicStyles.progressSection}>
-        <View style={styles.progressInfo}>
-          <Text style={dynamicStyles.progressLabel}>Collection Progress</Text>
-          <Text style={dynamicStyles.progressValue}>
-            {collectedCount}/{totalCards}
-          </Text>
-        </View>
-        <View style={dynamicStyles.progressBarBg}>
-          <View
-            style={[
-              styles.progressBarFill,
-              {
-                width: `${Math.min(progress * 100, 100)}%`,
-                backgroundColor:
-                  progress >= 1 ? colors.success : gameInfo?.color || colors.tint,
-              },
-            ]}
-          />
-        </View>
-        <Text style={dynamicStyles.progressPercent}>
-          {Math.round(progress * 100)}% Complete
-        </Text>
-      </View>
-
-      <View style={styles.binderHeader}>
-        <View style={{ flex: 1 }}>
-          <Text style={dynamicStyles.binderTitle}>Binder View</Text>
-          <Text style={dynamicStyles.binderSubtitle}>Scan cards to fill in your collection</Text>
-        </View>
-        <View style={styles.binderActions}>
+        <View style={{ flexDirection: "row", gap: 8 }}>
           <Pressable
             style={[styles.actionBtn, { backgroundColor: colors.tint + "15" }]}
             onPress={() => { setQuickAddSearch(""); setQuickAddVisible(true); }}
@@ -501,6 +459,41 @@ export default function SetDetailScreen() {
               <Ionicons name="trash-outline" size={18} color={trashMode ? "#FFFFFF" : colors.error} />
             </Pressable>
           )}
+          <Pressable
+            style={dynamicStyles.scanButton}
+            onPress={() => router.push("/(tabs)/scan")}
+          >
+            <Ionicons name="scan" size={18} color="#FFFFFF" />
+          </Pressable>
+        </View>
+      </View>
+
+      {isOffline && (
+        <View style={{ backgroundColor: "#F59E0B", paddingVertical: 6, paddingHorizontal: 14, borderRadius: 8, marginHorizontal: 16, marginBottom: 8, alignItems: "center" }}>
+          <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 12, color: "#FFFFFF" }}>Offline Mode - Showing cached data</Text>
+        </View>
+      )}
+
+      <View style={dynamicStyles.progressSection}>
+        <View style={styles.progressInfo}>
+          <Text style={dynamicStyles.progressLabel}>
+            {collectedCount}/{totalCards} collected
+          </Text>
+          <Text style={dynamicStyles.progressPercent}>
+            {Math.round(progress * 100)}%
+          </Text>
+        </View>
+        <View style={dynamicStyles.progressBarBg}>
+          <View
+            style={[
+              styles.progressBarFill,
+              {
+                width: `${Math.min(progress * 100, 100)}%`,
+                backgroundColor:
+                  progress >= 1 ? colors.success : gameInfo?.color || colors.tint,
+              },
+            ]}
+          />
         </View>
       </View>
 
@@ -749,13 +742,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   headerSection: {
-    paddingBottom: 16,
+    paddingBottom: 12,
+    gap: 12,
   },
   topBar: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 12,
-    paddingBottom: 16,
+    paddingBottom: 4,
     gap: 8,
   },
   backButton: {
@@ -782,7 +776,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    marginTop: 16,
   },
   binderActions: {
     flexDirection: "row",
@@ -800,7 +793,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    marginTop: 12,
   },
   filterChips: {
     flexDirection: "row",
