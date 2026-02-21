@@ -28,6 +28,8 @@ function countCollectionCards(collection: any): number {
 }
 
 const setsCache: Record<string, any[]> = {};
+const setCardsCache = new Map<string, { data: any; ts: number }>();
+const SET_CARDS_CACHE_TTL = 60 * 60 * 1000;
 const pokemonReleaseDateCache: Record<string, string | null> = {};
 let pokemonReleaseDatesFetched = false;
 
@@ -1740,6 +1742,11 @@ Return ONLY valid JSON with your corrected identification:
     try {
       const { id } = req.params;
       const lang = req.query.lang === "ja" ? "ja" : "en";
+      const cacheKey = `pokemon:${id}:${lang}`;
+      const cached = setCardsCache.get(cacheKey);
+      if (cached && Date.now() - cached.ts < SET_CARDS_CACHE_TTL) {
+        return res.json(cached.data);
+      }
       const response = await fetch(`https://api.tcgdex.net/v2/${lang}/sets/${id}`);
       const setData = await response.json();
 
@@ -1800,12 +1807,14 @@ Return ONLY valid JSON with your corrected identification:
         return a.localId.localeCompare(b.localId, undefined, { numeric: true });
       });
 
-      res.json({
+      const result = {
         id: setData.id,
         name: setData.name,
         totalCards: setData.cardCount?.total || cards.length,
         cards,
-      });
+      };
+      setCardsCache.set(cacheKey, { data: result, ts: Date.now() });
+      res.json(result);
     } catch (error) {
       console.error("Error fetching Pokemon set cards:", error);
       res.status(500).json({ error: "Failed to fetch set cards" });
@@ -1846,6 +1855,11 @@ Return ONLY valid JSON with your corrected identification:
   app.get("/api/tcg/yugioh/sets/:id/cards", async (req, res) => {
     try {
       const { id } = req.params;
+      const cacheKey = `yugioh:${id}`;
+      const cached = setCardsCache.get(cacheKey);
+      if (cached && Date.now() - cached.ts < SET_CARDS_CACHE_TTL) {
+        return res.json(cached.data);
+      }
 
       const allSets = await fetchSetsForGame("yugioh");
       const setMeta = (allSets as any[]).find((s: any) => s.set_code === id);
@@ -1877,12 +1891,14 @@ Return ONLY valid JSON with your corrected identification:
         return a.localId.localeCompare(b.localId, undefined, { numeric: true });
       });
 
-      res.json({
+      const result = {
         id,
         name: setName,
         totalCards: cards.length,
         cards,
-      });
+      };
+      setCardsCache.set(cacheKey, { data: result, ts: Date.now() });
+      res.json(result);
     } catch (error) {
       console.error("Error fetching Yu-Gi-Oh! set cards:", error);
       res.status(500).json({ error: "Failed to fetch set cards" });
@@ -1936,6 +1952,11 @@ Return ONLY valid JSON with your corrected identification:
   app.get("/api/tcg/onepiece/sets/:id/cards", async (req, res) => {
     try {
       const { id } = req.params;
+      const cacheKey = `onepiece:${id}`;
+      const cached = setCardsCache.get(cacheKey);
+      if (cached && Date.now() - cached.ts < SET_CARDS_CACHE_TTL) {
+        return res.json(cached.data);
+      }
 
       const isStarterDeck = id.startsWith("ST-");
 
@@ -1976,12 +1997,14 @@ Return ONLY valid JSON with your corrected identification:
 
       const setName = data[0]?.set_name || id;
 
-      res.json({
+      const result = {
         id,
         name: setName,
         totalCards: cards.length,
         cards,
-      });
+      };
+      setCardsCache.set(cacheKey, { data: result, ts: Date.now() });
+      res.json(result);
     } catch (error) {
       console.error("Error fetching One Piece set cards:", error);
       res.status(500).json({ error: "Failed to fetch set cards" });
@@ -2016,6 +2039,11 @@ Return ONLY valid JSON with your corrected identification:
   app.get("/api/tcg/mtg/sets/:id/cards", async (req, res) => {
     try {
       const { id } = req.params;
+      const cacheKey = `mtg:${id}`;
+      const cached = setCardsCache.get(cacheKey);
+      if (cached && Date.now() - cached.ts < SET_CARDS_CACHE_TTL) {
+        return res.json(cached.data);
+      }
       const allCards: any[] = [];
       let url: string | null = `https://api.scryfall.com/cards/search?order=set&q=set:${encodeURIComponent(id)}&unique=prints`;
 
@@ -2055,12 +2083,14 @@ Return ONLY valid JSON with your corrected identification:
 
       const setName = allCards[0]?.set_name || id;
 
-      res.json({
+      const result = {
         id,
         name: setName,
         totalCards: cards.length,
         cards,
-      });
+      };
+      setCardsCache.set(cacheKey, { data: result, ts: Date.now() });
+      res.json(result);
     } catch (error) {
       console.error("Error fetching MTG set cards:", error);
       res.status(500).json({ error: "Failed to fetch set cards" });
