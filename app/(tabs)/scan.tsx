@@ -114,7 +114,10 @@ export default function ScanScreen() {
   const identifyCard = async (base64: string) => {
     setIsScanning(true);
     try {
-      const res = await apiRequest("POST", "/api/identify-card", { image: base64 });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      const res = await apiRequest("POST", "/api/identify-card", { image: base64 }, controller.signal);
+      clearTimeout(timeout);
       const data: CardIdentification = await res.json();
       if (data.error) {
         Alert.alert("Could not identify", data.error);
@@ -123,8 +126,17 @@ export default function ScanScreen() {
         setScanResult(data);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-    } catch (error) {
-      Alert.alert("Error", "Failed to identify the card. Please try again.");
+    } catch (error: any) {
+      if (error?.name === "AbortError") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        Alert.alert(
+          "Taking too long",
+          "The scan is taking longer than expected. Try taking a clearer photo with good lighting.",
+          [{ text: "Retake Photo", onPress: resetScan }]
+        );
+      } else {
+        Alert.alert("Error", "Failed to identify the card. Please try again.");
+      }
     } finally {
       setIsScanning(false);
     }
