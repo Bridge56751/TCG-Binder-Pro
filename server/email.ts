@@ -1,6 +1,6 @@
 import { Resend } from 'resend';
 
-const FROM_EMAIL = 'TCG Binder <noreply@tcgbinderpro.com>';
+const FROM_EMAIL = 'TCG Binder <onboarding@resend.dev>';
 
 function getResendClient() {
   const apiKey = process.env.RESEND_API_KEY;
