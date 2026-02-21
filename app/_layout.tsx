@@ -13,7 +13,6 @@ import { PurchaseProvider } from "@/lib/PurchaseContext";
 import { ThemeProvider, useTheme } from "@/lib/ThemeContext";
 import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold } from "@expo-google-fonts/dm-sans";
 import { StatusBar } from "expo-status-bar";
-import { CollectionProgressToast } from "@/components/CollectionProgressToast";
 import { GalleryProvider } from "@/lib/GalleryContext";
 
 SplashScreen.preventAutoHideAsync();
@@ -106,7 +105,6 @@ function RootLayoutNav() {
           }}
         />
       </Stack>
-      <CollectionProgressToast />
     </>
   );
 }
