@@ -591,8 +591,7 @@ export default function SetDetailScreen() {
                     toggleCardSelection(item.id);
                     return;
                   }
-                  const allSetCards = activeData?.cards || [];
-                  const galleryList = allSetCards.map((c) => ({
+                  const galleryList = filteredAndSortedCards.map((c) => ({
                     id: c.id,
                     name: c.englishName || c.name,
                     image: c.image,
