@@ -32,6 +32,7 @@ import * as Haptics from "expo-haptics";
 import { useTheme } from "@/lib/ThemeContext";
 import { useCollection } from "@/lib/CollectionContext";
 import { useGallery } from "@/lib/GalleryContext";
+import { CardGallery } from "@/components/CardGallery";
 import type { CardDetail, GameId } from "@/lib/types";
 import { GAMES } from "@/lib/types";
 
@@ -75,7 +76,10 @@ export default function CardDetailScreen() {
   const { game, cardId, lang } = useLocalSearchParams<{ game: string; cardId: string; lang?: string }>();
   const gameId = game as GameId;
   const { hasCard, removeCard, addCard, cardQuantity } = useCollection();
-  const { openGallery, galleryCardsRef } = useGallery();
+  const { galleryCardsRef } = useGallery();
+  const [galleryVisible, setGalleryVisible] = useState(false);
+  const [galleryCards, setLocalGalleryCards] = useState<any[]>([]);
+  const [galleryStartIndex, setGalleryStartIndex] = useState(0);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
 
@@ -218,7 +222,9 @@ export default function CardDetailScreen() {
               galleryCardsList = [{ id: cardId || "", name: card.name, image: card.image, localId: card.localId, setName: card.setName }];
             }
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            openGallery(galleryCardsList, startIdx, gameId);
+            setLocalGalleryCards(galleryCardsList);
+            setGalleryStartIndex(startIdx);
+            setGalleryVisible(true);
           }}
         >
           <Animated.View style={flipStyle}>
@@ -438,6 +444,12 @@ export default function CardDetailScreen() {
           </View>
         </View>
       </ScrollView>
+      <CardGallery
+        visible={galleryVisible}
+        cards={galleryCards}
+        initialIndex={galleryStartIndex}
+        onClose={(lastIndex) => setGalleryVisible(false)}
+      />
     </View>
   );
 }

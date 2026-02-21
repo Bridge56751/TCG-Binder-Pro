@@ -1,7 +1,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect, useCallback } from "react";
+import React, { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -14,8 +14,7 @@ import { ThemeProvider, useTheme } from "@/lib/ThemeContext";
 import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold } from "@expo-google-fonts/dm-sans";
 import { StatusBar } from "expo-status-bar";
 import { CollectionProgressToast } from "@/components/CollectionProgressToast";
-import { GalleryProvider, useGallery } from "@/lib/GalleryContext";
-import { CardGallery } from "@/components/CardGallery";
+import { GalleryProvider } from "@/lib/GalleryContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -45,30 +44,6 @@ function useProtectedRoute() {
   }, [user, isGuest, loading, needsVerification, segments]);
 }
 
-function GalleryOverlay() {
-  const { gallery, closeGallery, gameIdRef } = useGallery();
-  const handleClose = useCallback((lastIndex: number) => {
-    const lastCard = gallery.cards[lastIndex];
-    closeGallery(lastIndex);
-    if (lastCard) {
-      const game = gameIdRef.current;
-      if (game && lastCard.id) {
-        setTimeout(() => {
-          router.replace(`/card/${game}/${lastCard.id}`);
-        }, 100);
-      }
-    }
-  }, [gallery.cards, closeGallery, gameIdRef]);
-
-  return (
-    <CardGallery
-      visible={gallery.visible}
-      cards={gallery.cards}
-      initialIndex={gallery.initialIndex}
-      onClose={handleClose}
-    />
-  );
-}
 
 function RootLayoutNav() {
   const { loading } = useAuth();
@@ -132,7 +107,6 @@ function RootLayoutNav() {
           }}
         />
       </Stack>
-      <GalleryOverlay />
     </>
   );
 }
