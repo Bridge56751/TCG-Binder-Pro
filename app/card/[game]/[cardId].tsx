@@ -448,7 +448,13 @@ export default function CardDetailScreen() {
         visible={galleryVisible}
         cards={galleryCards}
         initialIndex={galleryStartIndex}
-        onClose={(lastIndex) => setGalleryVisible(false)}
+        onClose={(lastIndex) => {
+          setGalleryVisible(false);
+          const lastCard = galleryCards[lastIndex];
+          if (lastCard && lastCard.id !== cardId) {
+            router.replace(`/card/${game}/${lastCard.id}`);
+          }
+        }}
       />
     </View>
   );
