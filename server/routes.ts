@@ -2334,6 +2334,96 @@ Return ONLY valid JSON with your corrected identification:
     }
   });
 
+  // ───── COLLECTION CARD METADATA (batch) ─────
+
+  const cardMetaCache = new Map<string, { name: string; image: string | null; setName: string; rarity: string | null; game: string; ts: number }>();
+  const CARD_META_CACHE_TTL = 60 * 60 * 1000;
+
+  app.post("/api/collection/cards-meta", async (req, res) => {
+    try {
+      const { cards } = req.body;
+      if (!Array.isArray(cards) || cards.length === 0) {
+        return res.status(400).json({ error: "Cards array is required" });
+      }
+
+      const limited = cards.slice(0, 200);
+      const results: { cardId: string; game: string; name: string; image: string | null; setName: string; rarity: string | null }[] = [];
+
+      async function fetchMeta(card: { game: string; cardId: string }) {
+        const cacheKey = `${card.game}:${card.cardId}`;
+        const cached = cardMetaCache.get(cacheKey);
+        if (cached && Date.now() - cached.ts < CARD_META_CACHE_TTL) {
+          return { cardId: card.cardId, game: card.game, name: cached.name, image: cached.image, setName: cached.setName, rarity: cached.rarity };
+        }
+
+        let name = card.cardId;
+        let image: string | null = null;
+        let setName = "";
+        let rarity: string | null = null;
+
+        try {
+          if (card.game === "pokemon") {
+            const r = await fetch(`https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(card.cardId)}`);
+            if (r.ok) {
+              const c = await r.json();
+              name = c.name || card.cardId;
+              image = c.image ? `${c.image}/high.png` : null;
+              setName = c.set?.name || "";
+              rarity = c.rarity || null;
+            }
+          } else if (card.game === "yugioh") {
+            const parts = card.cardId.split("-");
+            const ygId = parts.length > 1 ? parts[1] : card.cardId;
+            const r = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?id=${encodeURIComponent(ygId)}`);
+            if (r.ok) {
+              const data = await r.json();
+              const c = data.data?.[0];
+              if (c) {
+                name = c.name || card.cardId;
+                image = c.card_images?.[0]?.image_url || null;
+                rarity = c.card_sets?.[0]?.set_rarity_code || null;
+                setName = c.card_sets?.[0]?.set_name || "";
+              }
+            }
+          } else if (card.game === "onepiece") {
+            const r = await fetch(`https://apitcg.com/api/one-piece/cards/${encodeURIComponent(card.cardId)}`);
+            if (r.ok) {
+              const c = await r.json();
+              name = c.name || card.cardId;
+              image = c.image || null;
+              rarity = c.rarity || null;
+              setName = c.set?.name || "";
+            }
+          } else if (card.game === "mtg") {
+            const r = await fetch(`https://api.scryfall.com/cards/${encodeURIComponent(card.cardId)}`);
+            if (r.ok) {
+              const c = await r.json();
+              name = c.name || card.cardId;
+              image = c.image_uris?.normal || c.image_uris?.small || (c.card_faces?.[0]?.image_uris?.normal) || null;
+              rarity = c.rarity || null;
+              setName = c.set_name || "";
+            }
+          }
+        } catch {}
+
+        cardMetaCache.set(cacheKey, { name, image, setName, rarity, game: card.game, ts: Date.now() });
+        return { cardId: card.cardId, game: card.game, name, image, setName, rarity };
+      }
+
+      const CONCURRENCY = 8;
+      for (let i = 0; i < limited.length; i += CONCURRENCY) {
+        const batch = limited.slice(i, i + CONCURRENCY);
+        const batchResults = await Promise.all(batch.map(fetchMeta));
+        results.push(...batchResults);
+      }
+
+      res.json({ cards: results });
+    } catch (error) {
+      console.error("Error fetching card metadata:", error);
+      res.status(500).json({ error: "Failed to fetch card metadata" });
+    }
+  });
+
   // ───── COLLECTION VALUE ─────
 
   const priceCache = new Map<string, { name: string; price: number | null; ts: number }>();
