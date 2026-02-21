@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { View, Text, StyleSheet, Platform, Modal } from "react-native";
+import { View, Text, StyleSheet, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, {
@@ -151,23 +151,16 @@ export function CollectionProgressToast() {
   if (!modalVisible || !visibleData) return null;
 
   return (
-    <Modal visible transparent animationType="none" statusBarTranslucent>
-      <View style={styles.modalOverlay} pointerEvents="box-none">
-        <Animated.View
-          style={[styles.container, { top: topInset + 4 }, animatedStyle]}
-          {...panResponder.panHandlers}
-        >
-          <ProgressContent data={visibleData} />
-        </Animated.View>
-      </View>
-    </Modal>
+    <Animated.View
+      style={[styles.container, { top: topInset + 4 }, animatedStyle]}
+      {...panResponder.panHandlers}
+    >
+      <ProgressContent data={visibleData} />
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-  },
   container: {
     position: "absolute",
     left: 16,

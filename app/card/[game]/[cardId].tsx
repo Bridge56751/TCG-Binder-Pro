@@ -35,6 +35,7 @@ import { useGallery } from "@/lib/GalleryContext";
 import { CardGallery } from "@/components/CardGallery";
 import type { CardDetail, GameId } from "@/lib/types";
 import { GAMES } from "@/lib/types";
+import { CollectionProgressToast } from "@/components/CollectionProgressToast";
 
 const screenWidth = Dimensions.get("window").width;
 
@@ -450,6 +451,7 @@ export default function CardDetailScreen() {
           }
         }}
       />
+      <CollectionProgressToast />
     </View>
   );
 }
