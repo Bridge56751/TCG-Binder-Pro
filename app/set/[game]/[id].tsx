@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useLocalSearchParams, router } from "expo-router";
+import { useLocalSearchParams, router, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { CardCell } from "@/components/CardCell";
@@ -53,12 +53,24 @@ export default function SetDetailScreen() {
   const [isOffline, setIsOffline] = useState(false);
   const pricesFetched = React.useRef(false);
   const isAddingRef = useRef(false);
+  const flatListRef = useRef<FlatList>(null);
+  const scrollOffsetRef = useRef(0);
 
   const queryPath = `/api/tcg/${game}/sets/${id}/cards`;
 
   const { data: setDetail, isLoading, isError } = useQuery<SetDetail>({
     queryKey: [queryPath],
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      if (scrollOffsetRef.current > 0) {
+        requestAnimationFrame(() => {
+          flatListRef.current?.scrollToOffset({ offset: scrollOffsetRef.current, animated: false });
+        });
+      }
+    }, [])
+  );
 
   useEffect(() => {
     if (setDetail?.cards && game) {
@@ -565,10 +577,13 @@ export default function SetDetailScreen() {
   return (
     <View style={dynamicStyles.container}>
       <FlatList
+        ref={flatListRef}
         data={filteredAndSortedCards}
         keyExtractor={(item) => item.id}
         numColumns={NUM_COLUMNS}
         ListHeaderComponent={renderHeader}
+        onScroll={(e) => { scrollOffsetRef.current = e.nativeEvent.contentOffset.y; }}
+        scrollEventThrottle={16}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.tint} colors={[colors.tint]} />}
         renderItem={({ item }) => {
           const qty = setCollectionMap[item.id] || 0;
