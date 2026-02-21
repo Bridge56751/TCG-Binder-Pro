@@ -55,10 +55,10 @@ export default function AuthScreen() {
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
 
   useEffect(() => {
-    if (!canDismiss && (isGuest || user)) {
+    if (!canDismiss && (isGuest || (user && !needsVerification))) {
       router.replace("/(tabs)");
     }
-  }, [isGuest, user, canDismiss]);
+  }, [isGuest, user, canDismiss, needsVerification]);
 
   useEffect(() => {
     if (needsVerification && user && mode !== "verify") {
@@ -326,9 +326,6 @@ export default function AuthScreen() {
             </Text>
           </Pressable>
 
-          <Pressable style={[styles.skipLink, { marginTop: 12 }]} onPress={clearVerification}>
-            <Text style={[styles.switchText, { color: colors.textTertiary, fontSize: 13 }]}>Skip for now</Text>
-          </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
     );

@@ -23,7 +23,7 @@ function ThemedStatusBar() {
 }
 
 function useProtectedRoute() {
-  const { user, isGuest, loading } = useAuth();
+  const { user, isGuest, loading, needsVerification } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -35,10 +35,12 @@ function useProtectedRoute() {
 
     if (!user && !isGuest && !inAuthScreen && !inUpgradeScreen) {
       router.replace("/auth");
-    } else if (user && inAuthScreen) {
+    } else if (user && needsVerification && !inAuthScreen) {
+      router.replace("/auth");
+    } else if (user && !needsVerification && inAuthScreen) {
       router.replace("/(tabs)");
     }
-  }, [user, isGuest, loading, segments]);
+  }, [user, isGuest, loading, needsVerification, segments]);
 }
 
 function RootLayoutNav() {

@@ -567,6 +567,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Invalid email or password" });
       }
       req.session.userId = user.id;
+      if (!user.isVerified) {
+        const code = generateCode();
+        const expiry = new Date(Date.now() + 10 * 60 * 1000);
+        await storage.setVerificationCode(user.id, code, expiry);
+        sendVerificationEmail(user.email, code).catch(e => console.error("Verification email failed:", e));
+      }
       res.json({ id: user.id, email: user.email, isPremium: user.isPremium, isVerified: user.isVerified });
     } catch (error) {
       console.error("Login error:", error);
