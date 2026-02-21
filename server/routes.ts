@@ -1614,6 +1614,7 @@ Return ONLY valid JSON with your corrected identification:
       const response = await fetch(`https://api.tcgdex.net/v2/${lang}/sets`);
       const sets = await response.json();
       const seen = new Set<string>();
+      const phantomSets = new Set(["wp", "jumbo"]);
       const formatted = sets
         .map((s: any) => ({
           id: s.id,
@@ -1626,6 +1627,7 @@ Return ONLY valid JSON with your corrected identification:
         }))
         .filter((s: any) => {
           if (seen.has(s.id)) return false;
+          if (phantomSets.has(s.id)) return false;
           seen.add(s.id);
           return true;
         });
