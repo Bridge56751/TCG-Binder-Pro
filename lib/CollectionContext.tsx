@@ -14,7 +14,7 @@ import {
   getCardQuantity,
 } from "./collection-storage";
 import { getCachedSets, type CachedSet } from "./card-cache";
-import { apiRequest, getApiUrl } from "./query-client";
+import { apiRequest, getApiUrl, queryClient } from "./query-client";
 import { useAuth } from "./AuthContext";
 import { usePurchase } from "./PurchaseContext";
 import { fetch } from "expo/fetch";
@@ -238,6 +238,7 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
       mergeAndSyncAfterLogin();
     } else if (!user && prevUserRef.current) {
       prevUserRef.current = null;
+      queryClient.clear();
       loadCollection();
     } else {
       loadCollection();

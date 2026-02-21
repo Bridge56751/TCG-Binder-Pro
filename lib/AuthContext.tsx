@@ -144,6 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsGuest(false);
     setNeedsVerification(false);
     await AsyncStorage.removeItem(GUEST_KEY);
+    await AsyncStorage.removeItem("cardvault_collection");
   }, []);
 
   const continueAsGuest = useCallback(() => {
