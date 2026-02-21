@@ -88,7 +88,7 @@ export default function ScanScreen() {
     }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ["images"],
-      quality: 1.0,
+      quality: 0.7,
       base64: true,
     });
     if (!result.canceled && result.assets[0]) {
@@ -101,7 +101,7 @@ export default function ScanScreen() {
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
-      quality: 1.0,
+      quality: 0.7,
       base64: true,
     });
     if (!result.canceled && result.assets[0]) {
