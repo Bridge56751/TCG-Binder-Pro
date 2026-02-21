@@ -451,7 +451,7 @@ export default function CardDetailScreen() {
           }
         }}
       />
-      <CollectionProgressToast />
+      <CollectionProgressToast topOffset={12} />
     </View>
   );
 }

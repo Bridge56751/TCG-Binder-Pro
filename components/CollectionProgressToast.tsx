@@ -96,10 +96,10 @@ function ProgressContent({ data }: { data: ProgressToastData }) {
   );
 }
 
-export function CollectionProgressToast() {
+export function CollectionProgressToast({ topOffset }: { topOffset?: number } = {}) {
   const { progressToast, clearProgressToast } = useCollection();
   const insets = useSafeAreaInsets();
-  const topInset = Platform.OS === "web" ? 67 : insets.top;
+  const topInset = topOffset !== undefined ? topOffset : (Platform.OS === "web" ? 67 : insets.top);
   const [visibleData, setVisibleData] = React.useState<ProgressToastData | null>(null);
   const [modalVisible, setModalVisible] = React.useState(false);
 
@@ -109,15 +109,16 @@ export function CollectionProgressToast() {
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dy) > 5;
+        return Math.abs(gestureState.dy) > 2;
       },
+      onPanResponderGrant: () => {},
       onPanResponderMove: (_, gestureState) => {
         if (gestureState.dy < 0) {
           translateY.value = gestureState.dy;
         }
       },
       onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy < -30 || gestureState.vy < -0.5) {
+        if (gestureState.dy < -20 || gestureState.vy < -0.3) {
           translateY.value = withTiming(-200, { duration: 200 }, () => {
             runOnJS(clearProgressToast)();
           });
