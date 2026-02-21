@@ -12,7 +12,9 @@ import Animated, {
   Easing,
   SlideInUp,
   SlideOutUp,
+  runOnJS,
 } from "react-native-reanimated";
+import { PanResponder } from "react-native";
 import { useTheme } from "@/lib/ThemeContext";
 import { useCollection, type ProgressToastData } from "@/lib/CollectionContext";
 import type { GameId } from "@/lib/types";
@@ -97,9 +99,44 @@ function ProgressContent({ data }: { data: ProgressToastData }) {
 }
 
 export function CollectionProgressToast() {
-  const { progressToast } = useCollection();
+  const { progressToast, clearProgressToast } = useCollection();
   const insets = useSafeAreaInsets();
   const topInset = Platform.OS === "web" ? 67 : insets.top;
+
+  const translateY = useSharedValue(0);
+
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dy) > 5;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy < 0) {
+          translateY.value = gestureState.dy;
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy < -30 || gestureState.vy < -0.5) {
+          translateY.value = withTiming(-200, { duration: 200 }, () => {
+            runOnJS(clearProgressToast)();
+          });
+        } else {
+          translateY.value = withSpring(0, { damping: 15, stiffness: 150 });
+        }
+      },
+    })
+  ).current;
+
+  useEffect(() => {
+    if (progressToast) {
+      translateY.value = 0;
+    }
+  }, [progressToast]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
 
   if (!progressToast) return null;
 
@@ -107,8 +144,8 @@ export function CollectionProgressToast() {
     <Animated.View
       entering={SlideInUp.duration(350).springify()}
       exiting={SlideOutUp.duration(250)}
-      style={[styles.container, { top: topInset + 4 }]}
-      pointerEvents="none"
+      style={[styles.container, { top: topInset + 4 }, animatedStyle]}
+      {...panResponder.panHandlers}
     >
       <ProgressContent data={progressToast} />
     </Animated.View>
