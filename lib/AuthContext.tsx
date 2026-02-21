@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { apiRequest, getApiUrl } from "./query-client";
-import { fetch } from "expo/fetch";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const GUEST_KEY = "cardvault_guest_mode";
@@ -44,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const baseUrl = getApiUrl();
         const url = new URL("/api/auth/me", baseUrl);
-        const res = await fetch(url.toString(), { credentials: "include" });
+        const res = await globalThis.fetch(url.toString(), { credentials: "include" });
         if (res.ok) {
           const data = await res.json();
           setUser({ id: data.id, email: data.email, isPremium: data.isPremium ?? false, isVerified: data.isVerified ?? false });

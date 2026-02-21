@@ -17,7 +17,6 @@ import { getCachedSets, type CachedSet } from "./card-cache";
 import { apiRequest, getApiUrl, queryClient } from "./query-client";
 import { useAuth } from "./AuthContext";
 import { usePremiumStatus } from "./PremiumContext";
-import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const ENABLED_GAMES_KEY = "cardvault_enabled_games";
@@ -88,12 +87,14 @@ const MAX_SYNC_RETRIES = 3;
 const SYNC_RETRY_DELAY = 2000;
 
 export function CollectionProvider({ children }: { children: ReactNode }) {
+  "use no memo";
   const [collection, setCollection] = useState<CollectionData>({});
   const [loading, setLoading] = useState(true);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
   const { user, isGuest } = useAuth();
   const purchaseIsPremium = usePremiumStatus();
+  const isPremium = purchaseIsPremium || (user?.isPremium ?? false);
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevUserRef = useRef<string | null>(null);
   const syncRetryRef = useRef(0);
@@ -186,7 +187,7 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     try {
       const baseUrl = getApiUrl();
       const url = new URL("/api/collection/sync", baseUrl);
-      const res = await fetch(url.toString(), { credentials: "include" });
+      const res = await globalThis.fetch(url.toString(), { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         if (data.collection && Object.keys(data.collection).length > 0) {
@@ -213,7 +214,7 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     try {
       const baseUrl = getApiUrl();
       const url = new URL("/api/collection/sync", baseUrl);
-      const res = await fetch(url.toString(), { credentials: "include" });
+      const res = await globalThis.fetch(url.toString(), { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         const cloudData = data.collection || {};
@@ -293,8 +294,6 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     if (progressToastTimer.current) clearTimeout(progressToastTimer.current);
     setProgressToast(null);
   }, []);
-
-  const isPremium = purchaseIsPremium || (user?.isPremium ?? false);
 
   const addCard = useCallback(async (game: GameId, setId: string, cardId: string, quantity: number = 1) => {
     if (!isPremium) {

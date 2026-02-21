@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { Platform, Alert } from "react-native";
-import Purchases, { type CustomerInfo, type PurchasesPackage } from "react-native-purchases";
 import { useAuth } from "./AuthContext";
 import { apiRequest } from "./query-client";
 import { router } from "expo-router";
@@ -9,10 +8,17 @@ import { PremiumContext } from "./PremiumContext";
 const REVENUECAT_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY || "";
 const ENTITLEMENT_ID = "premium";
 
+let Purchases: any = null;
+if (Platform.OS !== "web") {
+  try {
+    Purchases = require("react-native-purchases").default;
+  } catch {}
+}
+
 interface PurchaseContextValue {
   isPremium: boolean;
   loading: boolean;
-  packages: PurchasesPackage[];
+  packages: any[];
   purchasePremium: () => Promise<boolean>;
   restorePurchases: () => Promise<boolean>;
 }
@@ -23,25 +29,18 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
   const { user, isGuest, setPremiumStatus } = useAuth();
   const [isPremium, setIsPremium] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [packages, setPackages] = useState<PurchasesPackage[]>([]);
+  const [packages, setPackages] = useState<any[]>([]);
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
     const initPurchases = async () => {
-      if (!REVENUECAT_API_KEY || initialized) {
+      if (!Purchases || !REVENUECAT_API_KEY || initialized) {
         setLoading(false);
         return;
       }
 
       try {
-        if (Platform.OS === "ios") {
-          Purchases.configure({ apiKey: REVENUECAT_API_KEY });
-        } else if (Platform.OS === "android") {
-          Purchases.configure({ apiKey: REVENUECAT_API_KEY });
-        } else {
-          Purchases.configure({ apiKey: REVENUECAT_API_KEY });
-        }
-
+        Purchases.configure({ apiKey: REVENUECAT_API_KEY });
         setInitialized(true);
 
         if (user) {
@@ -75,7 +74,7 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const syncPremiumToBackend = useCallback(async () => {
-    if (!user) return;
+    if (!user || !Purchases) return;
     try {
       const customerInfo = await Purchases.getCustomerInfo();
       const rcUserId = customerInfo.originalAppUserId || "";
@@ -91,6 +90,10 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const purchasePremium = useCallback(async (): Promise<boolean> => {
+    if (!Purchases) {
+      Alert.alert("Not Available", "In-app purchases are only available on mobile devices.");
+      return false;
+    }
     try {
       if (packages.length === 0) {
         const offerings = await Purchases.getOfferings();
@@ -125,6 +128,10 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
   }, [packages, syncPremiumToBackend]);
 
   const restorePurchases = useCallback(async (): Promise<boolean> => {
+    if (!Purchases) {
+      Alert.alert("Not Available", "Purchase restoration is only available on mobile devices.");
+      return false;
+    }
     try {
       const customerInfo = await Purchases.restorePurchases();
       const hasPremium = !!customerInfo.entitlements.active[ENTITLEMENT_ID];
