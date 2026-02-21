@@ -17,6 +17,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
+function getHighResUrl(url: string | null): string | null {
+  if (!url) return null;
+  if (url.includes("/low.png")) return url.replace("/low.png", "/high.png");
+  if (url.includes("ygoprodeck.com") && url.includes("/cards_small/")) return url.replace("/cards_small/", "/cards/");
+  if (url.includes("scryfall") || url.includes("cards.scryfall.io")) {
+    return url.replace(/\/(small|normal)\//, "/large/");
+  }
+  return url;
+}
+
 export interface GalleryCard {
   id: string;
   name: string;
@@ -59,24 +69,28 @@ export function CardGallery({ visible, cards, initialIndex, onClose }: CardGalle
     index,
   }), []);
 
-  const renderCard = useCallback(({ item }: { item: GalleryCard }) => (
-    <View style={styles.slide}>
-      {item.image ? (
-        <Image
-          source={{ uri: item.image }}
-          style={styles.fullImage}
-          contentFit="contain"
-          transition={200}
-          cachePolicy="disk"
-        />
-      ) : (
-        <View style={styles.noImageContainer}>
-          <Ionicons name="image-outline" size={64} color="rgba(255,255,255,0.3)" />
-          <Text style={styles.noImageText}>No image available</Text>
-        </View>
-      )}
-    </View>
-  ), []);
+  const renderCard = useCallback(({ item }: { item: GalleryCard }) => {
+    const highResUri = getHighResUrl(item.image);
+    return (
+      <View style={styles.slide}>
+        {highResUri ? (
+          <Image
+            source={{ uri: highResUri }}
+            style={styles.fullImage}
+            contentFit="contain"
+            transition={200}
+            cachePolicy="disk"
+            placeholder={item.image ? { uri: item.image } : undefined}
+          />
+        ) : (
+          <View style={styles.noImageContainer}>
+            <Ionicons name="image-outline" size={64} color="rgba(255,255,255,0.3)" />
+            <Text style={styles.noImageText}>No image available</Text>
+          </View>
+        )}
+      </View>
+    );
+  }, []);
 
   if (cards.length === 0) return null;
 
