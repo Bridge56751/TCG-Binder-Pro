@@ -1087,8 +1087,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (res.ok) {
           const card = await res.json();
           if (namesMatch(name, card.name)) {
-            console.log(`[DeepVerify] MTG exact HIT (name matches): ${card.name} (${card.set}/${card.collector_number})`);
-            return { name: card.name, cardId: `${card.set}-${card.collector_number}`, setId: card.set, verified: true };
+            console.log(`[DeepVerify] MTG exact HIT (name matches): ${card.name} (${card.set}/${card.collector_number}) uuid=${card.id}`);
+            return { name: card.name, cardId: card.id, setId: card.set, verified: true };
           } else {
             console.log(`[DeepVerify] MTG number hit but name mismatch: AI="${name}" DB="${card.name}"`);
           }
@@ -1100,23 +1100,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[DeepVerify] MTG name search found ${nameResults.length} prints for "${name}"`);
         const inSet = nameResults.find((c: any) => c.set === setId);
         if (inSet) {
-          return { name: inSet.name, cardId: `${inSet.set}-${inSet.collector_number}`, setId: inSet.set, verified: true };
+          return { name: inSet.name, cardId: inSet.id, setId: inSet.set, verified: true };
         }
         if (cardNumber) {
           const byNum = nameResults.find((c: any) => c.collector_number === cardNumber);
           if (byNum) {
-            return { name: byNum.name, cardId: `${byNum.set}-${byNum.collector_number}`, setId: byNum.set, verified: true };
+            return { name: byNum.name, cardId: byNum.id, setId: byNum.set, verified: true };
           }
         }
         const card = nameResults[0];
-        return { name: card.name, cardId: `${card.set}-${card.collector_number}`, setId: card.set, verified: true };
+        return { name: card.name, cardId: card.id, setId: card.set, verified: true };
       }
 
       const nameResultsNoSet = await nameSearchMTG(name);
       if (nameResultsNoSet && Array.isArray(nameResultsNoSet)) {
         const card = nameResultsNoSet[0];
-        console.log(`[DeepVerify] MTG broad name search HIT: ${card.name} (${card.set})`);
-        return { name: card.name, cardId: `${card.set}-${card.collector_number}`, setId: card.set, verified: true };
+        console.log(`[DeepVerify] MTG broad name search HIT: ${card.name} (${card.set}) uuid=${card.id}`);
+        return { name: card.name, cardId: card.id, setId: card.set, verified: true };
       }
 
       console.log(`[DeepVerify] MTG not found for "${name}"`);
