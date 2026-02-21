@@ -75,6 +75,7 @@ export default function SettingsScreen() {
         "cardvault_set_order_onepiece",
         "cardvault_set_order_mtg",
         "cardvault_guest_mode",
+        "cardvault_theme",
       ]);
     } catch {}
   };

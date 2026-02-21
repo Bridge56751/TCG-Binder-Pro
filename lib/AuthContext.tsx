@@ -154,6 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       "cardvault_set_order_yugioh",
       "cardvault_set_order_onepiece",
       "cardvault_set_order_mtg",
+      "cardvault_theme",
     ]);
   }, []);
 
