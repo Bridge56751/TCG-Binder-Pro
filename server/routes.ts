@@ -758,7 +758,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const rcData = await rcRes.json();
       const entitlements = rcData?.subscriber?.entitlements || {};
-      const premiumEntitlement = entitlements["premium"];
+      const premiumEntitlement = entitlements["TCG Binder Pro Unlimited"];
 
       if (!premiumEntitlement || new Date(premiumEntitlement.expires_date) < new Date()) {
         return res.status(403).json({ error: "No active premium subscription found" });
