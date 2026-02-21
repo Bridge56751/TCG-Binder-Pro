@@ -51,6 +51,7 @@ export default function SetDetailScreen() {
   const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set());
   const [offlineData, setOfflineData] = useState<SetDetail | null>(null);
   const [isOffline, setIsOffline] = useState(false);
+  const [cachedInitialData, setCachedInitialData] = useState<SetDetail | null>(null);
   const pricesFetched = React.useRef(false);
   const isAddingRef = useRef(false);
   const flatListRef = useRef<FlatList>(null);
@@ -59,8 +60,43 @@ export default function SetDetailScreen() {
 
   const queryPath = `/api/tcg/${game}/sets/${id}/cards`;
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const cached = await getCachedSetCards(game as GameId, String(id));
+      if (cached.length > 0 && !cancelled) {
+        const cachedSetsData = await getCachedSets(game || "");
+        const setInfo = cachedSetsData?.find(s => s.id === id);
+        const cards = cached.map(c => ({
+          id: c.id,
+          localId: c.localId,
+          name: c.name,
+          englishName: c.englishName,
+          image: c.image,
+          rarity: c.rarity || null,
+          number: c.localId,
+        }));
+        cards.sort((a, b) => {
+          const numA = parseInt(a.localId, 10);
+          const numB = parseInt(b.localId, 10);
+          if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+          return a.localId.localeCompare(b.localId, undefined, { numeric: true });
+        });
+        setCachedInitialData({
+          id: String(id),
+          name: setInfo?.name || cached[0]?.setName || String(id),
+          game: game || "",
+          totalCards: setInfo?.totalCards || cards.length,
+          cards,
+        });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [game, id]);
+
   const { data: setDetail, isLoading, isError } = useQuery<SetDetail>({
     queryKey: [queryPath],
+    staleTime: 5 * 60 * 1000,
   });
 
   useFocusEffect(
@@ -235,7 +271,7 @@ export default function SetDetailScreen() {
     setRefreshing(false);
   }, [queryPath]);
 
-  const activeData = setDetail || offlineData;
+  const activeData = setDetail || cachedInitialData || offlineData;
 
   const quickAddFilteredCards = useMemo(() => {
     const allCards = activeData?.cards || [];
@@ -573,7 +609,7 @@ export default function SetDetailScreen() {
     </View>
   );
 
-  if (isLoading && !activeData) {
+  if (isLoading && !activeData && !cachedInitialData) {
     return (
       <View style={[dynamicStyles.container, styles.centered]}>
         <ActivityIndicator size="large" color={colors.tint} />
