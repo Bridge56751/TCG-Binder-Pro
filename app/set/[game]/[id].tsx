@@ -55,6 +55,7 @@ export default function SetDetailScreen() {
   const isAddingRef = useRef(false);
   const flatListRef = useRef<FlatList>(null);
   const scrollOffsetRef = useRef(0);
+  const needsScrollRestore = useRef(false);
 
   const queryPath = `/api/tcg/${game}/sets/${id}/cards`;
 
@@ -65,10 +66,17 @@ export default function SetDetailScreen() {
   useFocusEffect(
     useCallback(() => {
       if (scrollOffsetRef.current > 0) {
-        requestAnimationFrame(() => {
+        needsScrollRestore.current = true;
+        const restore = () => {
           flatListRef.current?.scrollToOffset({ offset: scrollOffsetRef.current, animated: false });
-        });
+        };
+        restore();
+        setTimeout(restore, 50);
+        setTimeout(restore, 150);
       }
+      return () => {
+        needsScrollRestore.current = false;
+      };
     }, [])
   );
 
@@ -582,8 +590,18 @@ export default function SetDetailScreen() {
         keyExtractor={(item) => item.id}
         numColumns={NUM_COLUMNS}
         ListHeaderComponent={renderHeader}
-        onScroll={(e) => { scrollOffsetRef.current = e.nativeEvent.contentOffset.y; }}
+        onScroll={(e) => {
+          if (!needsScrollRestore.current) {
+            scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
+          }
+        }}
         scrollEventThrottle={16}
+        onContentSizeChange={() => {
+          if (needsScrollRestore.current && scrollOffsetRef.current > 0) {
+            flatListRef.current?.scrollToOffset({ offset: scrollOffsetRef.current, animated: false });
+            needsScrollRestore.current = false;
+          }
+        }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.tint} colors={[colors.tint]} />}
         renderItem={({ item }) => {
           const qty = setCollectionMap[item.id] || 0;
