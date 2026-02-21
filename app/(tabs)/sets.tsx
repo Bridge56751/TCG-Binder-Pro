@@ -84,6 +84,7 @@ export default function SetsScreen() {
         game: selectedGame,
         totalCards: s.totalCards,
         logo: s.logo,
+        releaseDate: s.releaseDate,
         cachedAt: Date.now(),
       })));
     }
@@ -100,6 +101,7 @@ export default function SetsScreen() {
             game: c.game,
             totalCards: c.totalCards,
             logo: c.logo || undefined,
+            releaseDate: c.releaseDate,
           }));
           setOfflineSets(asSets);
           setIsOffline(true);

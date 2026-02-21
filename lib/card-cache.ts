@@ -25,6 +25,7 @@ export interface CachedSet {
   game: string;
   totalCards: number;
   logo?: string | null;
+  releaseDate?: string | null;
   cachedAt: number;
 }
 
