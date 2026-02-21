@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import {
   StyleSheet,
   Text,
@@ -14,6 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import * as Haptics from "expo-haptics";
 import { GameSelector } from "@/components/GameSelector";
 import { SetCard } from "@/components/SetCard";
 import { useCollection } from "@/lib/CollectionContext";
@@ -23,6 +24,17 @@ import { getCachedSets, cacheSets, type CachedSet } from "@/lib/card-cache";
 import type { GameId, TCGSet } from "@/lib/types";
 
 type SearchMode = "sets" | "cards";
+type SetSortOption = "default" | "name_az" | "name_za" | "most_completed" | "least_completed" | "most_cards" | "least_cards";
+
+const SET_SORT_OPTIONS: { id: SetSortOption; label: string; icon: string }[] = [
+  { id: "default", label: "Default", icon: "list-outline" },
+  { id: "most_completed", label: "Most Completed", icon: "checkmark-circle-outline" },
+  { id: "least_completed", label: "Least Completed", icon: "ellipse-outline" },
+  { id: "name_az", label: "Name A-Z", icon: "text-outline" },
+  { id: "name_za", label: "Name Z-A", icon: "text-outline" },
+  { id: "most_cards", label: "Most Cards", icon: "layers-outline" },
+  { id: "least_cards", label: "Least Cards", icon: "remove-circle-outline" },
+];
 
 interface CardSearchResult {
   id: string;
@@ -41,7 +53,9 @@ export default function SetsScreen() {
   const [searchMode, setSearchMode] = useState<SearchMode>("sets");
   const [cardResults, setCardResults] = useState<CardSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const { setCards, enabledGames } = useCollection();
+  const [sortBy, setSortBy] = useState<SetSortOption>("default");
+  const [showSortMenu, setShowSortMenu] = useState(false);
+  const { setCards, collection, enabledGames } = useCollection();
 
   useEffect(() => {
     if (!enabledGames.includes(selectedGame) && enabledGames.length > 0) {
@@ -99,12 +113,52 @@ export default function SetsScreen() {
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
 
-  const filteredSets =
-    activeSets?.filter(
+  const filteredSets = useMemo(() => {
+    const filtered = activeSets?.filter(
       (s) =>
         s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.id.toLowerCase().includes(searchQuery.toLowerCase()),
     ) || [];
+
+    if (sortBy === "default") return filtered;
+
+    const sorted = [...filtered];
+    switch (sortBy) {
+      case "name_az":
+        sorted.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case "name_za":
+        sorted.sort((a, b) => b.name.localeCompare(a.name));
+        break;
+      case "most_completed": {
+        sorted.sort((a, b) => {
+          const aCollected = collection[selectedGame]?.[a.id]?.length || 0;
+          const bCollected = collection[selectedGame]?.[b.id]?.length || 0;
+          const aPct = a.totalCards > 0 ? aCollected / a.totalCards : 0;
+          const bPct = b.totalCards > 0 ? bCollected / b.totalCards : 0;
+          return bPct - aPct;
+        });
+        break;
+      }
+      case "least_completed": {
+        sorted.sort((a, b) => {
+          const aCollected = collection[selectedGame]?.[a.id]?.length || 0;
+          const bCollected = collection[selectedGame]?.[b.id]?.length || 0;
+          const aPct = a.totalCards > 0 ? aCollected / a.totalCards : 0;
+          const bPct = b.totalCards > 0 ? bCollected / b.totalCards : 0;
+          return aPct - bPct;
+        });
+        break;
+      }
+      case "most_cards":
+        sorted.sort((a, b) => b.totalCards - a.totalCards);
+        break;
+      case "least_cards":
+        sorted.sort((a, b) => a.totalCards - b.totalCards);
+        break;
+    }
+    return sorted;
+  }, [activeSets, searchQuery, sortBy, collection, selectedGame]);
 
   const searchCards = useCallback(
     async (query: string, game: GameId) => {
@@ -406,6 +460,73 @@ export default function SetsScreen() {
       </View>
 
       {renderSearchTabs()}
+
+      {searchQuery.length === 0 && (
+        <>
+          <Pressable
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 6,
+              marginHorizontal: 20,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 10,
+              backgroundColor: colors.surfaceAlt,
+              alignSelf: "flex-start",
+            }}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setShowSortMenu(!showSortMenu);
+            }}
+          >
+            <Ionicons name={(SET_SORT_OPTIONS.find(s => s.id === sortBy)?.icon || "list-outline") as any} size={16} color={colors.tint} />
+            <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.text }}>
+              {SET_SORT_OPTIONS.find(s => s.id === sortBy)?.label || "Default"}
+            </Text>
+            <Ionicons name={showSortMenu ? "chevron-up" : "chevron-down"} size={14} color={colors.textTertiary} />
+          </Pressable>
+
+          {showSortMenu && (
+            <View style={{
+              marginHorizontal: 20,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: colors.cardBorder,
+              backgroundColor: colors.surface,
+              overflow: "hidden",
+            }}>
+              {SET_SORT_OPTIONS.map((opt) => {
+                const active = sortBy === opt.id;
+                return (
+                  <Pressable
+                    key={opt.id}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 10,
+                      paddingHorizontal: 16,
+                      paddingVertical: 12,
+                      backgroundColor: active ? colors.tint + "12" : "transparent",
+                    }}
+                    onPress={() => {
+                      setSortBy(opt.id);
+                      setShowSortMenu(false);
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                  >
+                    <Ionicons name={opt.icon as any} size={18} color={active ? colors.tint : colors.textSecondary} />
+                    <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 14, color: active ? colors.tint : colors.text, flex: 1 }}>
+                      {opt.label}
+                    </Text>
+                    {active && <Ionicons name="checkmark" size={18} color={colors.tint} />}
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </>
+      )}
     </View>
   );
 
