@@ -482,6 +482,7 @@ export default function AllCardsScreen() {
         </View>
       ) : viewMode === "grid" ? (
         <FlatList
+          key="grid"
           data={sortedCards}
           keyExtractor={keyExtractor}
           numColumns={NUM_COLUMNS}
@@ -493,6 +494,7 @@ export default function AllCardsScreen() {
         />
       ) : (
         <FlatList
+          key="list"
           data={sortedCards}
           keyExtractor={keyExtractor}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomInset + 20 }}
