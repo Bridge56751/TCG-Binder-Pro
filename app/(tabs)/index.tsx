@@ -446,24 +446,6 @@ export default function CollectionScreen() {
         </Text>
       )}
 
-      <View style={styles.binderSection}>
-        <Pressable
-          style={[styles.binderBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-          onPress={() => router.push({ pathname: "/all-cards", params: { game: selectedGame } })}
-        >
-          <View style={[styles.binderBtnIcon, { backgroundColor: colors.tint + "18" }]}>
-            <Ionicons name="albums" size={22} color={colors.tint} />
-          </View>
-          <View style={styles.binderBtnInfo}>
-            <Text style={[styles.binderBtnTitle, { color: colors.text }]}>View My Binder</Text>
-            <Text style={[styles.binderBtnSub, { color: colors.textSecondary }]}>
-              Browse all your cards with images and sorting
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
-        </Pressable>
-      </View>
-
       <View style={styles.selectorRow}>
         <GameSelector selected={selectedGame} onSelect={setSelectedGame} />
       </View>
@@ -589,6 +571,24 @@ export default function CollectionScreen() {
           <ActivityIndicator size="large" color={colors.tint} />
         </View>
       )}
+
+      <View style={styles.binderSection}>
+        <Pressable
+          style={[styles.binderBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+          onPress={() => router.push({ pathname: "/all-cards", params: { game: selectedGame } })}
+        >
+          <View style={[styles.binderBtnIcon, { backgroundColor: colors.tint + "18" }]}>
+            <Ionicons name="albums" size={22} color={colors.tint} />
+          </View>
+          <View style={styles.binderBtnInfo}>
+            <Text style={[styles.binderBtnTitle, { color: colors.text }]}>View My Binder</Text>
+            <Text style={[styles.binderBtnSub, { color: colors.textSecondary }]}>
+              Browse all your cards with images and sorting
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+        </Pressable>
+      </View>
 
       {!isLoading && collectedSets.length === 0 && (
         <View style={styles.emptyState}>
