@@ -40,8 +40,8 @@ function ProgressContent({ data }: { data: ProgressToastData }) {
     barWidth.value = prevPercent;
     barWidth.value = withDelay(200, withTiming(progressPercent, { duration: 400, easing: Easing.out(Easing.cubic) }));
     countScale.value = withSequence(
-      withTiming(1.15, { duration: 150, easing: Easing.out(Easing.quad) }),
-      withTiming(1, { duration: 150, easing: Easing.inOut(Easing.quad) })
+      withTiming(1.2, { duration: 150, easing: Easing.out(Easing.quad) }),
+      withSpring(1, { damping: 18, stiffness: 200 })
     );
   }, [data.collected]);
 
@@ -116,7 +116,7 @@ export function CollectionProgressToast({ topOffset }: { topOffset?: number } = 
       setModalVisible(true);
       translateY.value = -200;
       requestAnimationFrame(() => {
-        translateY.value = withTiming(0, { duration: 350, easing: Easing.out(Easing.cubic) });
+        translateY.value = withSpring(0, { damping: 22, stiffness: 180 });
       });
     } else {
       translateY.value = withTiming(-200, { duration: 250 }, () => {
