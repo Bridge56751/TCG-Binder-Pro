@@ -702,6 +702,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ error: "Not logged in" });
     }
     try {
+      const { rcUserId } = req.body || {};
+      if (!rcUserId || typeof rcUserId !== "string") {
+        return res.status(400).json({ error: "RevenueCat user ID is required" });
+      }
+
+      const rcSecretKey = process.env.REVENUECAT_SECRET_API_KEY;
+      if (!rcSecretKey) {
+        console.error("REVENUECAT_SECRET_API_KEY not configured");
+        return res.status(500).json({ error: "Payment verification not configured" });
+      }
+
+      const rcRes = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(rcUserId)}`, {
+        headers: {
+          "Authorization": `Bearer ${rcSecretKey}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!rcRes.ok) {
+        console.error("RevenueCat API error:", rcRes.status, await rcRes.text());
+        return res.status(403).json({ error: "Could not verify purchase" });
+      }
+
+      const rcData = await rcRes.json();
+      const entitlements = rcData?.subscriber?.entitlements || {};
+      const premiumEntitlement = entitlements["premium"];
+
+      if (!premiumEntitlement || new Date(premiumEntitlement.expires_date) < new Date()) {
+        return res.status(403).json({ error: "No active premium subscription found" });
+      }
+
       await storage.upgradeToPremium(req.session.userId);
       res.json({ ok: true, isPremium: true });
     } catch (err) {

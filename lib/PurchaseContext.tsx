@@ -76,7 +76,9 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
   const syncPremiumToBackend = useCallback(async () => {
     if (!user) return;
     try {
-      await apiRequest("POST", "/api/auth/upgrade-premium");
+      const customerInfo = await Purchases.getCustomerInfo();
+      const rcUserId = customerInfo.originalAppUserId || "";
+      await apiRequest("POST", "/api/auth/upgrade-premium", { rcUserId });
       setPremiumStatus(true);
     } catch {}
   }, [user, setPremiumStatus]);
