@@ -74,6 +74,13 @@ export default function LegalScreen() {
 
         <View style={[styles.divider, { backgroundColor: colors.cardBorder }]} />
 
+        <Text style={[styles.heading, { color: colors.text }]}>eBay Disclaimer</Text>
+        <Text style={[styles.body, { color: colors.textSecondary }]}>
+          TCG Binder is not affiliated with, endorsed by, or sponsored by eBay Inc. eBay and the eBay logo are trademarks of eBay Inc. Marketplace links are provided for user convenience only.
+        </Text>
+
+        <View style={[styles.divider, { backgroundColor: colors.cardBorder }]} />
+
         <Text style={[styles.heading, { color: colors.text }]}>Rights Holder Notice</Text>
         <Text style={[styles.body, { color: colors.textSecondary }]}>
           If you are a rights holder and believe that your intellectual property is being referenced or displayed in a manner that constitutes infringement, please contact us at tcgbinderpro.com. We take intellectual property concerns seriously and will promptly review and address all legitimate requests.
