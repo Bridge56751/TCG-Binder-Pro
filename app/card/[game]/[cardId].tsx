@@ -31,6 +31,7 @@ import Animated, {
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/lib/ThemeContext";
 import { useCollection } from "@/lib/CollectionContext";
+import { useGallery } from "@/lib/GalleryContext";
 import type { CardDetail, GameId } from "@/lib/types";
 import { GAMES } from "@/lib/types";
 
@@ -71,9 +72,10 @@ function getMarketplaceLinks(card: CardDetail) {
 export default function CardDetailScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
-  const { game, cardId, lang } = useLocalSearchParams<{ game: string; cardId: string; lang?: string }>();
+  const { game, cardId, lang, galleryCards: galleryCardsParam } = useLocalSearchParams<{ game: string; cardId: string; lang?: string; galleryCards?: string }>();
   const gameId = game as GameId;
   const { hasCard, removeCard, addCard, cardQuantity } = useCollection();
+  const { openGallery } = useGallery();
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
 
@@ -203,7 +205,27 @@ export default function CardDetailScreen() {
           )}
         </View>
 
-        <View style={styles.imageSection}>
+        <Pressable
+          style={styles.imageSection}
+          onPress={() => {
+            if (!card.image) return;
+            let galleryCardsList: { id: string; name: string; image: string | null; localId?: string; setName?: string }[] = [];
+            let startIdx = 0;
+            try {
+              if (galleryCardsParam) {
+                galleryCardsList = JSON.parse(galleryCardsParam);
+                startIdx = galleryCardsList.findIndex((c) => c.id === cardId);
+                if (startIdx < 0) startIdx = 0;
+              }
+            } catch {}
+            if (galleryCardsList.length === 0) {
+              galleryCardsList = [{ id: cardId || "", name: card.name, image: card.image, localId: card.localId, setName: card.setName }];
+              startIdx = 0;
+            }
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            openGallery(galleryCardsList, startIdx);
+          }}
+        >
           <Animated.View style={flipStyle}>
             {card.image ? (
               <Image
@@ -223,7 +245,13 @@ export default function CardDetailScreen() {
               pointerEvents="none"
             />
           </Animated.View>
-        </View>
+          {card.image && (
+            <View style={styles.tapHint}>
+              <Ionicons name="expand-outline" size={14} color="rgba(255,255,255,0.8)" />
+              <Text style={styles.tapHintText}>Tap to view fullscreen</Text>
+            </View>
+          )}
+        </Pressable>
 
         <View style={styles.infoSection}>
           <View style={styles.badgeRow}>
@@ -488,6 +516,23 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     borderWidth: 3,
     borderRadius: 12,
+  },
+  tapHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    position: "absolute",
+    bottom: 16,
+    alignSelf: "center",
+  },
+  tapHintText: {
+    fontFamily: "DMSans_500Medium",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.8)",
   },
   infoSection: {
     paddingHorizontal: 20,

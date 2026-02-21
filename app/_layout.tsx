@@ -14,6 +14,8 @@ import { ThemeProvider, useTheme } from "@/lib/ThemeContext";
 import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold } from "@expo-google-fonts/dm-sans";
 import { StatusBar } from "expo-status-bar";
 import { CollectionProgressToast } from "@/components/CollectionProgressToast";
+import { GalleryProvider, useGallery } from "@/lib/GalleryContext";
+import { CardGallery } from "@/components/CardGallery";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -43,6 +45,18 @@ function useProtectedRoute() {
   }, [user, isGuest, loading, needsVerification, segments]);
 }
 
+function GalleryOverlay() {
+  const { gallery, closeGallery } = useGallery();
+  return (
+    <CardGallery
+      visible={gallery.visible}
+      cards={gallery.cards}
+      initialIndex={gallery.initialIndex}
+      onClose={closeGallery}
+    />
+  );
+}
+
 function RootLayoutNav() {
   const { loading } = useAuth();
   const { colors } = useTheme();
@@ -59,6 +73,7 @@ function RootLayoutNav() {
   return (
     <>
       <CollectionProgressToast />
+      <GalleryOverlay />
       <Stack screenOptions={{ headerBackTitle: "Back" }}>
         <Stack.Screen name="auth" options={{ headerShown: false, presentation: "modal" }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -127,8 +142,10 @@ export default function RootLayout() {
               <PurchaseProvider>
                 <CollectionProvider>
                   <ThemeProvider>
-                    <ThemedStatusBar />
-                    <RootLayoutNav />
+                    <GalleryProvider>
+                      <ThemedStatusBar />
+                      <RootLayoutNav />
+                    </GalleryProvider>
                   </ThemeProvider>
                 </CollectionProvider>
               </PurchaseProvider>
