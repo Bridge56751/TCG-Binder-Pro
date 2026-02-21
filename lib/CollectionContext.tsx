@@ -272,7 +272,7 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
       prevUserRef.current = null;
       queryClient.clear();
       setCollection({});
-      setTimeout(() => loadCollection(), 500);
+      saveCollection({});
     } else {
       loadCollection();
     }
