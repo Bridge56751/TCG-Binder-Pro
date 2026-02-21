@@ -177,11 +177,38 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     await loadCollection();
   }, [loadCollection]);
 
+  const truncateToLimit = useCallback((data: CollectionData, limit: number): CollectionData => {
+    const count = getCollectedCount(data);
+    if (count <= limit) return data;
+    const truncated: CollectionData = {};
+    let remaining = limit;
+    for (const gameKey of Object.keys(data)) {
+      if (remaining <= 0) break;
+      truncated[gameKey] = {};
+      const gameData = data[gameKey] || {};
+      for (const setKey of Object.keys(gameData)) {
+        if (remaining <= 0) break;
+        const cards = gameData[setKey] || [];
+        if (Array.isArray(cards)) {
+          const take = cards.slice(0, remaining);
+          truncated[gameKey][setKey] = take;
+          remaining -= take.length;
+        }
+      }
+    }
+    return truncated;
+  }, []);
+
   const mergeAndSyncAfterLogin = useCallback(async () => {
     const localData = await getCollection();
     const localHasCards = Object.values(localData).some(
       (game) => game && Object.values(game).some((set) => set && Object.keys(set).length > 0)
     );
+
+    const applyLimit = (data: CollectionData) => {
+      if (!isPremium) return truncateToLimit(data, FREE_CARD_LIMIT);
+      return data;
+    };
 
     try {
       const baseUrl = getApiUrl();
@@ -195,12 +222,14 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
         );
 
         if (localHasCards && !cloudHasCards) {
-          setCollection(localData);
-          performSync(localData);
+          const limited = applyLimit(localData);
+          setCollection(limited);
+          performSync(limited);
           return;
         } else if (cloudHasCards && !localHasCards) {
-          await saveCollection(cloudData);
-          setCollection(cloudData);
+          const limited = applyLimit(cloudData);
+          await saveCollection(limited);
+          setCollection(limited);
           return;
         } else if (localHasCards && cloudHasCards) {
           const merged: CollectionData = {};
@@ -216,21 +245,23 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
               merged[gameKey][setKey] = [...new Set([...localCards, ...cloudCards])];
             }
           }
-          await saveCollection(merged);
-          setCollection(merged);
-          performSync(merged);
+          const limited = applyLimit(merged);
+          await saveCollection(limited);
+          setCollection(limited);
+          performSync(limited);
           return;
         }
       }
     } catch {}
 
     if (localHasCards) {
-      setCollection(localData);
-      performSync(localData);
+      const limited = applyLimit(localData);
+      setCollection(limited);
+      performSync(limited);
     } else {
       await loadCollection();
     }
-  }, [performSync, loadCollection]);
+  }, [performSync, loadCollection, isPremium, truncateToLimit]);
 
   useEffect(() => {
     if (user && prevUserRef.current !== user.id) {
