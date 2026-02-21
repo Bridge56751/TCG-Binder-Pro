@@ -13,8 +13,9 @@ let db: any;
 if (googleCloudUrl) {
   const { drizzle } = require("drizzle-orm/node-postgres");
   const { Pool } = require("pg");
+  const cleanUrl = googleCloudUrl.replace(/[\?&]sslmode=[^&]*/g, "");
   const pool = new Pool({
-    connectionString: googleCloudUrl,
+    connectionString: cleanUrl,
     ssl: { rejectUnauthorized: false },
   });
   db = drizzle(pool, { schema });
