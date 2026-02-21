@@ -591,15 +591,14 @@ export default function SetDetailScreen() {
                     toggleCardSelection(item.id);
                     return;
                   }
-                  const galleryList = filteredAndSortedCards
-                    .filter((c) => c.image)
-                    .map((c) => ({
-                      id: c.id,
-                      name: c.englishName || c.name,
-                      image: c.image,
-                      localId: c.localId,
-                      setName: activeData?.name,
-                    }));
+                  const allSetCards = activeData?.cards || [];
+                  const galleryList = allSetCards.map((c) => ({
+                    id: c.id,
+                    name: c.englishName || c.name,
+                    image: c.image,
+                    localId: c.localId,
+                    setName: activeData?.name,
+                  }));
                   setGalleryCards(galleryList);
                   router.push(`/card/${game}/${item.id}`);
                 }}
