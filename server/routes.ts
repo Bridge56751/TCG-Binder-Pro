@@ -1688,6 +1688,7 @@ Return ONLY valid JSON with your corrected identification:
           seen.add(s.id);
           return true;
         });
+      formatted.sort((a: any, b: any) => (b.releaseDate || "").localeCompare(a.releaseDate || ""));
       res.json(formatted);
     } catch (error) {
       console.error("Error fetching Pokemon sets:", error);
@@ -1794,6 +1795,7 @@ Return ONLY valid JSON with your corrected identification:
           symbol: s.set_image || null,
           releaseDate: s.tcg_date || null,
         }));
+      formatted.sort((a: any, b: any) => (b.releaseDate || "").localeCompare(a.releaseDate || ""));
       res.json(formatted);
     } catch (error) {
       console.error("Error fetching Yu-Gi-Oh! sets:", error);

@@ -14,6 +14,7 @@ export interface TCGSet {
   totalCards: number;
   logo?: string | null;
   symbol?: string | null;
+  releaseDate?: string | null;
 }
 
 export interface TCGCard {
