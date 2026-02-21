@@ -246,12 +246,6 @@ export default function CardDetailScreen() {
               pointerEvents="none"
             />
           </Animated.View>
-          {card.image && (
-            <View style={styles.tapHint}>
-              <Ionicons name="expand-outline" size={14} color="rgba(255,255,255,0.8)" />
-              <Text style={styles.tapHintText}>Tap to view fullscreen</Text>
-            </View>
-          )}
         </Pressable>
 
         <View style={styles.infoSection}>
@@ -529,23 +523,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     borderWidth: 3,
     borderRadius: 12,
-  },
-  tapHint: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    position: "absolute",
-    bottom: 16,
-    alignSelf: "center",
-  },
-  tapHintText: {
-    fontFamily: "DMSans_500Medium",
-    fontSize: 11,
-    color: "rgba(255,255,255,0.8)",
   },
   infoSection: {
     paddingHorizontal: 20,
