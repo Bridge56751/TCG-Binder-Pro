@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useState } from "react";
+import React, { useRef, useCallback, useState, useEffect } from "react";
 import {
   StyleSheet,
   View,
@@ -8,6 +8,7 @@ import {
   Dimensions,
   Platform,
   StatusBar,
+  Modal,
   ViewToken,
 } from "react-native";
 import { Image } from "expo-image";
@@ -37,6 +38,12 @@ export function CardGallery({ visible, cards, initialIndex, onClose }: CardGalle
   const flatListRef = useRef<FlatList>(null);
   const topInset = Platform.OS === "web" ? 20 : insets.top;
   const bottomInset = Platform.OS === "web" ? 20 : insets.bottom;
+
+  useEffect(() => {
+    if (visible) {
+      setCurrentIndex(initialIndex);
+    }
+  }, [visible, initialIndex]);
 
   const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     if (viewableItems.length > 0 && viewableItems[0].index != null) {
@@ -71,75 +78,78 @@ export function CardGallery({ visible, cards, initialIndex, onClose }: CardGalle
     </View>
   ), []);
 
-  if (!visible || cards.length === 0) return null;
+  if (cards.length === 0) return null;
 
   const currentCard = cards[currentIndex] || cards[0];
 
   return (
-    <View style={styles.overlay}>
-      <StatusBar barStyle="light-content" />
-      <View style={[styles.header, { paddingTop: topInset + 8 }]}>
-        <Pressable style={styles.closeButton} onPress={onClose} hitSlop={12}>
-          <Ionicons name="close" size={28} color="#FFFFFF" />
-        </Pressable>
-        <View style={styles.headerCenter}>
-          <Text style={styles.cardName} numberOfLines={1}>{currentCard.name}</Text>
-          {currentCard.setName && (
-            <Text style={styles.setName} numberOfLines={1}>
-              {currentCard.setName}{currentCard.localId ? ` #${currentCard.localId}` : ""}
-            </Text>
-          )}
+    <Modal
+      visible={visible}
+      animationType="fade"
+      transparent={false}
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <View style={styles.overlay}>
+        <StatusBar barStyle="light-content" />
+        <View style={[styles.header, { paddingTop: topInset + 8 }]}>
+          <Pressable style={styles.closeButton} onPress={onClose} hitSlop={12}>
+            <Ionicons name="close" size={28} color="#FFFFFF" />
+          </Pressable>
+          <View style={styles.headerCenter}>
+            <Text style={styles.cardName} numberOfLines={1}>{currentCard.name}</Text>
+            {currentCard.setName && (
+              <Text style={styles.setName} numberOfLines={1}>
+                {currentCard.setName}{currentCard.localId ? ` #${currentCard.localId}` : ""}
+              </Text>
+            )}
+          </View>
+          <View style={styles.counterBadge}>
+            <Text style={styles.counterText}>{currentIndex + 1}/{cards.length}</Text>
+          </View>
         </View>
-        <View style={styles.counterBadge}>
-          <Text style={styles.counterText}>{currentIndex + 1}/{cards.length}</Text>
+
+        <FlatList
+          ref={flatListRef}
+          data={cards}
+          keyExtractor={(item) => item.id}
+          renderItem={renderCard}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          initialScrollIndex={initialIndex}
+          getItemLayout={getItemLayout}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          bounces={false}
+          decelerationRate="fast"
+          style={styles.list}
+        />
+
+        <View style={[styles.footer, { paddingBottom: bottomInset + 12 }]}>
+          <View style={styles.dots}>
+            {cards.length <= 20 ? cards.map((_, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.dot,
+                  i === currentIndex && styles.dotActive,
+                ]}
+              />
+            )) : (
+              <Text style={styles.pageIndicator}>{currentIndex + 1} of {cards.length}</Text>
+            )}
+          </View>
         </View>
       </View>
-
-      <FlatList
-        ref={flatListRef}
-        data={cards}
-        keyExtractor={(item) => item.id}
-        renderItem={renderCard}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        initialScrollIndex={initialIndex}
-        getItemLayout={getItemLayout}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-        bounces={false}
-        decelerationRate="fast"
-        style={styles.list}
-      />
-
-      <View style={[styles.footer, { paddingBottom: bottomInset + 12 }]}>
-        <View style={styles.dots}>
-          {cards.length <= 20 ? cards.map((_, i) => (
-            <View
-              key={i}
-              style={[
-                styles.dot,
-                i === currentIndex && styles.dotActive,
-              ]}
-            />
-          )) : (
-            <Text style={styles.pageIndicator}>{currentIndex + 1} of {cards.length}</Text>
-          )}
-        </View>
-      </View>
-    </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   overlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    flex: 1,
     backgroundColor: "#000000",
-    zIndex: 9999,
   },
   header: {
     flexDirection: "row",
@@ -147,7 +157,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 8,
     gap: 12,
-    zIndex: 10,
   },
   closeButton: {
     width: 40,
