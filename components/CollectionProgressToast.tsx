@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { View, Text, StyleSheet, Platform } from "react-native";
+import { View, Text, StyleSheet, Platform, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, {
@@ -12,7 +12,6 @@ import Animated, {
   Easing,
   runOnJS,
 } from "react-native-reanimated";
-import { PanResponder } from "react-native";
 import { useTheme } from "@/lib/ThemeContext";
 import { useCollection, type ProgressToastData } from "@/lib/CollectionContext";
 import type { GameId } from "@/lib/types";
@@ -105,29 +104,11 @@ export function CollectionProgressToast({ topOffset }: { topOffset?: number } = 
 
   const translateY = useSharedValue(-200);
 
-  const panResponder = React.useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dy) > 2;
-      },
-      onPanResponderGrant: () => {},
-      onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dy < 0) {
-          translateY.value = gestureState.dy;
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy < -20 || gestureState.vy < -0.3) {
-          translateY.value = withTiming(-200, { duration: 200 }, () => {
-            runOnJS(clearProgressToast)();
-          });
-        } else {
-          translateY.value = withSpring(0, { damping: 15, stiffness: 150 });
-        }
-      },
-    })
-  ).current;
+  const dismiss = () => {
+    translateY.value = withTiming(-200, { duration: 200 }, () => {
+      runOnJS(clearProgressToast)();
+    });
+  };
 
   useEffect(() => {
     if (progressToast) {
@@ -154,9 +135,10 @@ export function CollectionProgressToast({ topOffset }: { topOffset?: number } = 
   return (
     <Animated.View
       style={[styles.container, { top: topInset + 4 }, animatedStyle]}
-      {...panResponder.panHandlers}
     >
-      <ProgressContent data={visibleData} />
+      <Pressable onPress={dismiss}>
+        <ProgressContent data={visibleData} />
+      </Pressable>
     </Animated.View>
   );
 }
