@@ -24,10 +24,11 @@ import { getCachedSets, cacheSets, type CachedSet } from "@/lib/card-cache";
 import type { GameId, TCGSet } from "@/lib/types";
 
 type SearchMode = "sets" | "cards";
-type SetSortOption = "default" | "name_az" | "name_za" | "most_completed" | "least_completed" | "most_cards" | "least_cards";
+type SetSortOption = "default" | "oldest" | "name_az" | "name_za" | "most_completed" | "least_completed" | "most_cards" | "least_cards";
 
 const SET_SORT_OPTIONS: { id: SetSortOption; label: string; icon: string }[] = [
-  { id: "default", label: "Default", icon: "list-outline" },
+  { id: "default", label: "Newest", icon: "calendar-outline" },
+  { id: "oldest", label: "Oldest", icon: "calendar-outline" },
   { id: "most_completed", label: "Most Completed", icon: "checkmark-circle-outline" },
   { id: "least_completed", label: "Least Completed", icon: "ellipse-outline" },
   { id: "name_az", label: "Name A-Z", icon: "text-outline" },
@@ -124,6 +125,9 @@ export default function SetsScreen() {
 
     const sorted = [...filtered];
     switch (sortBy) {
+      case "oldest":
+        sorted.sort((a, b) => (a.releaseDate || "").localeCompare(b.releaseDate || ""));
+        break;
       case "name_az":
         sorted.sort((a, b) => a.name.localeCompare(b.name));
         break;
