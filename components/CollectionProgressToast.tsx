@@ -38,10 +38,10 @@ function ProgressContent({ data }: { data: ProgressToastData }) {
   useEffect(() => {
     const prevPercent = data.total > 0 ? Math.max((data.collected - 1) / data.total, 0) : 0;
     barWidth.value = prevPercent;
-    barWidth.value = withDelay(200, withSpring(progressPercent, { damping: 15, stiffness: 90 }));
+    barWidth.value = withDelay(200, withTiming(progressPercent, { duration: 400, easing: Easing.out(Easing.cubic) }));
     countScale.value = withSequence(
-      withTiming(1.3, { duration: 200, easing: Easing.out(Easing.back(2)) }),
-      withSpring(1, { damping: 10, stiffness: 150 })
+      withTiming(1.15, { duration: 150, easing: Easing.out(Easing.quad) }),
+      withTiming(1, { duration: 150, easing: Easing.inOut(Easing.quad) })
     );
   }, [data.collected]);
 
@@ -116,7 +116,7 @@ export function CollectionProgressToast({ topOffset }: { topOffset?: number } = 
       setModalVisible(true);
       translateY.value = -200;
       requestAnimationFrame(() => {
-        translateY.value = withSpring(0, { damping: 15, stiffness: 120 });
+        translateY.value = withTiming(0, { duration: 350, easing: Easing.out(Easing.cubic) });
       });
     } else {
       translateY.value = withTiming(-200, { duration: 250 }, () => {
