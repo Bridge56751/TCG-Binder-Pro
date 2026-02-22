@@ -1,8 +1,6 @@
 import { db } from "./db";
 import { users, userCollections, type User, type InsertUser } from "../shared/schema";
-import { eq, type InferInsertModel } from "drizzle-orm";
-
-type UsersUpdate = Partial<InferInsertModel<typeof users>>;
+import { eq } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -55,7 +53,7 @@ export const storage: IStorage = {
 
   async linkAppleId(userId: string, appleId: string) {
     await db.update(users)
-      .set({ appleId })
+      .set({ appleId } as any)
       .where(eq(users.id, userId));
   },
 
@@ -82,37 +80,37 @@ export const storage: IStorage = {
 
   async upgradeToPremium(userId: string) {
     await db.update(users)
-      .set({ isPremium: true } as UsersUpdate)
+      .set({ isPremium: true } as any)
       .where(eq(users.id, userId));
   },
 
   async setVerificationCode(userId: string, code: string, expiry: Date) {
     await db.update(users)
-      .set({ verificationCode: code, verificationExpiry: expiry } as UsersUpdate)
+      .set({ verificationCode: code, verificationExpiry: expiry } as any)
       .where(eq(users.id, userId));
   },
 
   async verifyUser(userId: string) {
     await db.update(users)
-      .set({ isVerified: true, verificationCode: null, verificationExpiry: null } as UsersUpdate)
+      .set({ isVerified: true, verificationCode: null, verificationExpiry: null } as any)
       .where(eq(users.id, userId));
   },
 
   async setResetCode(userId: string, code: string, expiry: Date) {
     await db.update(users)
-      .set({ resetCode: code, resetExpiry: expiry } as UsersUpdate)
+      .set({ resetCode: code, resetExpiry: expiry } as any)
       .where(eq(users.id, userId));
   },
 
   async clearResetCode(userId: string) {
     await db.update(users)
-      .set({ resetCode: null, resetExpiry: null } as UsersUpdate)
+      .set({ resetCode: null, resetExpiry: null } as any)
       .where(eq(users.id, userId));
   },
 
   async updatePassword(userId: string, hashedPassword: string) {
     await db.update(users)
-      .set({ password: hashedPassword, resetCode: null, resetExpiry: null } as UsersUpdate)
+      .set({ password: hashedPassword, resetCode: null, resetExpiry: null } as any)
       .where(eq(users.id, userId));
   },
 };
