@@ -10,6 +10,7 @@ import {
   ScrollView,
   TextInput,
   KeyboardAvoidingView,
+  Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
@@ -84,7 +85,14 @@ export default function ScanScreen() {
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission needed", "Camera access is required to scan cards");
+      Alert.alert(
+        "Camera Access Required",
+        "TCG Binder needs camera access to scan your trading cards. Please enable it in your device settings.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Open Settings", onPress: () => Linking.openSettings() },
+        ]
+      );
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -100,6 +108,18 @@ export default function ScanScreen() {
   };
 
   const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Photo Library Access Required",
+        "TCG Binder needs access to your photo library to select card images for scanning. Please enable it in your device settings.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Open Settings", onPress: () => Linking.openSettings() },
+        ]
+      );
+      return;
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       quality: 0.7,

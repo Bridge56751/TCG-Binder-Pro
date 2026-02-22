@@ -17,7 +17,8 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.cardvault",
       "infoPlist": {
-        "NSCameraUsageDescription": "TCG Binder needs camera access to scan your trading cards"
+        "NSCameraUsageDescription": "TCG Binder needs camera access to scan and identify your trading cards using AI recognition.",
+        "NSPhotoLibraryUsageDescription": "TCG Binder needs access to your photo library so you can select photos of trading cards to scan and identify."
       }
     },
     "android": {
@@ -44,7 +45,14 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow TCG Binder to use your camera to scan trading cards"
+          "cameraPermission": "Allow TCG Binder to use your camera to scan and identify your trading cards using AI recognition."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow TCG Binder to access your photos so you can select trading card images to scan and identify.",
+          "cameraPermission": "Allow TCG Binder to use your camera to scan and identify your trading cards using AI recognition."
         }
       ]
     ],
