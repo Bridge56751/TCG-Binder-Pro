@@ -42,6 +42,7 @@ export default function SetDetailScreen() {
 
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const [sortMode, setSortMode] = useState<SortMode>("number");
+  const [sortDropdownVisible, setSortDropdownVisible] = useState(false);
   const [quickAddVisible, setQuickAddVisible] = useState(false);
   const [quickAddSearch, setQuickAddSearch] = useState("");
   const [cardPrices, setCardPrices] = useState<Record<string, number | null>>({});
@@ -479,6 +480,35 @@ export default function SetDetailScreen() {
           fontSize: 12,
           color: colors.textSecondary,
         },
+        sortDropdown: {
+          position: "absolute" as const,
+          top: 40,
+          right: 0,
+          backgroundColor: colors.surface,
+          borderRadius: 12,
+          paddingVertical: 4,
+          minWidth: 150,
+          zIndex: 100,
+          elevation: 5,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.2,
+          shadowRadius: 8,
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        sortDropdownItem: {
+          flexDirection: "row" as const,
+          alignItems: "center" as const,
+          gap: 8,
+          paddingHorizontal: 14,
+          paddingVertical: 10,
+        },
+        sortDropdownItemText: {
+          fontFamily: "DMSans_500Medium",
+          fontSize: 13,
+          color: colors.textSecondary,
+        },
         filterCountText: {
           fontFamily: "DMSans_400Regular",
           fontSize: 12,
@@ -563,7 +593,7 @@ export default function SetDetailScreen() {
         </View>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterBar}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterBar} style={{ zIndex: 100 }}>
         {filterOptions.map((opt) => {
           const isActive = filterMode === opt.key;
           return (
@@ -583,30 +613,72 @@ export default function SetDetailScreen() {
             </Pressable>
           );
         })}
-        <Pressable
-          style={dynamicStyles.sortButton}
-          onPress={() => setSortMode((prev) => {
-            if (prev === "number") return "name";
-            if (prev === "name") return "value";
-            return "number";
-          })}
-        >
-          <Ionicons
-            name={sortMode === "value" ? "trending-down" : "swap-vertical"}
-            size={14}
-            color={sortMode === "value" ? colors.tint : colors.textSecondary}
-          />
-          {sortMode === "value" && pricesLoading ? (
-            <ActivityIndicator size={10} color={colors.tint} />
-          ) : (
+        <View>
+          <Pressable
+            style={dynamicStyles.sortButton}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setSortDropdownVisible(!sortDropdownVisible);
+            }}
+          >
+            <Ionicons
+              name="swap-vertical"
+              size={14}
+              color={sortMode !== "number" ? colors.tint : colors.textSecondary}
+            />
             <Text style={[
               dynamicStyles.sortButtonText,
-              sortMode === "value" && { color: colors.tint },
+              sortMode !== "number" && { color: colors.tint },
             ]}>
-              {sortMode === "number" ? "#" : sortMode === "name" ? "A-Z" : "$"}
+              Sort
             </Text>
+            <Ionicons
+              name={sortDropdownVisible ? "chevron-up" : "chevron-down"}
+              size={12}
+              color={sortMode !== "number" ? colors.tint : colors.textSecondary}
+            />
+          </Pressable>
+          {sortDropdownVisible && (
+            <View style={dynamicStyles.sortDropdown}>
+              {([
+                { key: "number" as SortMode, label: "#  Number", icon: "list-outline" as const },
+                { key: "name" as SortMode, label: "A-Z  Name", icon: "text-outline" as const },
+                { key: "value" as SortMode, label: "$  Value", icon: "trending-down" as const },
+              ]).map((opt) => (
+                <Pressable
+                  key={opt.key}
+                  style={[
+                    dynamicStyles.sortDropdownItem,
+                    sortMode === opt.key && { backgroundColor: colors.tint + "20" },
+                  ]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setSortMode(opt.key);
+                    setSortDropdownVisible(false);
+                  }}
+                >
+                  <Ionicons
+                    name={opt.icon}
+                    size={14}
+                    color={sortMode === opt.key ? colors.tint : colors.textSecondary}
+                  />
+                  <Text style={[
+                    dynamicStyles.sortDropdownItemText,
+                    sortMode === opt.key && { color: colors.tint },
+                  ]}>
+                    {opt.label}
+                  </Text>
+                  {sortMode === opt.key && (
+                    <Ionicons name="checkmark" size={14} color={colors.tint} style={{ marginLeft: "auto" }} />
+                  )}
+                  {opt.key === "value" && pricesLoading && sortMode === "value" && (
+                    <ActivityIndicator size={10} color={colors.tint} style={{ marginLeft: 4 }} />
+                  )}
+                </Pressable>
+              ))}
+            </View>
           )}
-        </Pressable>
+        </View>
       </ScrollView>
 
       {filterMode !== "all" && (
@@ -635,6 +707,7 @@ export default function SetDetailScreen() {
         numColumns={NUM_COLUMNS}
         ListHeaderComponent={renderHeader}
         onScroll={(e) => {
+          if (sortDropdownVisible) setSortDropdownVisible(false);
           if (!needsScrollRestore.current) {
             scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
           }
@@ -878,6 +951,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 20,
+    zIndex: 100,
   },
   gridContent: {
     paddingHorizontal: 16,
