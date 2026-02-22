@@ -32,6 +32,17 @@ export interface SetDetail {
   cards: TCGCard[];
 }
 
+export interface CardAlternative {
+  game: GameId;
+  name: string;
+  cardId: string;
+  localId: string;
+  setId: string;
+  setName: string;
+  image: string | null;
+  rarity?: string;
+}
+
 export interface CardIdentification {
   game: GameId;
   name: string;
@@ -46,6 +57,7 @@ export interface CardIdentification {
   verified?: boolean;
   language?: string;
   error?: string;
+  alternatives?: CardAlternative[];
 }
 
 export interface CardDetail {

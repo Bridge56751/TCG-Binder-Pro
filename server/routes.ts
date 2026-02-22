@@ -1398,7 +1398,128 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
         }
       }
 
-      res.json(result);
+      let alternatives: any[] = [];
+      if (!result.error && result.game && result.name) {
+        try {
+          const searchName = (result.englishName || result.name).split(" ").slice(0, 3).join(" ");
+          const altLimit = 5;
+          let altCards: any[] = [];
+
+          if (result.game === "pokemon") {
+            const r = await fetch(`https://api.tcgdex.net/v2/en/cards?name=${encodeURIComponent(searchName)}`);
+            if (r.ok) {
+              const data = await r.json();
+              if (Array.isArray(data)) altCards = data.slice(0, altLimit * 3);
+            }
+          } else if (result.game === "yugioh") {
+            const r = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(searchName)}&num=15&offset=0`);
+            if (r.ok) {
+              const data = await r.json();
+              if (data?.data) {
+                for (const card of data.data) {
+                  if (card.card_sets) {
+                    for (const cs of card.card_sets.slice(0, 2)) {
+                      altCards.push({
+                        name: card.name,
+                        cardId: cs.set_code,
+                        localId: cs.set_code?.split("-").pop() || "",
+                        setId: cs.set_code?.split("-").slice(0, -1).join("-") || cs.set_name,
+                        setName: cs.set_name,
+                        image: card.card_images?.[0]?.image_url_small || null,
+                        rarity: cs.set_rarity || "",
+                      });
+                    }
+                  }
+                }
+              }
+            }
+          } else if (result.game === "mtg") {
+            const r = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(searchName)}&unique=prints&order=released&dir=desc`);
+            if (r.ok) {
+              const data = await r.json();
+              if (data?.data) altCards = data.data.slice(0, altLimit * 2);
+            }
+          } else if (result.game === "onepiece") {
+            const sets = await fetchSetsForGame("onepiece");
+            const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+            const queryNorm = norm(searchName);
+            for (const s of sets.slice(0, 10)) {
+              if (altCards.length >= altLimit * 2) break;
+              try {
+                const setId = s.id || s.set_id;
+                const r = await fetch(`https://optcgapi.com/api/sets/${setId}/`);
+                if (r.ok) {
+                  const data = await r.json();
+                  const cards = Array.isArray(data) ? data : (data.cards || []);
+                  for (const c of cards) {
+                    if (norm(c.card_name || "").includes(queryNorm)) {
+                      altCards.push({
+                        name: c.card_name,
+                        cardId: c.card_set_id,
+                        localId: (c.card_set_id || "").split("-").pop() || "",
+                        setId: c.set_id || setId,
+                        setName: s.name || setId,
+                        image: c.image_url || null,
+                      });
+                    }
+                  }
+                }
+              } catch {}
+            }
+          }
+
+          const mainCardId = result.verifiedCardId || `${result.setId}-${result.cardNumber}`;
+          if (result.game === "pokemon") {
+            for (const c of altCards) {
+              if (alternatives.length >= 3) break;
+              const cId = c.id || `${c.set?.id || ""}-${c.localId || ""}`;
+              if (cId === mainCardId) continue;
+              const img = c.image ? `${c.image}/low.png` : null;
+              const sets = await fetchSetsForGame("pokemon");
+              const setId = c.set?.id || c.id?.split("-")[0] || "";
+              const setObj = sets.find((s: any) => s.id === setId);
+              alternatives.push({
+                game: "pokemon",
+                name: c.name,
+                cardId: cId,
+                localId: c.localId || cId.split("-").pop() || "",
+                setId,
+                setName: setObj?.name || c.set?.name || setId,
+                image: img,
+                rarity: c.rarity || "",
+              });
+            }
+          } else if (result.game === "mtg") {
+            for (const card of altCards) {
+              if (alternatives.length >= 3) break;
+              if (card.id === mainCardId) continue;
+              alternatives.push({
+                game: "mtg",
+                name: card.name,
+                cardId: card.id,
+                localId: card.collector_number || "",
+                setId: card.set || "",
+                setName: card.set_name || "",
+                image: card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small || null,
+                rarity: card.rarity || "",
+              });
+            }
+          } else {
+            for (const c of altCards) {
+              if (alternatives.length >= 3) break;
+              const cId = c.cardId || "";
+              if (cId === mainCardId) continue;
+              alternatives.push({ game: result.game, ...c });
+            }
+          }
+
+          console.log(`[Alternatives] Found ${alternatives.length} alternatives for "${result.name}"`);
+        } catch (e) {
+          console.error("Error fetching alternatives:", e);
+        }
+      }
+
+      res.json({ ...result, alternatives });
     } catch (error) {
       console.error("Error identifying card:", error);
       res.status(500).json({ error: "Failed to identify card" });
