@@ -1379,9 +1379,10 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
       }
 
       res.json({ ...result, alternatives });
-    } catch (error) {
-      console.error("Error identifying card:", error);
-      res.status(500).json({ error: "Failed to identify card" });
+    } catch (error: any) {
+      console.error("Error identifying card:", error?.message || error);
+      const errorMsg = error?.message || "Unknown error";
+      res.status(500).json({ error: "Failed to identify card", detail: errorMsg });
     }
   });
 
