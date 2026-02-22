@@ -10,12 +10,12 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://tcg-binder-pro.vercel.app"
+        "EXPO_PUBLIC_API_URL": "https://tcg-binder-pro.replit.app"
       }
     },
     "production": {
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://tcg-binder-pro.vercel.app"
+        "EXPO_PUBLIC_API_URL": "https://tcg-binder-pro.replit.app"
       }
     }
   },
