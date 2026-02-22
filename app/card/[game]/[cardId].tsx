@@ -249,51 +249,30 @@ export default function CardDetailScreen() {
         </Pressable>
 
         <View style={styles.infoSection}>
-          <View style={styles.badgeRow}>
-            {card.rarity && (
-              <View style={[styles.badge, { backgroundColor: (gameInfo?.color || colors.tint) + "18" }]}>
-                <Ionicons name="diamond" size={12} color={gameInfo?.color || colors.tint} />
-                <Text style={[styles.badgeText, { color: gameInfo?.color || colors.tint }]}>
-                  {card.rarity}
-                </Text>
-              </View>
-            )}
-            {card.cardType && (
-              <View style={[styles.badge, { backgroundColor: colors.surfaceAlt }]}>
-                <Text style={[styles.badgeText, { color: colors.textSecondary }]}>
-                  {card.cardType}
-                </Text>
-              </View>
-            )}
-            {card.hp != null && (
-              <View style={[styles.badge, { backgroundColor: colors.error + "18" }]}>
-                <Ionicons name="heart" size={12} color={colors.error} />
-                <Text style={[styles.badgeText, { color: colors.error }]}>
-                  {gameId === "yugioh" ? `ATK ${card.hp}` : gameId === "mtg" ? `P ${card.hp}` : `HP ${card.hp}`}
-                </Text>
-              </View>
-            )}
-            {isInCollection && (() => {
-              const qty = cardQuantity(gameId, card.setId, cardId || "");
-              return justAdded ? (
-                <Animated.View
-                  style={[styles.badge, { backgroundColor: colors.success + "18" }, ownedBadgeStyle]}
-                >
-                  <Ionicons name="layers" size={12} color={colors.success} />
-                  <Text style={[styles.badgeText, { color: colors.success }]}>
-                    x{qty} owned
-                  </Text>
-                </Animated.View>
-              ) : (
-                <View style={[styles.badge, { backgroundColor: colors.success + "18" }]}>
-                  <Ionicons name="layers" size={12} color={colors.success} />
-                  <Text style={[styles.badgeText, { color: colors.success }]}>
-                    x{qty} owned
-                  </Text>
-                </View>
-              );
-            })()}
-          </View>
+          {isInCollection && (
+            <View style={styles.badgeRow}>
+              {(() => {
+                const qty = cardQuantity(gameId, card.setId, cardId || "");
+                return justAdded ? (
+                  <Animated.View
+                    style={[styles.badge, { backgroundColor: colors.success + "18" }, ownedBadgeStyle]}
+                  >
+                    <Ionicons name="layers" size={12} color={colors.success} />
+                    <Text style={[styles.badgeText, { color: colors.success }]}>
+                      x{qty} owned
+                    </Text>
+                  </Animated.View>
+                ) : (
+                  <View style={[styles.badge, { backgroundColor: colors.success + "18" }]}>
+                    <Ionicons name="layers" size={12} color={colors.success} />
+                    <Text style={[styles.badgeText, { color: colors.success }]}>
+                      x{qty} owned
+                    </Text>
+                  </View>
+                );
+              })()}
+            </View>
+          )}
 
           {!isInCollection && !limitReached && (
             <Pressable
@@ -354,10 +333,36 @@ export default function CardDetailScreen() {
             </View>
           )}
 
-          {card.description && (
+          {(card.rarity || card.cardType || card.hp != null || card.description) && (
             <View style={[styles.descCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
               <Text style={[styles.descLabel, { color: colors.textSecondary }]}>Card Details</Text>
-              <Text style={[styles.descText, { color: colors.text }]}>{card.description}</Text>
+              {(card.rarity || card.cardType || card.hp != null) && (
+                <View style={styles.detailsGrid}>
+                  {card.rarity && (
+                    <View style={styles.detailItem}>
+                      <Text style={[styles.detailItemLabel, { color: colors.textTertiary }]}>Rarity</Text>
+                      <Text style={[styles.detailItemValue, { color: colors.text }]}>{card.rarity}</Text>
+                    </View>
+                  )}
+                  {card.cardType && (
+                    <View style={styles.detailItem}>
+                      <Text style={[styles.detailItemLabel, { color: colors.textTertiary }]}>Type</Text>
+                      <Text style={[styles.detailItemValue, { color: colors.text }]}>{card.cardType}</Text>
+                    </View>
+                  )}
+                  {card.hp != null && (
+                    <View style={styles.detailItem}>
+                      <Text style={[styles.detailItemLabel, { color: colors.textTertiary }]}>
+                        {gameId === "yugioh" ? "ATK" : gameId === "mtg" ? "Power" : "HP"}
+                      </Text>
+                      <Text style={[styles.detailItemValue, { color: colors.text }]}>{card.hp}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+              {card.description && (
+                <Text style={[styles.descText, { color: colors.text }]}>{card.description}</Text>
+              )}
             </View>
           )}
         </View>
@@ -591,12 +596,28 @@ const styles = StyleSheet.create({
   descCard: {
     borderRadius: 12,
     padding: 16,
-    gap: 8,
+    gap: 10,
     borderWidth: 1,
   },
   descLabel: {
     fontFamily: "DMSans_600SemiBold",
     fontSize: 13,
+  },
+  detailsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+  },
+  detailItem: {
+    gap: 2,
+  },
+  detailItemLabel: {
+    fontFamily: "DMSans_400Regular",
+    fontSize: 11,
+  },
+  detailItemValue: {
+    fontFamily: "DMSans_600SemiBold",
+    fontSize: 14,
   },
   descText: {
     fontFamily: "DMSans_400Regular",
