@@ -138,8 +138,12 @@ function setupSession(app: express.Application) {
 
   app.set("trust proxy", 1);
 
+  const dbUrl = process.env.GOOGLE_CLOUD_DATABASE_URL;
   const pgStore = new PgStore({
-    conString: process.env.GOOGLE_CLOUD_DATABASE_URL,
+    conObject: {
+      connectionString: dbUrl,
+      ssl: isProduction ? { rejectUnauthorized: false } : undefined,
+    },
     createTableIfMissing: true,
     errorLog: (err: Error) => {
       console.error("Session store error (non-fatal):", err.message);
