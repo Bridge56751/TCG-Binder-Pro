@@ -68,7 +68,7 @@ function setupCors(app: express.Application) {
 function setupBodyParsing(app: express.Application) {
   app.use(
     express.json({
-      limit: "50mb",
+      limit: "10mb",
       verify: (req, _res, buf) => {
         req.rawBody = buf;
       },
@@ -167,6 +167,7 @@ function setupRateLimiting(app: express.Application) {
     message: { message: "Too many scans. Please wait a minute before scanning again." },
     standardHeaders: true,
     legacyHeaders: false,
+    validate: { ip: false },
   });
 
   const authLimiter = rateLimit({
@@ -175,12 +176,24 @@ function setupRateLimiting(app: express.Application) {
     message: { message: "Too many attempts. Please wait a minute and try again." },
     standardHeaders: true,
     legacyHeaders: false,
+    validate: { ip: false },
+  });
+
+  const emailLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 3,
+    message: { message: "Too many email requests. Please wait a minute." },
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: { ip: false },
   });
 
   app.use("/api/identify-card", scanLimiter);
   app.use("/api/auth/login", authLimiter);
   app.use("/api/auth/register", authLimiter);
   app.use("/api/auth/request-reset", authLimiter);
+  app.use("/api/auth/resend-verification", emailLimiter);
+  app.use("/api/auth/verify-email", authLimiter);
 }
 
 async function createApp() {
