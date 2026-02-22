@@ -220,10 +220,10 @@ export default function UpgradeScreen() {
           )}
 
           <Text style={[styles.cancelInfo, { color: colors.textTertiary }]}>
-            Subscription automatically renews monthly. You can cancel anytime in{" "}
+            Payment will be charged to your Apple ID account at confirmation of purchase. Subscription automatically renews unless auto-renew is turned off at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period at $2.99/month. You can manage and cancel your subscription by going to your{" "}
             <Text style={{ color: colors.textSecondary, textDecorationLine: "underline" }} onPress={() => Linking.openURL("https://apps.apple.com/account/subscriptions")}>
-              Settings → Apple ID → Subscriptions
-            </Text>.
+              Account Settings
+            </Text>{" "}after purchase.
           </Text>
 
           <Text style={[styles.legalLinks, { color: colors.textTertiary }]}>
