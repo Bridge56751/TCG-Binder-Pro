@@ -37,7 +37,7 @@ export default function AuthScreen() {
     }
   }, []);
 
-  const [mode, setMode] = useState<ScreenMode>("login");
+  const [mode, setMode] = useState<ScreenMode>("register");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -626,7 +626,9 @@ export default function AuthScreen() {
 
         {appleAuthAvailable && (
           <AppleAuthentication.AppleAuthenticationButton
-            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+            buttonType={mode === "register"
+              ? AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP
+              : AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
             buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
             cornerRadius={12}
             style={styles.appleButton}
