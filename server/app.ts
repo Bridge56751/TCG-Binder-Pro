@@ -138,7 +138,8 @@ function setupSession(app: express.Application) {
 
   app.set("trust proxy", 1);
 
-  const dbUrl = process.env.GOOGLE_CLOUD_DATABASE_URL;
+  const rawDbUrl = process.env.GOOGLE_CLOUD_DATABASE_URL;
+  const dbUrl = rawDbUrl ? rawDbUrl.replace(/[\?&]sslmode=[^&]*/g, "") : undefined;
   const pgStore = new PgStore({
     conObject: {
       connectionString: dbUrl,
