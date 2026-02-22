@@ -429,6 +429,12 @@ export async function registerRoutes(app: Express): Promise<Express> {
       if (password.length < 6) {
         return res.status(400).json({ error: "Password must be at least 6 characters" });
       }
+
+      if (!req.session) {
+        console.error("[Register] Session unavailable — aborting before creating account");
+        return res.status(503).json({ error: "Session service temporarily unavailable. Please try again in a moment." });
+      }
+
       const existing = await storage.getUserByEmail(email.toLowerCase());
       if (existing) {
         if (existing.appleId) {
@@ -442,12 +448,7 @@ export async function registerRoutes(app: Express): Promise<Express> {
       const expiry = new Date(Date.now() + 10 * 60 * 1000);
       await storage.setVerificationCode(user.id, code, expiry);
       sendVerificationEmail(email.toLowerCase(), code).catch(e => console.error("Verification email failed:", e));
-      if (req.session) {
-        req.session.userId = user.id;
-      } else {
-        console.error("[Register] Session unavailable — user created but session not saved");
-        return res.status(503).json({ error: "Account created but session service unavailable. Please try logging in." });
-      }
+      req.session.userId = user.id;
       res.json({ id: user.id, email: user.email, isPremium: user.isPremium, isVerified: false, needsVerification: true });
     } catch (error) {
       console.error("Register error:", error);
@@ -575,6 +576,10 @@ export async function registerRoutes(app: Express): Promise<Express> {
       if (!email || !password) {
         return res.status(400).json({ error: "Email and password are required" });
       }
+      if (!req.session) {
+        console.error("[Login] Session unavailable — aborting login");
+        return res.status(503).json({ error: "Session service temporarily unavailable. Please try again." });
+      }
       const user = await storage.getUserByEmail(email.toLowerCase());
       if (!user) {
         return res.status(401).json({ error: "Invalid email or password" });
@@ -589,12 +594,7 @@ export async function registerRoutes(app: Express): Promise<Express> {
       if (!valid) {
         return res.status(401).json({ error: "Invalid email or password" });
       }
-      if (req.session) {
-        req.session.userId = user.id;
-      } else {
-        console.error("[Login] Session unavailable — cannot save session");
-        return res.status(503).json({ error: "Session service temporarily unavailable. Please try again." });
-      }
+      req.session.userId = user.id;
       if (!user.isVerified) {
         const code = generateCode();
         const expiry = new Date(Date.now() + 10 * 60 * 1000);
