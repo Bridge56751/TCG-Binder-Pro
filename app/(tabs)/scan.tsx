@@ -64,6 +64,8 @@ export default function ScanScreen() {
   const [hasSearched, setHasSearched] = useState(false);
   const [confirmedResult, setConfirmedResult] = useState<CardIdentification | null>(null);
   const lastScanMethod = useRef<"camera" | "library">("camera");
+  const [batchQueue, setBatchQueue] = useState<{ uri: string; base64: string }[]>([]);
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const scrollToFocusedInput = useCallback(() => {
@@ -129,28 +131,72 @@ export default function ScanScreen() {
       mediaTypes: ["images"],
       quality: 0.7,
       base64: true,
+      allowsMultipleSelection: batchMode,
+      selectionLimit: batchMode ? 20 : 1,
     });
-    if (!result.canceled && result.assets[0]) {
+    if (!result.canceled && result.assets.length > 0) {
       lastScanMethod.current = "library";
-      setImageUri(result.assets[0].uri);
+      if (result.assets.length > 1) {
+        const queue = result.assets
+          .filter((a) => a.base64)
+          .map((a) => ({ uri: a.uri, base64: a.base64! }));
+        if (queue.length > 0) {
+          setBatchProgress({ current: 1, total: queue.length });
+          setImageUri(queue[0].uri);
+          setScanResult(null);
+          setConfirmedResult(null);
+          setIsEditing(false);
+          setAddQuantity(1);
+          setBatchQueue(queue.slice(1));
+          identifyCard(queue[0].base64);
+        }
+      } else {
+        setImageUri(result.assets[0].uri);
+        setScanResult(null);
+        setConfirmedResult(null);
+        setIsEditing(false);
+        setAddQuantity(1);
+        setBatchQueue([]);
+        setBatchProgress(null);
+        identifyCard(result.assets[0].base64!);
+      }
+    }
+  };
+
+  const processNextInQueue = useCallback(() => {
+    setBatchQueue((prev) => {
+      if (prev.length === 0) {
+        setBatchProgress(null);
+        return prev;
+      }
+      const next = prev[0];
+      const remaining = prev.slice(1);
+      setBatchProgress((p) => p ? { current: p.current + 1, total: p.total } : null);
+      setImageUri(next.uri);
       setScanResult(null);
       setConfirmedResult(null);
       setIsEditing(false);
       setAddQuantity(1);
-      identifyCard(result.assets[0].base64!);
-    }
-  };
+      identifyCard(next.base64);
+      return remaining;
+    });
+  }, []);
 
   const batchScanNext = useCallback(() => {
-    resetScan();
-    setTimeout(() => {
-      if (lastScanMethod.current === "library") {
-        pickImage();
-      } else {
-        takePhoto();
-      }
-    }, 400);
-  }, []);
+    if (batchQueue.length > 0) {
+      processNextInQueue();
+    } else {
+      setBatchProgress(null);
+      resetScan();
+      setTimeout(() => {
+        if (lastScanMethod.current === "library") {
+          pickImage();
+        } else {
+          takePhoto();
+        }
+      }, 400);
+    }
+  }, [batchQueue.length]);
 
   const identifyCard = async (base64: string) => {
     setIsScanning(true);
@@ -255,6 +301,8 @@ export default function ScanScreen() {
     setEditSetName("");
     setSearchResults([]);
     setHasSearched(false);
+    setBatchQueue([]);
+    setBatchProgress(null);
   };
 
   const confirmMainPick = () => {
@@ -438,6 +486,35 @@ export default function ScanScreen() {
         </View>
       </View>
 
+      {batchProgress && (
+        <Animated.View entering={FadeIn.duration(200)} style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          marginHorizontal: 20,
+          marginBottom: 8,
+          paddingVertical: 10,
+          paddingHorizontal: 16,
+          borderRadius: 12,
+          backgroundColor: colors.tint + "12",
+        }}>
+          <Ionicons name="images" size={16} color={colors.tint} />
+          <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 14, color: colors.tint }}>
+            Photo {batchProgress.current} of {batchProgress.total}
+          </Text>
+          {batchQueue.length > 0 && (
+            <Pressable
+              onPress={() => processNextInQueue()}
+              style={{ marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 4 }}
+            >
+              <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textSecondary }}>Skip</Text>
+              <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+            </Pressable>
+          )}
+        </Animated.View>
+      )}
+
       <View style={dynamicStyles.scanArea}>
         {imageUri ? (
           <Animated.View entering={FadeIn.duration(300)} style={[dynamicStyles.previewWrapper, { backgroundColor: colors.surfaceAlt }]}>
@@ -445,7 +522,9 @@ export default function ScanScreen() {
             {isScanning && (
               <View style={dynamicStyles.scanningOverlay}>
                 <ActivityIndicator size="large" color={colors.tint} />
-                <Text style={[dynamicStyles.scanningText, { color: colors.text }]}>Identifying card...</Text>
+                <Text style={[dynamicStyles.scanningText, { color: colors.text }]}>
+                  {batchProgress ? `Identifying card ${batchProgress.current} of ${batchProgress.total}...` : "Identifying card..."}
+                </Text>
               </View>
             )}
             <Pressable style={dynamicStyles.clearButton} onPress={resetScan}>
@@ -985,7 +1064,7 @@ export default function ScanScreen() {
           onPress={pickImage}
         >
           <Ionicons name="images" size={22} color={colors.tint} />
-          <Text style={[dynamicStyles.secondaryActionText, { color: colors.tint }]}>Library</Text>
+          <Text style={[dynamicStyles.secondaryActionText, { color: colors.tint }]}>{batchMode ? "Select Photos" : "Library"}</Text>
         </Pressable>
       </View>
 
