@@ -191,6 +191,8 @@ export default function SetDetailScreen() {
   const handleDeleteSelected = useCallback(() => {
     const count = selectedCards.size;
     if (count === 0) return;
+    const cardsToDelete = Array.from(selectedCards);
+    const setId = id || "";
     Alert.alert(
       "Remove Cards",
       `Remove ${count} card${count > 1 ? "s" : ""} from your collection? This cannot be undone.`,
@@ -200,12 +202,18 @@ export default function SetDetailScreen() {
           text: "Remove",
           style: "destructive",
           onPress: async () => {
-            for (const cardId of selectedCards) {
-              await removeCard(gameId, id || "", cardId);
+            try {
+              for (const cardId of cardsToDelete) {
+                await removeCard(gameId, setId, cardId);
+              }
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch (e) {
+              console.error("Failed to delete cards:", e);
+              Alert.alert("Error", "Failed to remove some cards. Please try again.");
+            } finally {
+              setSelectedCards(new Set());
+              setTrashMode(false);
             }
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            setSelectedCards(new Set());
-            setTrashMode(false);
           },
         },
       ]

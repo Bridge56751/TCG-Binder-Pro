@@ -332,6 +332,7 @@ export default function AllCardsScreen() {
   const handleDeleteSelected = useCallback(() => {
     if (selectedCards.size === 0) return;
     const count = selectedCards.size;
+    const keysToDelete = Array.from(selectedCards);
     Alert.alert(
       "Remove Cards",
       `Remove ${count} card${count !== 1 ? "s" : ""} from your collection? This removes one copy of each selected card.`,
@@ -341,13 +342,19 @@ export default function AllCardsScreen() {
           text: `Remove ${count}`,
           style: "destructive",
           onPress: async () => {
-            for (const key of selectedCards) {
-              const [game, setId, ...cardIdParts] = key.split(":");
-              const cardId = cardIdParts.join(":");
-              await removeOneCard(game as GameId, setId, cardId);
+            try {
+              for (const key of keysToDelete) {
+                const [game, setId, ...cardIdParts] = key.split(":");
+                const cardId = cardIdParts.join(":");
+                await removeOneCard(game as GameId, setId, cardId);
+              }
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch (e) {
+              console.error("Failed to delete cards:", e);
+              Alert.alert("Error", "Failed to remove some cards. Please try again.");
+            } finally {
+              exitSelectMode();
             }
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            exitSelectMode();
           },
         },
       ]
