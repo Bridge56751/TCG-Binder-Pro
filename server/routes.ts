@@ -442,7 +442,9 @@ export async function registerRoutes(app: Express): Promise<Express> {
       const expiry = new Date(Date.now() + 10 * 60 * 1000);
       await storage.setVerificationCode(user.id, code, expiry);
       sendVerificationEmail(email.toLowerCase(), code).catch(e => console.error("Verification email failed:", e));
-      req.session.userId = user.id;
+      if (req.session) {
+        req.session.userId = user.id;
+      }
       res.json({ id: user.id, email: user.email, isPremium: user.isPremium, isVerified: false, needsVerification: true });
     } catch (error) {
       console.error("Register error:", error);
@@ -452,7 +454,7 @@ export async function registerRoutes(app: Express): Promise<Express> {
 
   app.post("/api/auth/verify-email", async (req, res) => {
     try {
-      if (!req.session.userId) {
+      if (!req.session?.userId) {
         return res.status(401).json({ error: "Not logged in" });
       }
       const { code } = req.body;
@@ -485,7 +487,7 @@ export async function registerRoutes(app: Express): Promise<Express> {
 
   app.post("/api/auth/resend-verification", async (req, res) => {
     try {
-      if (!req.session.userId) {
+      if (!req.session?.userId) {
         return res.status(401).json({ error: "Not logged in" });
       }
       const user = await storage.getUser(req.session.userId);
@@ -581,7 +583,9 @@ export async function registerRoutes(app: Express): Promise<Express> {
       if (!valid) {
         return res.status(401).json({ error: "Invalid email or password" });
       }
-      req.session.userId = user.id;
+      if (req.session) {
+        req.session.userId = user.id;
+      }
       if (!user.isVerified) {
         const code = generateCode();
         const expiry = new Date(Date.now() + 10 * 60 * 1000);
@@ -649,7 +653,12 @@ export async function registerRoutes(app: Express): Promise<Express> {
         console.log(`[AppleAuth] Created new Apple user: ${user.id}`);
       }
 
-      req.session.userId = user.id;
+      if (req.session) {
+        req.session.userId = user.id;
+      } else {
+        console.error("[AppleAuth] Session unavailable — user created but session not saved");
+        return res.status(503).json({ error: "Session service temporarily unavailable. Please try again." });
+      }
       res.json({
         id: user.id,
         email: user.email,
@@ -663,6 +672,9 @@ export async function registerRoutes(app: Express): Promise<Express> {
   });
 
   app.post("/api/auth/logout", (req, res) => {
+    if (!req.session) {
+      return res.json({ ok: true });
+    }
     req.session.destroy((err) => {
       if (err) {
         return res.status(500).json({ error: "Logout failed" });
@@ -672,12 +684,12 @@ export async function registerRoutes(app: Express): Promise<Express> {
   });
 
   app.post("/api/auth/delete-account", async (req, res) => {
-    if (!req.session.userId) {
+    if (!req.session?.userId) {
       return res.status(401).json({ error: "Not logged in" });
     }
     try {
       await storage.deleteUser(req.session.userId);
-      req.session.destroy(() => {});
+      req.session?.destroy(() => {});
       res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: "Failed to delete account" });
@@ -685,7 +697,7 @@ export async function registerRoutes(app: Express): Promise<Express> {
   });
 
   app.get("/api/auth/me", async (req, res) => {
-    if (!req.session.userId) {
+    if (!req.session?.userId) {
       return res.status(401).json({ error: "Not logged in" });
     }
     const user = await storage.getUser(req.session.userId);
@@ -696,7 +708,7 @@ export async function registerRoutes(app: Express): Promise<Express> {
   });
 
   app.post("/api/auth/upgrade-premium", async (req, res) => {
-    if (!req.session.userId) {
+    if (!req.session?.userId) {
       return res.status(401).json({ error: "Not logged in" });
     }
     try {
@@ -740,7 +752,7 @@ export async function registerRoutes(app: Express): Promise<Express> {
   });
 
   app.get("/api/collection/sync", async (req, res) => {
-    if (!req.session.userId) {
+    if (!req.session?.userId) {
       return res.status(401).json({ error: "Not logged in" });
     }
     try {
@@ -753,7 +765,7 @@ export async function registerRoutes(app: Express): Promise<Express> {
   });
 
   app.post("/api/collection/sync", async (req, res) => {
-    if (!req.session.userId) {
+    if (!req.session?.userId) {
       return res.status(401).json({ error: "Not logged in" });
     }
     try {
