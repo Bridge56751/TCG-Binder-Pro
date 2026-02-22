@@ -77,14 +77,16 @@ function BinderCard({
   priceInfo,
   colors,
   onPress,
-  onDelete,
+  selecting,
+  selected,
 }: {
   card: CardWithMeta;
   meta?: CardMeta;
   priceInfo?: CardPriceInfo;
   colors: any;
   onPress: () => void;
-  onDelete: () => void;
+  selecting: boolean;
+  selected: boolean;
 }) {
   const displayName = meta?.name || priceInfo?.name || card.cardId;
   const price = priceInfo?.price;
@@ -92,7 +94,14 @@ function BinderCard({
 
   return (
     <Pressable
-      style={[styles.binderCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+      style={[
+        styles.binderCard,
+        {
+          backgroundColor: colors.surface,
+          borderColor: selected ? colors.error : colors.cardBorder,
+          borderWidth: selected ? 2 : 1,
+        },
+      ]}
       onPress={onPress}
     >
       {image ? (
@@ -108,19 +117,17 @@ function BinderCard({
           <Ionicons name="image-outline" size={28} color={colors.textTertiary} />
         </View>
       )}
-      <View style={styles.binderInfo}>
-        <View style={styles.binderNameRow}>
-          <Text style={[styles.binderName, { color: colors.text, flex: 1 }]} numberOfLines={1}>
-            {displayName}
-          </Text>
-          <Pressable
-            style={styles.binderDeleteBtn}
-            onPress={(e) => { e.stopPropagation?.(); onDelete(); }}
-            hitSlop={6}
-          >
-            <Ionicons name="trash-outline" size={14} color={colors.error} />
-          </Pressable>
+      {selecting && (
+        <View style={[styles.selectOverlay, selected && { backgroundColor: "rgba(0,0,0,0.35)" }]}>
+          <View style={[styles.selectCircle, { borderColor: "#FFF", backgroundColor: selected ? colors.error : "rgba(0,0,0,0.3)" }]}>
+            {selected && <Ionicons name="checkmark" size={14} color="#FFF" />}
+          </View>
         </View>
+      )}
+      <View style={styles.binderInfo}>
+        <Text style={[styles.binderName, { color: colors.text }]} numberOfLines={1}>
+          {displayName}
+        </Text>
         <View style={styles.binderBottom}>
           <View style={[styles.binderGameDot, { backgroundColor: gameColor(card.game) }]} />
           {price != null ? (
@@ -152,6 +159,8 @@ export default function AllCardsScreen() {
   const [sortBy, setSortBy] = useState<SortOption>("recent");
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set());
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
@@ -293,29 +302,63 @@ export default function AllCardsScreen() {
     return Math.round(total * 100) / 100;
   }, [filteredCards, priceMap]);
 
-  const handleDelete = useCallback(
-    (card: CardWithMeta) => {
-      const name = metaMap.get(card.cardId)?.name || priceMap.get(card.cardId)?.name || card.cardId;
-      Alert.alert(
-        "Remove Card",
-        `Remove one copy of "${name}" from your collection?`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Remove",
-            style: "destructive",
-            onPress: async () => {
-              await removeOneCard(card.game as GameId, card.setId, card.cardId);
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            },
+  const cardKey = useCallback((card: CardWithMeta) => `${card.game}:${card.setId}:${card.cardId}`, []);
+
+  const toggleSelect = useCallback((card: CardWithMeta) => {
+    const key = cardKey(card);
+    setSelectedCards((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [cardKey]);
+
+  const selectAll = useCallback(() => {
+    const keys = sortedCards.map(cardKey);
+    setSelectedCards(new Set(keys));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, [sortedCards, cardKey]);
+
+  const exitSelectMode = useCallback(() => {
+    setSelectMode(false);
+    setSelectedCards(new Set());
+  }, []);
+
+  const handleDeleteSelected = useCallback(() => {
+    if (selectedCards.size === 0) return;
+    const count = selectedCards.size;
+    Alert.alert(
+      "Remove Cards",
+      `Remove ${count} card${count !== 1 ? "s" : ""} from your collection? This removes one copy of each selected card.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: `Remove ${count}`,
+          style: "destructive",
+          onPress: async () => {
+            for (const key of selectedCards) {
+              const [game, setId, ...cardIdParts] = key.split(":");
+              const cardId = cardIdParts.join(":");
+              await removeOneCard(game as GameId, setId, cardId);
+            }
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            exitSelectMode();
           },
-        ]
-      );
-    },
-    [removeOneCard, metaMap, priceMap]
-  );
+        },
+      ]
+    );
+  }, [selectedCards, removeOneCard, exitSelectMode]);
 
   const handleCardPress = useCallback((card: CardWithMeta) => {
+    if (selectMode) {
+      toggleSelect(card);
+      return;
+    }
     const galleryList = sortedCards
       .map((c) => {
         const m = metaMap.get(c.cardId);
@@ -332,7 +375,7 @@ export default function AllCardsScreen() {
       pathname: "/card/[game]/[cardId]",
       params: { game: card.game, cardId: card.cardId },
     });
-  }, [sortedCards, metaMap, setGalleryCards]);
+  }, [selectMode, toggleSelect, sortedCards, metaMap, setGalleryCards]);
 
   const currentSort = SORT_OPTIONS.find((s) => s.id === sortBy)!;
 
@@ -343,21 +386,35 @@ export default function AllCardsScreen() {
       priceInfo={priceMap.get(item.cardId)}
       colors={colors}
       onPress={() => handleCardPress(item)}
-      onDelete={() => handleDelete(item)}
+      selecting={selectMode}
+      selected={selectedCards.has(cardKey(item))}
     />
-  ), [metaMap, priceMap, colors, handleCardPress, handleDelete]);
+  ), [metaMap, priceMap, colors, handleCardPress, selectMode, selectedCards, cardKey]);
 
   const renderListItem = useCallback(({ item }: { item: CardWithMeta }) => {
     const meta = metaMap.get(item.cardId);
     const priceInfo = priceMap.get(item.cardId);
     const displayName = meta?.name || priceInfo?.name || item.cardId;
     const price = priceInfo?.price;
+    const isSelected = selectedCards.has(cardKey(item));
 
     return (
       <Pressable
-        style={[styles.listRow, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+        style={[
+          styles.listRow,
+          {
+            backgroundColor: colors.surface,
+            borderColor: isSelected ? colors.error : colors.cardBorder,
+            borderWidth: isSelected ? 2 : 1,
+          },
+        ]}
         onPress={() => handleCardPress(item)}
       >
+        {selectMode && (
+          <View style={[styles.listSelectCircle, { borderColor: isSelected ? colors.error : colors.textTertiary, backgroundColor: isSelected ? colors.error : "transparent" }]}>
+            {isSelected && <Ionicons name="checkmark" size={14} color="#FFF" />}
+          </View>
+        )}
         {meta?.image ? (
           <Image
             source={{ uri: meta.image }}
@@ -383,16 +440,9 @@ export default function AllCardsScreen() {
         ) : (
           <Text style={[styles.listPrice, { color: colors.textTertiary }]}>--</Text>
         )}
-        <Pressable
-          style={styles.listDeleteBtn}
-          onPress={(e) => { e.stopPropagation?.(); handleDelete(item); }}
-          hitSlop={8}
-        >
-          <Ionicons name="trash-outline" size={18} color={colors.error} />
-        </Pressable>
       </Pressable>
     );
-  }, [metaMap, priceMap, colors, handleCardPress, handleDelete]);
+  }, [metaMap, priceMap, colors, handleCardPress, selectMode, selectedCards, cardKey]);
 
   const keyExtractor = useCallback((item: CardWithMeta) => `${item.game}:${item.setId}:${item.cardId}`, []);
 
@@ -400,91 +450,131 @@ export default function AllCardsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topInset + 8 }]}>
         <View style={styles.headerRow}>
-          <Pressable style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={24} color={colors.text} />
+          <Pressable style={styles.backBtn} onPress={() => { if (selectMode) { exitSelectMode(); } else { router.back(); } }}>
+            <Ionicons name={selectMode ? "close" : "chevron-back"} size={24} color={colors.text} />
           </Pressable>
           <View style={styles.headerTitles}>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>My Binder</Text>
-            <Text style={[styles.headerSub, { color: colors.textSecondary }]}>
-              {filteredCards.length} cards · ${totalValue.toFixed(2)} value
-            </Text>
-          </View>
-          <Pressable
-            style={[styles.viewToggle, { backgroundColor: colors.surfaceAlt }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setViewMode(v => v === "grid" ? "list" : "grid");
-            }}
-          >
-            <Ionicons name={viewMode === "grid" ? "list" : "grid"} size={20} color={colors.text} />
-          </Pressable>
-        </View>
-
-        <View style={styles.controlsRow}>
-          <View style={styles.filterRow}>
-            {[
-              { id: "all" as const, label: "All" },
-              ...GAMES.map((g) => ({ id: g.id, label: g.name })),
-            ].map((opt) => {
-              const active = filterGame === opt.id;
-              return (
-                <Pressable
-                  key={opt.id}
-                  style={[
-                    styles.filterChip,
-                    { backgroundColor: active ? colors.tint : colors.surfaceAlt },
-                  ]}
-                  onPress={() => setFilterGame(opt.id as any)}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      { color: active ? "#FFF" : colors.textSecondary },
-                    ]}
-                  >
-                    {opt.label}
+            {selectMode ? (
+              <>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>
+                  {selectedCards.size} Selected
+                </Text>
+                <Pressable onPress={selectedCards.size === sortedCards.length ? () => setSelectedCards(new Set()) : selectAll}>
+                  <Text style={[styles.headerSub, { color: colors.tint }]}>
+                    {selectedCards.size === sortedCards.length ? "Deselect All" : "Select All"}
                   </Text>
                 </Pressable>
-              );
-            })}
+              </>
+            ) : (
+              <>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>My Binder</Text>
+                <Text style={[styles.headerSub, { color: colors.textSecondary }]}>
+                  {filteredCards.length} cards · ${totalValue.toFixed(2)} value
+                </Text>
+              </>
+            )}
           </View>
+          {selectMode ? (
+            <Pressable
+              style={[styles.deleteBtn, { backgroundColor: selectedCards.size > 0 ? colors.error : colors.surfaceAlt }]}
+              onPress={handleDeleteSelected}
+              disabled={selectedCards.size === 0}
+            >
+              <Ionicons name="trash" size={20} color={selectedCards.size > 0 ? "#FFF" : colors.textTertiary} />
+            </Pressable>
+          ) : (
+            <View style={styles.headerActions}>
+              <Pressable
+                style={[styles.viewToggle, { backgroundColor: colors.surfaceAlt }]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setSelectMode(true);
+                }}
+              >
+                <Ionicons name="trash-outline" size={20} color={colors.error} />
+              </Pressable>
+              <Pressable
+                style={[styles.viewToggle, { backgroundColor: colors.surfaceAlt }]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setViewMode(v => v === "grid" ? "list" : "grid");
+                }}
+              >
+                <Ionicons name={viewMode === "grid" ? "list" : "grid"} size={20} color={colors.text} />
+              </Pressable>
+            </View>
+          )}
         </View>
 
-        <Pressable
-          style={[styles.sortBtn, { backgroundColor: colors.surfaceAlt }]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setShowSortMenu(!showSortMenu);
-          }}
-        >
-          <Ionicons name={currentSort.icon as any} size={16} color={colors.tint} />
-          <Text style={[styles.sortBtnText, { color: colors.text }]}>{currentSort.label}</Text>
-          <Ionicons name={showSortMenu ? "chevron-up" : "chevron-down"} size={14} color={colors.textTertiary} />
-        </Pressable>
+        {!selectMode && (
+          <>
+            <View style={styles.controlsRow}>
+              <View style={styles.filterRow}>
+                {[
+                  { id: "all" as const, label: "All" },
+                  ...GAMES.map((g) => ({ id: g.id, label: g.name })),
+                ].map((opt) => {
+                  const active = filterGame === opt.id;
+                  return (
+                    <Pressable
+                      key={opt.id}
+                      style={[
+                        styles.filterChip,
+                        { backgroundColor: active ? colors.tint : colors.surfaceAlt },
+                      ]}
+                      onPress={() => setFilterGame(opt.id as any)}
+                    >
+                      <Text
+                        style={[
+                          styles.filterChipText,
+                          { color: active ? "#FFF" : colors.textSecondary },
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
 
-        {showSortMenu && (
-          <View style={[styles.sortMenu, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-            {SORT_OPTIONS.map((opt) => {
-              const active = sortBy === opt.id;
-              return (
-                <Pressable
-                  key={opt.id}
-                  style={[styles.sortMenuItem, active && { backgroundColor: colors.tint + "12" }]}
-                  onPress={() => {
-                    setSortBy(opt.id);
-                    setShowSortMenu(false);
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  }}
-                >
-                  <Ionicons name={opt.icon as any} size={18} color={active ? colors.tint : colors.textSecondary} />
-                  <Text style={[styles.sortMenuText, { color: active ? colors.tint : colors.text }]}>
-                    {opt.label}
-                  </Text>
-                  {active && <Ionicons name="checkmark" size={18} color={colors.tint} />}
-                </Pressable>
-              );
-            })}
-          </View>
+            <Pressable
+              style={[styles.sortBtn, { backgroundColor: colors.surfaceAlt }]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowSortMenu(!showSortMenu);
+              }}
+            >
+              <Ionicons name={currentSort.icon as any} size={16} color={colors.tint} />
+              <Text style={[styles.sortBtnText, { color: colors.text }]}>{currentSort.label}</Text>
+              <Ionicons name={showSortMenu ? "chevron-up" : "chevron-down"} size={14} color={colors.textTertiary} />
+            </Pressable>
+
+            {showSortMenu && (
+              <View style={[styles.sortMenu, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                {SORT_OPTIONS.map((opt) => {
+                  const active = sortBy === opt.id;
+                  return (
+                    <Pressable
+                      key={opt.id}
+                      style={[styles.sortMenuItem, active && { backgroundColor: colors.tint + "12" }]}
+                      onPress={() => {
+                        setSortBy(opt.id);
+                        setShowSortMenu(false);
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      }}
+                    >
+                      <Ionicons name={opt.icon as any} size={18} color={active ? colors.tint : colors.textSecondary} />
+                      <Text style={[styles.sortMenuText, { color: active ? colors.tint : colors.text }]}>
+                        {opt.label}
+                      </Text>
+                      {active && <Ionicons name="checkmark" size={18} color={colors.tint} />}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+          </>
         )}
       </View>
 
@@ -519,6 +609,7 @@ export default function AllCardsScreen() {
           showsVerticalScrollIndicator={false}
           renderItem={renderGridItem}
           scrollEnabled={!!sortedCards.length}
+          extraData={selectedCards}
         />
       ) : (
         <FlatList
@@ -530,6 +621,7 @@ export default function AllCardsScreen() {
           renderItem={renderListItem}
           ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
           scrollEnabled={!!sortedCards.length}
+          extraData={selectedCards}
         />
       )}
     </View>
@@ -544,7 +636,9 @@ const styles = StyleSheet.create({
   headerTitles: { flex: 1 },
   headerTitle: { fontFamily: "DMSans_700Bold", fontSize: 24 },
   headerSub: { fontFamily: "DMSans_400Regular", fontSize: 13, marginTop: 2 },
+  headerActions: { flexDirection: "row", gap: 8 },
   viewToggle: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  deleteBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   controlsRow: { gap: 8 },
   filterRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20 },
@@ -575,7 +669,6 @@ const styles = StyleSheet.create({
   binderCard: {
     width: CARD_WIDTH,
     borderRadius: 12,
-    borderWidth: 1,
     overflow: "hidden",
   },
   binderImage: {
@@ -588,22 +681,34 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  selectOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: CARD_HEIGHT,
+    borderTopLeftRadius: 11,
+    borderTopRightRadius: 11,
+    justifyContent: "flex-start",
+    alignItems: "flex-end",
+    padding: 6,
+  },
+  selectCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   binderInfo: {
     paddingHorizontal: 8,
     paddingVertical: 8,
     gap: 4,
   },
-  binderNameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
   binderName: {
     fontFamily: "DMSans_600SemiBold",
     fontSize: 11,
-  },
-  binderDeleteBtn: {
-    padding: 2,
   },
   binderBottom: {
     flexDirection: "row",
@@ -637,16 +742,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 10,
     borderRadius: 14,
-    borderWidth: 1,
     gap: 12,
+  },
+  listSelectCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
   },
   listThumb: {
     width: 48,
     height: 66,
     borderRadius: 8,
-  },
-  listDeleteBtn: {
-    padding: 8,
   },
   listInfo: { flex: 1, gap: 2 },
   listName: { fontFamily: "DMSans_600SemiBold", fontSize: 15 },
