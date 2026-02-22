@@ -167,7 +167,7 @@ function setupRateLimiting(app: express.Application) {
     message: { message: "Too many scans. Please wait a minute before scanning again." },
     standardHeaders: true,
     legacyHeaders: false,
-    validate: { ip: false },
+    validate: false,
   });
 
   const authLimiter = rateLimit({
@@ -176,7 +176,7 @@ function setupRateLimiting(app: express.Application) {
     message: { message: "Too many attempts. Please wait a minute and try again." },
     standardHeaders: true,
     legacyHeaders: false,
-    validate: { ip: false },
+    validate: false,
   });
 
   const emailLimiter = rateLimit({
@@ -185,7 +185,7 @@ function setupRateLimiting(app: express.Application) {
     message: { message: "Too many email requests. Please wait a minute." },
     standardHeaders: true,
     legacyHeaders: false,
-    validate: { ip: false },
+    validate: false,
   });
 
   app.use("/api/identify-card", scanLimiter);
