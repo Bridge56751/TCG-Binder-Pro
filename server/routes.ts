@@ -996,7 +996,7 @@ export async function registerRoutes(app: Express): Promise<Express> {
       }
 
       const response = await openai.chat.completions.create({
-        model: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL?.includes("replit") ? "gpt-5.2" : "gpt-4o",
+        model: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL?.includes("replit") ? "gpt-5.2" : "gpt-4.1",
         messages: [
           {
             role: "system",
@@ -1176,7 +1176,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
         console.log(`[Retry] First pass failed verification for "${result.name}" (${result.game}), attempting second pass...`);
         try {
           const retryResponse = await openai.chat.completions.create({
-            model: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL?.includes("replit") ? "gpt-5.2" : "gpt-4o",
+            model: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL?.includes("replit") ? "gpt-5.2" : "gpt-4.1",
             messages: [
               {
                 role: "system",
