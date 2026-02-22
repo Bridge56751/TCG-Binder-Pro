@@ -1,5 +1,4 @@
 import type { Express } from "express";
-import { createServer, type Server } from "node:http";
 import OpenAI from "openai";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
@@ -406,7 +405,7 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
   return null;
 }
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export async function registerRoutes(app: Express): Promise<Express> {
 
   app.post("/api/auth/register", async (req, res) => {
     try {
@@ -2588,8 +2587,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
     }
   });
 
-  const httpServer = createServer(app);
-  return httpServer;
+  return app;
 }
 
 
