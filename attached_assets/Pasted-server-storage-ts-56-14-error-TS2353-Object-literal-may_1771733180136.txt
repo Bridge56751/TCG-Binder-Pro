@@ -1,0 +1,19 @@
+server/storage.ts(56,14): error TS2353: Object literal may only specify known properties, and 'appleId' does not exist in type '{ email?: string | SQL<unknown> | PgColumn<ColumnBaseConfig<ColumnDataType, string>, {}, {}>; }'.
+server/storage.ts(74,16): error TS2353: Object literal may only specify known properties, and 'data' does not exist in type '{ userId?: string | SQL<unknown> | PgColumn<ColumnBaseConfig<ColumnDataType, string>, {}, {}>; }'.
+server/storage.ts(77,40): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(value: { userId: string | SQL<unknown> | Placeholder<string, any>; }): PgInsertBase<PgTableWithColumns<{ name: "user_collections"; schema: undefined; columns: { userId: PgColumn<{ name: "user_id"; tableName: "user_collections"; ... 12 more ...; generated: undefined; }, {}, { ...; }>; data: PgColumn<...>; updatedAt: PgColumn<...>; }; dialect: "pg"; }>, ... 4 more ..., never>', gave the following error.
+    Object literal may only specify known properties, and 'data' does not exist in type '{ userId: string | SQL<unknown> | Placeholder<string, any>; }'.
+  Overload 2 of 2, '(values: { userId: string | SQL<unknown> | Placeholder<string, any>; }[]): PgInsertBase<PgTableWithColumns<{ name: "user_collections"; schema: undefined; columns: { userId: PgColumn<{ name: "user_id"; tableName: "user_collections"; ... 12 more ...; generated: undefined; }, {}, { ...; }>; data: PgColumn<...>; updatedAt: PgColumn<...>; }; dialect: "pg"; }>, ... 4 more ..., never>', gave the following error.
+    Object literal may only specify known properties, and 'userId' does not exist in type '{ userId: string | SQL<unknown> | Placeholder<string, any>; }[]'.
+server/storage.ts(83,14): error TS2353: Object literal may only specify known properties, and 'isPremium' does not exist in type '{ email?: string | SQL<unknown> | PgColumn<ColumnBaseConfig<ColumnDataType, string>, {}, {}>; }'.
+server/storage.ts(89,14): error TS2353: Object literal may only specify known properties, and 'verificationCode' does not exist in type '{ email?: string | SQL<unknown> | PgColumn<ColumnBaseConfig<ColumnDataType, string>, {}, {}>; }'.
+server/storage.ts(95,14): error TS2353: Object literal may only specify known properties, and 'isVerified' does not exist in type '{ email?: string | SQL<unknown> | PgColumn<ColumnBaseConfig<ColumnDataType, string>, {}, {}>; }'.
+server/storage.ts(101,14): error TS2353: Object literal may only specify known properties, and 'resetCode' does not exist in type '{ email?: string | SQL<unknown> | PgColumn<ColumnBaseConfig<ColumnDataType, string>, {}, {}>; }'.
+server/storage.ts(107,14): error TS2353: Object literal may only specify known properties, and 'resetCode' does not exist in type '{ email?: string | SQL<unknown> | PgColumn<ColumnBaseConfig<ColumnDataType, string>, {}, {}>; }'.
+server/storage.ts(113,14): error TS2353: Object literal may only specify known properties, and 'password' does not exist in type '{ email?: string | SQL<unknown> | PgColumn<ColumnBaseConfig<ColumnDataType, string>, {}, {}>; }'.
+shared/schema.ts(30,3): error TS2322: Type 'true' is not assignable to type 'never'.
+shared/schema.ts(31,3): error TS2322: Type 'true' is not assignable to type 'never'.
+Build Completed in /vercel/output [27s]
+Deploying outputs...
+Deployment completed
+Creating build cache...
