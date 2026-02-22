@@ -15,14 +15,14 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.cardvault",
+      "bundleIdentifier": "com.tcgbinder",
       "infoPlist": {
         "NSCameraUsageDescription": "TCG Binder needs camera access to scan and identify your trading cards using AI recognition.",
         "NSPhotoLibraryUsageDescription": "TCG Binder needs access to your photo library so you can select photos of trading cards to scan and identify."
       }
     },
     "android": {
-      "package": "com.cardvault",
+      "package": "com.tcgbinder",
       "adaptiveIcon": {
         "backgroundColor": "#E8882D",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
