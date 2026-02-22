@@ -111,6 +111,9 @@ function serveLandingPage({
   console.log("Expo routing: Checking expo-platform header on / and /manifest");
 
   const httpServer = createServer(app);
+  httpServer.timeout = 120000;
+  httpServer.keepAliveTimeout = 65000;
+  httpServer.headersTimeout = 66000;
 
   const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(

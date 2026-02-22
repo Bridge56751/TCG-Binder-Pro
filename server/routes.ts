@@ -7,6 +7,7 @@ import { generateCode, sendVerificationEmail, sendPasswordResetEmail } from "./e
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+  timeout: 30000,
 });
 
 const FREE_CARD_LIMIT = 20;
@@ -29,6 +30,14 @@ function countCollectionCards(collection: any): number {
 const setsCache: Record<string, any[]> = {};
 const setCardsCache = new Map<string, { data: any; ts: number }>();
 const SET_CARDS_CACHE_TTL = 60 * 60 * 1000;
+const SET_CARDS_CACHE_MAX = 500;
+
+function pruneSetCardsCache() {
+  if (setCardsCache.size <= SET_CARDS_CACHE_MAX) return;
+  const entries = [...setCardsCache.entries()].sort((a, b) => a[1].ts - b[1].ts);
+  const toRemove = entries.slice(0, entries.length - SET_CARDS_CACHE_MAX);
+  for (const [key] of toRemove) setCardsCache.delete(key);
+}
 const pokemonReleaseDateCache: Record<string, string | null> = {};
 let pokemonReleaseDatesFetched = false;
 
@@ -751,6 +760,10 @@ export async function registerRoutes(app: Express): Promise<Express> {
       const { collection } = req.body;
       if (!collection || typeof collection !== "object") {
         return res.status(400).json({ error: "Collection data is required" });
+      }
+      const collectionSize = JSON.stringify(collection).length;
+      if (collectionSize > 5 * 1024 * 1024) {
+        return res.status(413).json({ error: "Collection data too large" });
       }
 
       const user = await storage.getUser(req.session.userId);
@@ -1751,6 +1764,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
         cards,
       };
       setCardsCache.set(cacheKey, { data: result, ts: Date.now() });
+      pruneSetCardsCache();
       res.json(result);
     } catch (error) {
       console.error("Error fetching Pokemon set cards:", error);
@@ -1835,6 +1849,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
         cards,
       };
       setCardsCache.set(cacheKey, { data: result, ts: Date.now() });
+      pruneSetCardsCache();
       res.json(result);
     } catch (error) {
       console.error("Error fetching Yu-Gi-Oh! set cards:", error);
@@ -1921,6 +1936,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
         cards,
       };
       setCardsCache.set(cacheKey, { data: result, ts: Date.now() });
+      pruneSetCardsCache();
       res.json(result);
     } catch (error) {
       console.error("Error fetching MTG set cards:", error);
