@@ -33,6 +33,19 @@ const SET_CARDS_CACHE_TTL = 60 * 60 * 1000;
 const pokemonReleaseDateCache: Record<string, string | null> = {};
 let pokemonReleaseDatesFetched = false;
 
+let onepieceCardsCache: any[] | null = null;
+async function fetchOnePieceCards(): Promise<any[]> {
+  if (onepieceCardsCache) return onepieceCardsCache;
+  try {
+    const res = await fetch("https://onepiece-cardgame.dev/cards.json");
+    if (res.ok) {
+      onepieceCardsCache = await res.json();
+      return onepieceCardsCache || [];
+    }
+  } catch {}
+  return [];
+}
+
 async function fetchPokemonReleaseDates(setIds: string[], lang: string = "en"): Promise<Record<string, string | null>> {
   if (pokemonReleaseDatesFetched) return pokemonReleaseDateCache;
   const batchSize = 20;
@@ -74,9 +87,17 @@ async function fetchSetsForGame(game: string, lang: string = "en"): Promise<any[
       const res = await fetch("https://db.ygoprodeck.com/api/v7/cardsets.php");
       sets = await res.json();
     } else if (game === "onepiece") {
-      const res = await fetch("https://optcgapi.com/api/sets/");
-      const data = await res.json();
-      sets = Array.isArray(data) ? data : [];
+      const cards = await fetchOnePieceCards();
+      const setMap = new Map<string, string>();
+      for (const c of cards) {
+        const prefix = (c.cid || "").split("-")[0];
+        if (prefix && !setMap.has(prefix)) {
+          const srcName = c.srcN || prefix;
+          const cleanName = srcName.replace(/\s*\[.*?\]\s*$/, "");
+          setMap.set(prefix, cleanName);
+        }
+      }
+      sets = Array.from(setMap.entries()).map(([id, name]) => ({ id, name, set_id: id }));
     } else if (game === "mtg") {
       const res = await fetch("https://api.scryfall.com/sets");
       const data = await res.json();
@@ -372,38 +393,32 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
       }
     } else if (game === "onepiece") {
       const cleanNum = cardNumber.replace(/^0+/, "").padStart(3, "0");
-      const cardId = `${setId}-${cleanNum}`;
-      console.log(`[OP Verify] Trying: ${cardId}`);
-      const res = await fetch(`https://optcgapi.com/api/sets/card/${cardId}/`);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          const verifiedSetId = data[0].set_id || setId;
-          console.log(`[OP Verify] HIT: ${data[0].card_name} (${data[0].card_set_id}) in set ${verifiedSetId}`);
-          return { name: data[0].card_name, cardId: data[0].card_set_id, setId: verifiedSetId };
-        }
-      }
-      if (!setId.includes("-")) {
-        const altSetId = setId.replace(/(\D+)(\d+)/, "$1-$2");
-        const altCardId = `${altSetId}-${cleanNum}`;
-        console.log(`[OP Verify] Trying alt format: ${altCardId}`);
-        const altRes = await fetch(`https://optcgapi.com/api/sets/card/${altCardId}/`);
-        if (altRes.ok) {
-          const altData = await altRes.json();
-          if (Array.isArray(altData) && altData.length > 0) {
-            return { name: altData[0].card_name, cardId: altData[0].card_set_id, setId: altData[0].set_id || altSetId };
-          }
+      const allCards = await fetchOnePieceCards();
+      const normalizeSetId = (sid: string) => sid.replace("-", "");
+      const setIdNoDash = normalizeSetId(setId);
+      const cardIdFormats = [
+        `${setIdNoDash}-${cleanNum}`,
+        `${setId}-${cleanNum}`,
+      ];
+      for (const cid of [...new Set(cardIdFormats)]) {
+        console.log(`[OP Verify] Trying: ${cid}`);
+        const match = allCards.find((c: any) => c.cid === cid);
+        if (match) {
+          const verifiedSetId = (match.cid || "").split("-")[0] || setId;
+          console.log(`[OP Verify] HIT: ${match.n} (${match.cid}) in set ${verifiedSetId}`);
+          return { name: match.n, cardId: match.cid, setId: verifiedSetId };
         }
       }
       console.log(`[OP Verify] Searching by name: "${name}"`);
-      const searchByName = await fetch(`https://optcgapi.com/api/cards/search/${encodeURIComponent(name)}/`);
-      if (searchByName.ok) {
-        const searchData = await searchByName.json();
-        if (Array.isArray(searchData) && searchData.length > 0) {
-          const exact = searchData.find((c: any) => c.card_name?.toLowerCase() === name.toLowerCase());
-          const match = exact || searchData[0];
-          return { name: match.card_name, cardId: match.card_set_id, setId: match.set_id || setId };
-        }
+      const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const nameNorm = norm(name);
+      const nameMatch = allCards.find((c: any) => norm(c.n || "") === nameNorm);
+      if (nameMatch) {
+        return { name: nameMatch.n, cardId: nameMatch.cid, setId: (nameMatch.cid || "").split("-")[0] || setId };
+      }
+      const fuzzyMatch = allCards.find((c: any) => norm(c.n || "").includes(nameNorm) || nameNorm.includes(norm(c.n || "")));
+      if (fuzzyMatch) {
+        return { name: fuzzyMatch.n, cardId: fuzzyMatch.cid, setId: (fuzzyMatch.cid || "").split("-")[0] || setId };
       }
     } else if (game === "mtg") {
       console.log(`[MTG Verify] Trying: ${setId}/${cardNumber}`);
@@ -900,40 +915,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   async function nameSearchOnePiece(name: string, setId?: string): Promise<any[] | null> {
     const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
     const normalizedName = normalize(name);
+    const allCards = await fetchOnePieceCards();
+    const setIdNoDash = setId ? setId.replace("-", "") : "";
 
-    if (setId) {
-      const setIdWithDash = setId.includes("-") ? setId : setId.replace(/(\D+)(\d+)/, "$1-$2");
-      try {
-        const res = await fetch(`https://optcgapi.com/api/sets/${setIdWithDash}/`);
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            const matches = data.filter((c: any) => {
-              const cardName = normalize(c.card_name || "");
-              return cardName === normalizedName || cardName.includes(normalizedName) || normalizedName.includes(cardName);
-            });
-            if (matches.length > 0) return matches;
-          }
-        }
-      } catch {}
+    const matches = allCards.filter((c: any) => {
+      const cardName = normalize(c.n || "");
+      if (!(cardName === normalizedName || cardName.includes(normalizedName) || normalizedName.includes(cardName))) return false;
+      if (setIdNoDash) {
+        const prefix = (c.cid || "").split("-")[0] || "";
+        if (prefix !== setIdNoDash) return false;
+      }
+      return true;
+    }).map((c: any) => ({
+      card_name: c.n,
+      card_set_id: c.cid,
+      set_id: (c.cid || "").split("-")[0] || "",
+      image_url: c.iu || null,
+      set_name: (c.srcN || "").replace(/\s*\[.*?\]\s*$/, ""),
+    }));
+
+    if (matches.length > 0) return matches;
+
+    if (setIdNoDash) {
+      const broadMatches = allCards.filter((c: any) => {
+        const cardName = normalize(c.n || "");
+        return cardName === normalizedName || cardName.includes(normalizedName) || normalizedName.includes(cardName);
+      }).map((c: any) => ({
+        card_name: c.n,
+        card_set_id: c.cid,
+        set_id: (c.cid || "").split("-")[0] || "",
+        image_url: c.iu || null,
+        set_name: (c.srcN || "").replace(/\s*\[.*?\]\s*$/, ""),
+      }));
+      if (broadMatches.length > 0) return broadMatches;
     }
 
-    const allSets = await fetchSetsForGame("onepiece");
-    for (const set of allSets.slice(0, 15)) {
-      try {
-        const res = await fetch(`https://optcgapi.com/api/sets/${set.id}/`);
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            const matches = data.filter((c: any) => {
-              const cardName = normalize(c.card_name || "");
-              return cardName === normalizedName || cardName.includes(normalizedName) || normalizedName.includes(cardName);
-            });
-            if (matches.length > 0) return matches;
-          }
-        }
-      } catch {}
-    }
     return null;
   }
 
@@ -1041,6 +1057,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const normalizeSetId = (sid: string) => sid.replace("-", "");
       const setIdNoDash = normalizeSetId(setId);
       const setIdWithDash = setId.includes("-") ? setId : setId.replace(/(\D+)(\d+)/, "$1-$2");
+      const allCards = await fetchOnePieceCards();
       const cardIdFormats = [
         `${setIdNoDash}-${cleanNum}`,
         `${setIdWithDash}-${cleanNum}`,
@@ -1051,21 +1068,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const cid of cardIdFormats) {
         if (tried.has(cid)) continue;
         tried.add(cid);
-        try {
-          const res = await fetch(`https://optcgapi.com/api/sets/card/${cid}/`);
-          if (res.ok) {
-            const data = await res.json();
-            if (Array.isArray(data) && data.length > 0) {
-              const card = data[0];
-              if (namesMatch(name, card.card_name)) {
-                console.log(`[DeepVerify] OP exact HIT (name matches): ${card.card_name} (${card.card_set_id})`);
-                return { name: card.card_name, cardId: card.card_set_id, setId: card.set_id || setId, verified: true };
-              } else {
-                console.log(`[DeepVerify] OP number hit but name mismatch: AI="${name}" DB="${card.card_name}"`);
-              }
-            }
+        const card = allCards.find((c: any) => c.cid === cid);
+        if (card) {
+          if (namesMatch(name, card.n || "")) {
+            console.log(`[DeepVerify] OP exact HIT (name matches): ${card.n} (${card.cid})`);
+            return { name: card.n, cardId: card.cid, setId: (card.cid || "").split("-")[0] || setId, verified: true };
+          } else {
+            console.log(`[DeepVerify] OP number hit but name mismatch: AI="${name}" DB="${card.n}"`);
           }
-        } catch {}
+        }
       }
 
       const nameResults = await nameSearchOnePiece(name, setId);
@@ -1416,12 +1427,9 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
               }
             }
           } else if (result.game === "onepiece") {
-            const opRes = await fetch(`https://optcgapi.com/api/sets/card/${cardId}/`);
-            if (opRes.ok) {
-              const opData = await opRes.json();
-              const opCard = Array.isArray(opData) ? opData[0] : opData;
-              if (opCard?.image_url) result.image = opCard.image_url;
-            }
+            const allCards = await fetchOnePieceCards();
+            const match = allCards.find((c: any) => c.cid === cardId);
+            if (match?.iu) result.image = match.iu;
           } else if (result.game === "mtg") {
             const mtgRes = await fetch(`https://api.scryfall.com/cards/${cardId}`);
             if (mtgRes.ok) {
@@ -1477,31 +1485,23 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
               if (data?.data) altCards = data.data.slice(0, altLimit * 2);
             }
           } else if (result.game === "onepiece") {
-            const sets = await fetchSetsForGame("onepiece");
+            const allCards = await fetchOnePieceCards();
             const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
             const queryNorm = norm(searchName);
-            for (const s of sets.slice(0, 10)) {
+            for (const c of allCards) {
               if (altCards.length >= altLimit * 2) break;
-              try {
-                const setId = s.id || s.set_id;
-                const r = await fetch(`https://optcgapi.com/api/sets/${setId}/`);
-                if (r.ok) {
-                  const data = await r.json();
-                  const cards = Array.isArray(data) ? data : (data.cards || []);
-                  for (const c of cards) {
-                    if (norm(c.card_name || "").includes(queryNorm)) {
-                      altCards.push({
-                        name: c.card_name,
-                        cardId: c.card_set_id,
-                        localId: (c.card_set_id || "").split("-").pop() || "",
-                        setId: c.set_id || setId,
-                        setName: s.name || setId,
-                        image: c.image_url || null,
-                      });
-                    }
-                  }
-                }
-              } catch {}
+              if (norm(c.n || "").includes(queryNorm)) {
+                const setPrefix = (c.cid || "").split("-")[0] || "";
+                const setNameStr = (c.srcN || setPrefix).replace(/\s*\[.*?\]\s*$/, "");
+                altCards.push({
+                  name: c.n,
+                  cardId: c.cid,
+                  localId: (c.cid || "").split("-").pop() || "",
+                  setId: setPrefix,
+                  setName: setNameStr,
+                  image: c.iu || null,
+                });
+              }
             }
           }
 
@@ -1772,51 +1772,32 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
           if (results.length >= limit) break;
         }
       } else if (game === "onepiece") {
-        const sets = await fetchSetsForGame("onepiece");
-        const setMap: Record<string, string> = {};
-        for (const s of sets) setMap[s.id] = s.name;
-
+        const allCards = await fetchOnePieceCards();
         const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
         const queryNorm = query ? norm(query) : "";
 
-        const setsToSearch = sets.slice(0, 20);
-        const BATCH_SIZE = 5;
-        for (let i = 0; i < setsToSearch.length && results.length < limit; i += BATCH_SIZE) {
-          const batch = setsToSearch.slice(i, i + BATCH_SIZE);
-          const batchResults = await Promise.all(batch.map(async (s: any) => {
-            try {
-              const setId = s.id || s.set_id;
-              const r = await fetch(`https://optcgapi.com/api/sets/${setId}/`);
-              if (!r.ok) return [];
-              const data = await r.json();
-              const cards = Array.isArray(data) ? data : (data.cards || []);
-              return cards.filter((c: any) => {
-                const cardName = c.card_name || c.name || "";
-                if (queryNorm && !norm(cardName).includes(queryNorm)) return false;
-                const localId = (c.card_set_id || "").split("-").pop() || "";
-                if (!matchesNumber(localId)) return false;
-                return true;
-              }).map((c: any) => {
-                const localId = (c.card_set_id || "").split("-").pop() || "";
-                const cardSetId = c.set_id || setId;
-                return {
-                  game: "onepiece",
-                  name: c.card_name || c.name,
-                  cardId: c.card_set_id,
-                  localId,
-                  setId: cardSetId,
-                  setName: setMap[cardSetId] || s.name || cardSetId,
-                  image: c.image_url || null,
-                };
-              });
-            } catch { return []; }
-          }));
-          for (const batch of batchResults) {
-            for (const card of batch) {
-              if (results.length >= limit) break;
-              results.push(card);
-            }
+        for (const c of allCards) {
+          if (results.length >= limit) break;
+          const cardName = c.n || "";
+          if (queryNorm && !norm(cardName).includes(queryNorm)) continue;
+          const localId = (c.cid || "").split("-").pop() || "";
+          if (!matchesNumber(localId)) continue;
+          const setPrefix = (c.cid || "").split("-")[0] || "";
+          const setNameStr = (c.srcN || setPrefix).replace(/\s*\[.*?\]\s*$/, "");
+          if (setName) {
+            if (!norm(setNameStr).includes(norm(setName)) && !norm(setName).includes(norm(setNameStr))) continue;
           }
+          const rarityMap: Record<string, string> = {"1":"Leader","2":"Common","3":"Uncommon","4":"Rare","5":"Super Rare","6":"Secret Rare"};
+          results.push({
+            game: "onepiece",
+            name: cardName,
+            cardId: c.cid,
+            localId,
+            setId: setPrefix,
+            setName: setNameStr,
+            image: c.iu || null,
+            rarity: rarityMap[c.r] || "",
+          });
         }
       } else if (game === "mtg") {
         let cards: any[] = [];
@@ -2069,44 +2050,33 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
     }
   });
 
-  // ───── ONE PIECE (OPTCG API) ─────
+  // ───── ONE PIECE (onepiece-cardgame.dev) ─────
 
   app.get("/api/tcg/onepiece/sets", async (_req, res) => {
     try {
-      const [setsRes, decksRes] = await Promise.all([
-        fetch("https://optcgapi.com/api/allSets/"),
-        fetch("https://optcgapi.com/api/allDecks/"),
-      ]);
-
-      const boosterSets = await setsRes.json();
-      const starterDecks = await decksRes.json();
-
-      const getOnePieceCardImage = (setId: string) => {
-        const cleanId = setId.replace("-", "");
-        return `https://optcgapi.com/media/static/Card_Images/${cleanId}-001.jpg`;
-      };
-
-      const formattedBoosters = (boosterSets as any[]).map((s: any) => ({
-        id: s.set_id,
-        name: s.set_name,
+      const allCards = await fetchOnePieceCards();
+      const setMap = new Map<string, { name: string; count: number; logo: string | null }>();
+      for (const c of allCards) {
+        const prefix = (c.cid || "").split("-")[0];
+        if (!prefix) continue;
+        if (!setMap.has(prefix)) {
+          const srcName = c.srcN || prefix;
+          const cleanName = srcName.replace(/\s*\[.*?\]\s*$/, "");
+          setMap.set(prefix, { name: cleanName, count: 1, logo: c.iu || null });
+        } else {
+          setMap.get(prefix)!.count++;
+        }
+      }
+      const sets = Array.from(setMap.entries()).map(([id, info]) => ({
+        id,
+        name: info.name,
         game: "onepiece",
-        totalCards: 0,
-        logo: getOnePieceCardImage(s.set_id),
+        totalCards: info.count,
+        logo: info.logo,
         symbol: null,
         releaseDate: null,
       }));
-
-      const formattedDecks = (starterDecks as any[]).map((s: any) => ({
-        id: s.structure_deck_id,
-        name: s.structure_deck_name,
-        game: "onepiece",
-        totalCards: 0,
-        logo: getOnePieceCardImage(s.structure_deck_id),
-        symbol: null,
-        releaseDate: null,
-      }));
-
-      res.json([...formattedBoosters, ...formattedDecks]);
+      res.json(sets);
     } catch (error) {
       console.error("Error fetching One Piece sets:", error);
       res.status(500).json({ error: "Failed to fetch One Piece sets" });
@@ -2122,48 +2092,40 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
         return res.json(cached.data);
       }
 
-      const isStarterDeck = id.startsWith("ST-");
+      const allCards = await fetchOnePieceCards();
+      const setCards = allCards.filter((c: any) => {
+        const prefix = (c.cid || "").split("-")[0] || "";
+        return prefix === id || prefix === id.replace("-", "");
+      });
 
-      const apiUrl = isStarterDeck
-        ? `https://optcgapi.com/api/decks/${id}/`
-        : `https://optcgapi.com/api/sets/${id}/`;
-
-      const response = await fetch(apiUrl);
-
-      if (!response.ok) {
-        return res.status(404).json({ error: "Set not found" });
-      }
-
-      const data = await response.json();
-
-      if (!Array.isArray(data) || data.length === 0) {
+      if (setCards.length === 0) {
         return res.status(404).json({ error: "No cards found for this set" });
       }
 
       const uniqueCards = new Map<string, any>();
-      for (const c of data) {
-        if (!uniqueCards.has(c.card_set_id)) {
-          uniqueCards.set(c.card_set_id, c);
+      for (const c of setCards) {
+        if (!uniqueCards.has(c.cid)) {
+          uniqueCards.set(c.cid, c);
         }
       }
 
       const cards = Array.from(uniqueCards.values()).map((c: any) => {
-        const numPart = c.card_set_id?.split("-").pop() || "000";
+        const numPart = (c.cid || "").split("-").pop() || "000";
         return {
-          id: c.card_set_id,
+          id: c.cid,
           localId: numPart,
-          name: c.card_name,
-          image: c.card_image || null,
+          name: c.n,
+          image: c.iu || null,
         };
       });
 
       cards.sort((a, b) => a.localId.localeCompare(b.localId, undefined, { numeric: true }));
 
-      const setName = data[0]?.set_name || id;
+      const setNameStr = setCards[0]?.srcN ? (setCards[0].srcN || "").replace(/\s*\[.*?\]\s*$/, "") : id;
 
       const result = {
         id,
-        name: setName,
+        name: setNameStr,
         totalCards: cards.length,
         cards,
       };
@@ -2327,14 +2289,11 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
           }
         }
       } else if (game === "onepiece") {
-        const setRes = await fetch(`https://optcgapi.com/api/sets/card-list/?set_id=${id}`);
-        if (setRes.ok) {
-          const data = await setRes.json();
-          if (Array.isArray(data)) {
-            for (const c of data) {
-              const cardId = c.card_id || c.id;
-              if (cardId) prices[cardId] = c.market_price ?? c.inventory_price ?? null;
-            }
+        const allCards = await fetchOnePieceCards();
+        for (const c of allCards) {
+          const prefix = (c.cid || "").split("-")[0] || "";
+          if (prefix === id || prefix === id.replace("-", "")) {
+            prices[c.cid] = null;
           }
         }
       } else if (game === "mtg") {
@@ -2511,22 +2470,9 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
   app.get("/api/tcg/onepiece/card/:cardId", async (req, res) => {
     try {
       const { cardId } = req.params;
-      const response = await fetch(`https://optcgapi.com/api/sets/card/${cardId}/`);
-      if (!response.ok) {
-        const deckRes = await fetch(`https://optcgapi.com/api/decks/card/${cardId}/`);
-        if (!deckRes.ok) return res.status(404).json({ error: "Card not found" });
-        const deckData = await deckRes.json();
-        if (!Array.isArray(deckData) || deckData.length === 0)
-          return res.status(404).json({ error: "Card not found" });
-        const c = deckData[0];
-        res.json(formatOnePieceCard(c));
-        return;
-      }
-      const data = await response.json();
-      if (!Array.isArray(data) || data.length === 0)
-        return res.status(404).json({ error: "Card not found" });
-
-      const c = data[0];
+      const allCards = await fetchOnePieceCards();
+      const c = allCards.find((card: any) => card.cid === cardId);
+      if (!c) return res.status(404).json({ error: "Card not found" });
       res.json(formatOnePieceCard(c));
     } catch (error) {
       console.error("Error fetching One Piece card detail:", error);
@@ -2628,16 +2574,14 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
               }
             }
           } else if (card.game === "onepiece") {
-            const r = await fetch(`https://optcgapi.com/api/sets/card/${encodeURIComponent(card.cardId)}/`);
-            if (r.ok) {
-              const data = await r.json();
-              const c = Array.isArray(data) ? data[0] : data;
-              if (c) {
-                name = c.card_name || c.name || card.cardId;
-                image = c.image_url || c.image || null;
-                rarity = c.rarity || null;
-                setName = c.set_name || c.set?.name || "";
-              }
+            const allCards = await fetchOnePieceCards();
+            const c = allCards.find((x: any) => x.cid === card.cardId);
+            if (c) {
+              const rarityMap: Record<string, string> = {"1":"Leader","2":"Common","3":"Uncommon","4":"Rare","5":"Super Rare","6":"Secret Rare"};
+              name = c.n || card.cardId;
+              image = c.iu || null;
+              rarity = rarityMap[c.r] || null;
+              setName = (c.srcN || "").replace(/\s*\[.*?\]\s*$/, "");
             }
           } else if (card.game === "mtg") {
             const r = await fetch(`https://api.scryfall.com/cards/${encodeURIComponent(card.cardId)}`);
@@ -2831,14 +2775,10 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
             }
           }
         } else if (card.game === "onepiece") {
-          const response = await fetch(`https://optcgapi.com/api/sets/card/${card.cardId}/`);
-          if (response.ok) {
-            const data = await response.json();
-            if (Array.isArray(data) && data.length > 0) {
-              const c = data[0];
-              const price = c.market_price ?? c.inventory_price ?? null;
-              result = { cardId: card.cardId, name: c.card_name || card.cardId, price };
-            }
+          const allCards = await fetchOnePieceCards();
+          const c = allCards.find((x: any) => x.cid === card.cardId);
+          if (c) {
+            result = { cardId: card.cardId, name: c.n || card.cardId, price: null };
           }
         }
 
@@ -2942,18 +2882,26 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
 
       async function searchOnePiece(): Promise<typeof results> {
         try {
-          const response = await fetch(`https://optcgapi.com/api/search/${encodeURIComponent(searchTerm)}/`);
-          if (!response.ok) return [];
-          const cards = await response.json();
-          if (!Array.isArray(cards)) return [];
-          return cards.slice(0, limitPerGame).map((c: any) => ({
-            id: c.card_set_id || c.id,
-            name: c.card_name || c.name,
-            game: "onepiece",
-            setName: c.set_name || "",
-            image: c.card_image || null,
-            price: c.market_price ?? c.inventory_price ?? null,
-          }));
+          const allCards = await fetchOnePieceCards();
+          const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+          const searchNorm = norm(searchTerm);
+          const matched: typeof results = [];
+          for (const c of allCards) {
+            if (matched.length >= limitPerGame) break;
+            const name = c.n || "";
+            if (!norm(name).includes(searchNorm)) continue;
+            const setPrefix = (c.cid || "").split("-")[0] || "";
+            const setNameStr = (c.srcN || setPrefix).replace(/\s*\[.*?\]\s*$/, "");
+            matched.push({
+              id: c.cid,
+              name,
+              game: "onepiece",
+              setName: setNameStr,
+              image: c.iu || null,
+              price: null,
+            });
+          }
+          return matched;
         } catch { return []; }
       }
 
@@ -3003,25 +2951,28 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
 }
 
 function formatOnePieceCard(c: any) {
-  const currentPrice = c.market_price ?? c.inventory_price ?? null;
+  const rarityMap: Record<string, string> = {"1":"Leader","2":"Common","3":"Uncommon","4":"Rare","5":"Super Rare","6":"Secret Rare"};
+  const typeMap: Record<string, string> = {"1":"Leader","2":"Character","3":"Event","4":"Stage"};
+  const setPrefix = (c.cid || "").split("-")[0] || "";
+  const setNameStr = (c.srcN || setPrefix).replace(/\s*\[.*?\]\s*$/, "");
 
   return {
-    id: c.card_set_id,
-    localId: c.card_set_id?.split("-").pop() || "000",
-    name: c.card_name,
-    image: c.card_image || null,
+    id: c.cid,
+    localId: (c.cid || "").split("-").pop() || "000",
+    name: c.n,
+    image: c.iu || null,
     game: "onepiece",
-    setId: c.set_id || "",
-    setName: c.set_name || "",
-    rarity: c.rarity || null,
-    cardType: c.card_type || null,
-    hp: c.card_power ? parseInt(c.card_power, 10) : null,
-    description: c.card_text || null,
+    setId: setPrefix,
+    setName: setNameStr,
+    rarity: rarityMap[c.r] || null,
+    cardType: typeMap[c.t] || null,
+    hp: null,
+    description: null,
     artist: null,
-    currentPrice,
+    currentPrice: null,
     priceUnit: "USD",
-    priceLow: c.inventory_price ?? null,
-    priceHigh: currentPrice ? currentPrice * 1.5 : null,
+    priceLow: null,
+    priceHigh: null,
   };
 }
 
