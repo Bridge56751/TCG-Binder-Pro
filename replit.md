@@ -42,15 +42,15 @@ Preferred communication style: Simple, everyday language.
   - `/api/auth/upgrade-premium` — mark user as premium after RevenueCat purchase verification
   - `/api/collection/sync` — GET/POST collection sync for logged-in users
 - **AI Integration**: OpenAI API (via Replit AI Integrations proxy) for card identification using vision model (gpt-5.2). Configured via `AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL` environment variables.
-- **CORS**: Dynamic origin allowlist based on Replit environment variables, plus localhost for Expo web dev
+- **CORS**: Dynamic origin allowlist based on environment variables (`ALLOWED_ORIGINS`, Replit domains), plus localhost for Expo web dev. Native mobile apps (no Origin header) are allowed by default.
 
 ### Database
 
 - **ORM**: Drizzle ORM configured for PostgreSQL (`drizzle.config.ts`)
 - **Schema location**: `shared/schema.ts` (users table, user_collections table) and `shared/models/chat.ts` (conversations and messages tables for chat integration)
-- **Current schema**: Users table (id, email, password, isPremium, isVerified, verificationCode, verificationExpiry, resetCode, resetExpiry) and user_collections table (userId FK, collection JSONB, updatedAt) and chat-related tables (conversations, messages). The TCG card/set data appears to come from external APIs rather than the database.
+- **Current schema**: Users table (id, email, password, appleId, isPremium, isVerified, verificationCode, verificationExpiry, resetCode, resetExpiry) and user_collections table (userId FK, data JSONB, updatedAt) and chat-related tables (conversations, messages). The TCG card/set data comes from external APIs, not the database.
 - **Migration management**: Drizzle Kit with `db:push` script for schema sync
-- **Connection**: `DATABASE_URL` environment variable required
+- **Connection**: `GOOGLE_CLOUD_DATABASE_URL` environment variable (Google Cloud SQL). All server code uses this exclusively.
 
 ### Replit Integrations (Pre-built Modules)
 
@@ -89,10 +89,22 @@ migrations/             # Drizzle migration output
 - **Production**: Static Expo web build (`expo:static:build`) served by Express, server bundled with esbuild (`server:build`)
 - **Schema sync**: `npm run db:push` pushes Drizzle schema to PostgreSQL
 
+### Vercel Deployment (Backend)
+
+- **Entry point**: `api/index.ts` exports the Express app for Vercel's `@vercel/node` runtime
+- **App setup**: `server/app.ts` creates and configures the Express app (CORS, sessions, routes, error handling) without starting a listener
+- **Local dev**: `server/index.ts` imports from `server/app.ts` and adds Expo landing page serving + `httpServer.listen()`
+- **Config**: `vercel.json` routes all requests to the serverless function; `tsconfig.server.json` resolves `@shared/*` path aliases
+- **Session cookies**: Production uses `secure: true`, `sameSite: "none"` for cross-origin native app requests; `trust proxy` enabled
+- **Required Vercel env vars**: `GOOGLE_CLOUD_DATABASE_URL`, `SESSION_SECRET`, `RESEND_API_KEY`, `REVENUECAT_SECRET_API_KEY`, `AI_INTEGRATIONS_OPENAI_API_KEY`, `AI_INTEGRATIONS_OPENAI_BASE_URL`, `ALLOWED_ORIGINS` (comma-separated), `NODE_ENV=production`
+- **Frontend config**: Set `EXPO_PUBLIC_API_URL` in app.json or build config to the Vercel deployment URL (e.g., `https://your-app.vercel.app/`)
+
 ## External Dependencies
 
-- **PostgreSQL**: Required database, connected via `DATABASE_URL` environment variable. Used by Drizzle ORM for user data and chat storage.
-- **OpenAI API (via Replit AI Integrations)**: Powers card identification from camera images and chat/voice/image features. Requires `AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL` environment variables.
+- **Google Cloud SQL (PostgreSQL)**: Primary database, connected via `GOOGLE_CLOUD_DATABASE_URL` environment variable. Used by Drizzle ORM for user data, sessions, and collections.
+- **OpenAI API (via Replit AI Integrations)**: Powers card identification from camera images. Requires `AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL` environment variables.
 - **External TCG APIs**: The app fetches card/set data from external free APIs — TCGdex (Pokemon), YGOProDeck (Yu-Gi-Oh!), and Scryfall (Magic: The Gathering). No API keys needed. Endpoints under `/api/tcg/:game/sets`. Implementation in `server/routes.ts`. Pokemon routes support `?lang=ja` query parameter for Japanese card data (TCGdex `/ja/` endpoint). Japanese sets use different IDs (e.g., `SV2a` for Pokemon 151 instead of English `sv03.5`).
 - **AsyncStorage**: On-device persistence for the card collection (no server-side collection sync).
 - **Expo Services**: Used for font loading, camera, image picker, haptics, and other native capabilities.
+- **Resend**: Email service for verification and password reset emails. Requires `RESEND_API_KEY`.
+- **RevenueCat**: In-app purchase management. Frontend uses `EXPO_PUBLIC_REVENUECAT_API_KEY`, backend uses `REVENUECAT_SECRET_API_KEY` for verification.
