@@ -85,6 +85,18 @@ export default function ScanScreen() {
     }, 2000);
   }, []);
 
+  const takeSinglePhoto = async (): Promise<{ uri: string; base64: string } | null> => {
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ["images"],
+      quality: 0.7,
+      base64: true,
+    });
+    if (!result.canceled && result.assets[0] && result.assets[0].base64) {
+      return { uri: result.assets[0].uri, base64: result.assets[0].base64 };
+    }
+    return null;
+  };
+
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
@@ -98,19 +110,46 @@ export default function ScanScreen() {
       );
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ["images"],
-      quality: 0.7,
-      base64: true,
-    });
-    if (!result.canceled && result.assets[0]) {
-      lastScanMethod.current = "camera";
-      setImageUri(result.assets[0].uri);
-      setScanResult(null);
-      setConfirmedResult(null);
-      setIsEditing(false);
-      setAddQuantity(1);
-      identifyCard(result.assets[0].base64!);
+    lastScanMethod.current = "camera";
+
+    if (batchMode) {
+      const photos: { uri: string; base64: string }[] = [];
+      for (let i = 0; i < 5; i++) {
+        const photo = await takeSinglePhoto();
+        if (!photo) break;
+        photos.push(photo);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+      if (photos.length === 0) return;
+      if (photos.length === 1) {
+        setImageUri(photos[0].uri);
+        setScanResult(null);
+        setConfirmedResult(null);
+        setIsEditing(false);
+        setAddQuantity(1);
+        setBatchQueue([]);
+        setBatchProgress(null);
+        identifyCard(photos[0].base64);
+      } else {
+        setBatchProgress({ current: 1, total: photos.length });
+        setImageUri(photos[0].uri);
+        setScanResult(null);
+        setConfirmedResult(null);
+        setIsEditing(false);
+        setAddQuantity(1);
+        setBatchQueue(photos.slice(1));
+        identifyCard(photos[0].base64);
+      }
+    } else {
+      const photo = await takeSinglePhoto();
+      if (photo) {
+        setImageUri(photo.uri);
+        setScanResult(null);
+        setConfirmedResult(null);
+        setIsEditing(false);
+        setAddQuantity(1);
+        identifyCard(photo.base64);
+      }
     }
   };
 
@@ -1057,7 +1096,7 @@ export default function ScanScreen() {
           onPress={takePhoto}
         >
           <Ionicons name="camera" size={24} color="#FFFFFF" />
-          <Text style={dynamicStyles.primaryActionText}>Take Photo</Text>
+          <Text style={dynamicStyles.primaryActionText}>{batchMode ? "Take Photos" : "Take Photo"}</Text>
         </Pressable>
         <Pressable
           style={({ pressed }) => [dynamicStyles.actionButton, dynamicStyles.secondaryAction, { backgroundColor: colors.surface, borderColor: colors.cardBorder }, pressed && { opacity: 0.9 }]}
