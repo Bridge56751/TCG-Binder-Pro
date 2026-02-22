@@ -1,6 +1,8 @@
 import { db } from "./db";
 import { users, userCollections, type User, type InsertUser } from "../shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, type InferInsertModel } from "drizzle-orm";
+
+type UsersUpdate = Partial<InferInsertModel<typeof users>>;
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -80,37 +82,37 @@ export const storage: IStorage = {
 
   async upgradeToPremium(userId: string) {
     await db.update(users)
-      .set({ isPremium: true })
+      .set({ isPremium: true } as UsersUpdate)
       .where(eq(users.id, userId));
   },
 
   async setVerificationCode(userId: string, code: string, expiry: Date) {
     await db.update(users)
-      .set({ verificationCode: code, verificationExpiry: expiry })
+      .set({ verificationCode: code, verificationExpiry: expiry } as UsersUpdate)
       .where(eq(users.id, userId));
   },
 
   async verifyUser(userId: string) {
     await db.update(users)
-      .set({ isVerified: true, verificationCode: null, verificationExpiry: null })
+      .set({ isVerified: true, verificationCode: null, verificationExpiry: null } as UsersUpdate)
       .where(eq(users.id, userId));
   },
 
   async setResetCode(userId: string, code: string, expiry: Date) {
     await db.update(users)
-      .set({ resetCode: code, resetExpiry: expiry })
+      .set({ resetCode: code, resetExpiry: expiry } as UsersUpdate)
       .where(eq(users.id, userId));
   },
 
   async clearResetCode(userId: string) {
     await db.update(users)
-      .set({ resetCode: null, resetExpiry: null })
+      .set({ resetCode: null, resetExpiry: null } as UsersUpdate)
       .where(eq(users.id, userId));
   },
 
   async updatePassword(userId: string, hashedPassword: string) {
     await db.update(users)
-      .set({ password: hashedPassword, resetCode: null, resetExpiry: null })
+      .set({ password: hashedPassword, resetCode: null, resetExpiry: null } as UsersUpdate)
       .where(eq(users.id, userId));
   },
 };

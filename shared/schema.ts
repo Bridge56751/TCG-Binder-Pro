@@ -27,9 +27,10 @@ export const userCollections = pgTable("user_collections", {
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
-  email: true,
-  password: true,
+  email: true as const,
+  password: true as const,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+export type UserUpdate = Partial<typeof users.$inferInsert>;
