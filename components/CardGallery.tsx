@@ -46,12 +46,23 @@ export function CardGallery({ visible, cards, initialIndex, onClose }: CardGalle
   const insets = useSafeAreaInsets();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const flatListRef = useRef<FlatList>(null);
+  const hasScrolledRef = useRef(false);
   const topInset = Platform.OS === "web" ? 20 : insets.top;
   const bottomInset = Platform.OS === "web" ? 20 : insets.bottom;
 
   useEffect(() => {
     if (visible) {
       setCurrentIndex(initialIndex);
+      hasScrolledRef.current = false;
+      const scrollToCard = () => {
+        if (initialIndex > 0 && flatListRef.current && !hasScrolledRef.current) {
+          flatListRef.current.scrollToIndex({ index: initialIndex, animated: false });
+          hasScrolledRef.current = true;
+        }
+      };
+      setTimeout(scrollToCard, 50);
+      setTimeout(scrollToCard, 150);
+      setTimeout(scrollToCard, 300);
     }
   }, [visible, initialIndex]);
 
@@ -131,12 +142,17 @@ export function CardGallery({ visible, cards, initialIndex, onClose }: CardGalle
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
-          initialScrollIndex={initialIndex}
+          initialScrollIndex={initialIndex > 0 ? initialIndex : undefined}
           getItemLayout={getItemLayout}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
           bounces={false}
           decelerationRate="fast"
+          onScrollToIndexFailed={(info) => {
+            setTimeout(() => {
+              flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
+            }, 100);
+          }}
           style={styles.list}
         />
 
