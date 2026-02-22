@@ -138,23 +138,41 @@ function setupSession(app: express.Application) {
 
   app.set("trust proxy", 1);
 
-  app.use(
-    session({
-      store: new PgStore({
-        conString: process.env.GOOGLE_CLOUD_DATABASE_URL,
-        createTableIfMissing: true,
-      }),
-      secret: process.env.SESSION_SECRET || "cardvault-dev-secret",
-      resave: false,
-      saveUninitialized: false,
-      cookie: {
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-        httpOnly: true,
-        secure: isProduction,
-        sameSite: isProduction ? "none" : "lax",
-      },
-    })
-  );
+  const pgStore = new PgStore({
+    conString: process.env.GOOGLE_CLOUD_DATABASE_URL,
+    createTableIfMissing: true,
+    errorLog: (err: Error) => {
+      console.error("Session store error (non-fatal):", err.message);
+    },
+  });
+
+  pgStore.on("error", (err: Error) => {
+    console.error("PgStore connection error (non-fatal):", err.message);
+  });
+
+  const sessionMiddleware = session({
+    store: pgStore,
+    secret: process.env.SESSION_SECRET || "cardvault-dev-secret",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+    },
+  });
+
+  app.use((req, res, next) => {
+    sessionMiddleware(req, res, (err) => {
+      if (err) {
+        console.error("Session middleware error (continuing without session):", err.message);
+        next();
+      } else {
+        next();
+      }
+    });
+  });
 }
 
 function setupRateLimiting(app: express.Application) {
