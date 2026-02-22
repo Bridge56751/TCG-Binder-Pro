@@ -45,29 +45,23 @@ interface CardGalleryProps {
 export function CardGallery({ visible, cards, initialIndex, onClose }: CardGalleryProps) {
   const insets = useSafeAreaInsets();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
-  const [mountKey, setMountKey] = useState(0);
   const flatListRef = useRef<FlatList>(null);
-  const isSettledRef = useRef(false);
   const topInset = Platform.OS === "web" ? 20 : insets.top;
   const bottomInset = Platform.OS === "web" ? 20 : insets.bottom;
 
   useEffect(() => {
     if (visible) {
       setCurrentIndex(initialIndex);
-      setMountKey((k) => k + 1);
-      isSettledRef.current = false;
-      setTimeout(() => {
-        isSettledRef.current = true;
-      }, 600);
     }
   }, [visible, initialIndex]);
 
-  const handleScroll = useCallback((e: any) => {
-    if (!isSettledRef.current) return;
-    const offsetX = e.nativeEvent.contentOffset.x;
-    const idx = Math.round(offsetX / SCREEN_WIDTH);
-    setCurrentIndex(idx);
+  const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    if (viewableItems.length > 0 && viewableItems[0].index != null) {
+      setCurrentIndex(viewableItems[0].index);
+    }
   }, []);
+
+  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
 
   const getItemLayout = useCallback((_: any, index: number) => ({
     length: SCREEN_WIDTH,
@@ -130,7 +124,6 @@ export function CardGallery({ visible, cards, initialIndex, onClose }: CardGalle
         </View>
 
         <FlatList
-          key={`gallery-${mountKey}`}
           ref={flatListRef}
           data={cards}
           keyExtractor={(item) => item.id}
@@ -140,13 +133,13 @@ export function CardGallery({ visible, cards, initialIndex, onClose }: CardGalle
           showsHorizontalScrollIndicator={false}
           initialScrollIndex={initialIndex}
           getItemLayout={getItemLayout}
-          onMomentumScrollEnd={handleScroll}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
           bounces={false}
           decelerationRate="fast"
           onScrollToIndexFailed={(info) => {
-            const offset = info.index * SCREEN_WIDTH;
             setTimeout(() => {
-              flatListRef.current?.scrollToOffset({ offset, animated: false });
+              flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
             }, 100);
           }}
           style={styles.list}
