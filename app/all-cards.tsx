@@ -77,14 +77,14 @@ function BinderCard({
   priceInfo,
   colors,
   onPress,
-  onLongPress,
+  onDelete,
 }: {
   card: CardWithMeta;
   meta?: CardMeta;
   priceInfo?: CardPriceInfo;
   colors: any;
   onPress: () => void;
-  onLongPress: () => void;
+  onDelete: () => void;
 }) {
   const displayName = meta?.name || priceInfo?.name || card.cardId;
   const price = priceInfo?.price;
@@ -94,7 +94,6 @@ function BinderCard({
     <Pressable
       style={[styles.binderCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
       onPress={onPress}
-      onLongPress={onLongPress}
     >
       {image ? (
         <Image
@@ -110,9 +109,18 @@ function BinderCard({
         </View>
       )}
       <View style={styles.binderInfo}>
-        <Text style={[styles.binderName, { color: colors.text }]} numberOfLines={1}>
-          {displayName}
-        </Text>
+        <View style={styles.binderNameRow}>
+          <Text style={[styles.binderName, { color: colors.text, flex: 1 }]} numberOfLines={1}>
+            {displayName}
+          </Text>
+          <Pressable
+            style={styles.binderDeleteBtn}
+            onPress={(e) => { e.stopPropagation?.(); onDelete(); }}
+            hitSlop={6}
+          >
+            <Ionicons name="trash-outline" size={14} color={colors.error} />
+          </Pressable>
+        </View>
         <View style={styles.binderBottom}>
           <View style={[styles.binderGameDot, { backgroundColor: gameColor(card.game) }]} />
           {price != null ? (
@@ -335,7 +343,7 @@ export default function AllCardsScreen() {
       priceInfo={priceMap.get(item.cardId)}
       colors={colors}
       onPress={() => handleCardPress(item)}
-      onLongPress={() => handleDelete(item)}
+      onDelete={() => handleDelete(item)}
     />
   ), [metaMap, priceMap, colors, handleCardPress, handleDelete]);
 
@@ -349,7 +357,6 @@ export default function AllCardsScreen() {
       <Pressable
         style={[styles.listRow, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
         onPress={() => handleCardPress(item)}
-        onLongPress={() => handleDelete(item)}
       >
         {meta?.image ? (
           <Image
@@ -376,6 +383,13 @@ export default function AllCardsScreen() {
         ) : (
           <Text style={[styles.listPrice, { color: colors.textTertiary }]}>--</Text>
         )}
+        <Pressable
+          style={styles.listDeleteBtn}
+          onPress={(e) => { e.stopPropagation?.(); handleDelete(item); }}
+          hitSlop={8}
+        >
+          <Ionicons name="trash-outline" size={18} color={colors.error} />
+        </Pressable>
       </Pressable>
     );
   }, [metaMap, priceMap, colors, handleCardPress, handleDelete]);
@@ -579,9 +593,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     gap: 4,
   },
+  binderNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
   binderName: {
     fontFamily: "DMSans_600SemiBold",
     fontSize: 11,
+  },
+  binderDeleteBtn: {
+    padding: 2,
   },
   binderBottom: {
     flexDirection: "row",
@@ -622,6 +644,9 @@ const styles = StyleSheet.create({
     width: 48,
     height: 66,
     borderRadius: 8,
+  },
+  listDeleteBtn: {
+    padding: 8,
   },
   listInfo: { flex: 1, gap: 2 },
   listName: { fontFamily: "DMSans_600SemiBold", fontSize: 15 },
