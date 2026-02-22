@@ -16,6 +16,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.tcgbinder",
+      "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "TCG Binder needs camera access to scan and identify your trading cards using AI recognition.",
         "NSPhotoLibraryUsageDescription": "TCG Binder needs access to your photo library so you can select photos of trading cards to scan and identify."
