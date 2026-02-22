@@ -20,7 +20,7 @@ import { router } from "expo-router";
 import { apiRequest } from "@/lib/query-client";
 import { useCollection } from "@/lib/CollectionContext";
 import { useTheme } from "@/lib/ThemeContext";
-import type { CardIdentification, GameId } from "@/lib/types";
+import type { CardIdentification, CardAlternative, GameId } from "@/lib/types";
 import {
   addToScanHistory,
 } from "@/lib/scan-history-storage";
@@ -61,6 +61,7 @@ export default function ScanScreen() {
   const [isCorrecting, setIsCorrecting] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [confirmedResult, setConfirmedResult] = useState<CardIdentification | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const scrollToFocusedInput = useCallback(() => {
@@ -143,12 +144,13 @@ export default function ScanScreen() {
   };
 
   const handleAddToCollection = async () => {
-    if (!scanResult) return;
-    const cardId = scanResult.verifiedCardId || `${scanResult.setId}-${scanResult.cardNumber}`;
+    const activeResult = confirmedResult || scanResult;
+    if (!activeResult) return;
+    const cardId = activeResult.verifiedCardId || `${activeResult.setId}-${activeResult.cardNumber}`;
     try {
       await addCard(
-        scanResult.game,
-        scanResult.setId,
+        activeResult.game,
+        activeResult.setId,
         cardId,
         addQuantity
       );
@@ -160,18 +162,18 @@ export default function ScanScreen() {
       }
       throw err;
     }
-    await addToScanHistory(scanResult, true);
+    await addToScanHistory(activeResult, true);
     cacheCard({
-      id: scanResult.verifiedCardId || `${scanResult.setId}-${scanResult.cardNumber}`,
-      localId: scanResult.cardNumber,
-      name: scanResult.name,
-      englishName: scanResult.englishName,
+      id: activeResult.verifiedCardId || `${activeResult.setId}-${activeResult.cardNumber}`,
+      localId: activeResult.cardNumber,
+      name: activeResult.name,
+      englishName: activeResult.englishName,
       image: null,
-      game: scanResult.game,
-      setId: scanResult.setId,
-      setName: scanResult.setName,
-      rarity: scanResult.rarity,
-      currentPrice: scanResult.estimatedValue,
+      game: activeResult.game,
+      setId: activeResult.setId,
+      setName: activeResult.setName,
+      rarity: activeResult.rarity,
+      currentPrice: activeResult.estimatedValue,
       cachedAt: Date.now(),
     });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -180,12 +182,12 @@ export default function ScanScreen() {
 
     if (batchMode) {
       setBatchCount((c) => c + addQuantity);
-      showToast(`${qtyLabel}${scanResult.name} added!`);
+      showToast(`${qtyLabel}${activeResult.name} added!`);
       resetScan();
     } else {
       Alert.alert(
         "Added!",
-        `${qtyLabel}${scanResult.name} has been added to your collection.`,
+        `${qtyLabel}${activeResult.name} has been added to your collection.`,
         [
           { text: "Scan Another", onPress: resetScan },
           {
@@ -193,7 +195,7 @@ export default function ScanScreen() {
             onPress: () =>
               router.push({
                 pathname: "/set/[game]/[id]",
-                params: { game: scanResult.game, id: scanResult.setId, lang: scanResult.language || "en" },
+                params: { game: activeResult.game, id: activeResult.setId, lang: activeResult.language || "en" },
               }),
           },
         ]
@@ -204,6 +206,7 @@ export default function ScanScreen() {
   const resetScan = () => {
     setImageUri(null);
     setScanResult(null);
+    setConfirmedResult(null);
     setIsScanning(false);
     setAddQuantity(1);
     setIsEditing(false);
@@ -212,6 +215,30 @@ export default function ScanScreen() {
     setEditSetName("");
     setSearchResults([]);
     setHasSearched(false);
+  };
+
+  const confirmMainPick = () => {
+    if (!scanResult) return;
+    setConfirmedResult(scanResult);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const confirmAlternative = (alt: CardAlternative) => {
+    if (!scanResult) return;
+    const altResult: CardIdentification = {
+      game: alt.game,
+      name: alt.name,
+      setName: alt.setName,
+      setId: alt.setId,
+      cardNumber: alt.localId,
+      rarity: alt.rarity || "",
+      estimatedValue: scanResult.estimatedValue || 0,
+      verified: true,
+      verifiedCardId: alt.cardId,
+      language: scanResult.language || "en",
+    };
+    setConfirmedResult(altResult);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   const startEditing = () => {
@@ -403,26 +430,266 @@ export default function ScanScreen() {
         )}
       </View>
 
-      {scanResult && (() => {
-        const isVerified = scanResult.verified === true;
-        const cardId = scanResult.verifiedCardId || `${scanResult.setId}-${scanResult.cardNumber}`;
-        const alreadyOwned = isVerified && hasCard(scanResult.game, scanResult.setId, cardId);
-        const ownedQty = alreadyOwned ? cardQuantity(scanResult.game, scanResult.setId, cardId) : 0;
+      {scanResult && !confirmedResult && !isEditing && (() => {
+        const alternatives = scanResult.alternatives || [];
+        const hasAlts = alternatives.length > 0;
         return (
-        <Animated.View entering={FadeInDown.duration(400).springify()} style={[dynamicStyles.resultCard, { backgroundColor: colors.surface, borderColor: isVerified ? colors.cardBorder : colors.error + "40" }]}>
-          {!isVerified && !isEditing && (
-            <View style={{ backgroundColor: colors.error + "12", paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, marginBottom: 12, flexDirection: "row", alignItems: "center", gap: 10 }}>
-              <Ionicons name="warning" size={20} color={colors.error} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 14, color: colors.error, marginBottom: 2 }}>Could not verify this card</Text>
-                <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 12, color: colors.textSecondary }}>
-                  Try editing the name or number below, or rescan with better lighting.
-                </Text>
+        <Animated.View entering={FadeInDown.duration(400).springify()} style={[dynamicStyles.resultCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <Ionicons name="sparkles" size={18} color={colors.tint} />
+            <Text style={{ fontFamily: "DMSans_700Bold", fontSize: 16, color: colors.text }}>
+              {scanResult.verified ? "Match Found" : "Best Guess"}
+            </Text>
+          </View>
+          <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 13, color: colors.textSecondary, marginBottom: 8 }}>
+            Tap the correct card to confirm
+          </Text>
+
+          <Pressable
+            style={({ pressed }) => ({
+              flexDirection: "row" as const,
+              gap: 12,
+              padding: 12,
+              borderRadius: 12,
+              backgroundColor: pressed ? colors.tint + "12" : colors.tint + "08",
+              borderWidth: 2,
+              borderColor: colors.tint + "40",
+            })}
+            onPress={confirmMainPick}
+          >
+            <View style={{ justifyContent: "center" }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.tint }} />
+            </View>
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={{ fontFamily: "DMSans_700Bold", fontSize: 16, color: colors.text }} numberOfLines={1}>
+                {scanResult.englishName || scanResult.name}
+              </Text>
+              <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 13, color: colors.textSecondary }} numberOfLines={1}>
+                {scanResult.englishSetName || scanResult.setName} #{scanResult.cardNumber}
+              </Text>
+              <View style={{ flexDirection: "row", gap: 6, marginTop: 2 }}>
+                <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5, backgroundColor: colors[scanResult.game] + "20" }}>
+                  <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 10, color: colors[scanResult.game] }}>
+                    {gameLabel(scanResult.game)}
+                  </Text>
+                </View>
+                {scanResult.rarity ? (
+                  <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5, backgroundColor: colors.surfaceAlt }}>
+                    <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 10, color: colors.textTertiary }}>{scanResult.rarity}</Text>
+                  </View>
+                ) : null}
+                {scanResult.verified && (
+                  <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5, backgroundColor: colors.success + "18" }}>
+                    <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 10, color: colors.success }}>Verified</Text>
+                  </View>
+                )}
               </View>
+            </View>
+            <View style={{ justifyContent: "center" }}>
+              <Ionicons name="checkmark-circle" size={24} color={colors.tint} />
+            </View>
+          </Pressable>
+
+          {hasAlts && (
+            <View style={{ gap: 8, marginTop: 12 }}>
+              <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 13, color: colors.textSecondary }}>
+                Other possible matches
+              </Text>
+              {alternatives.map((alt, idx) => (
+                <Pressable
+                  key={`${alt.cardId}-${idx}`}
+                  style={({ pressed }) => ({
+                    flexDirection: "row" as const,
+                    gap: 10,
+                    padding: 10,
+                    borderRadius: 10,
+                    backgroundColor: pressed ? colors.tint + "10" : colors.surfaceAlt,
+                    borderWidth: 1,
+                    borderColor: pressed ? colors.tint + "30" : colors.cardBorder,
+                  })}
+                  onPress={() => confirmAlternative(alt)}
+                >
+                  {alt.image ? (
+                    <Image
+                      source={{ uri: alt.image }}
+                      style={{ width: 44, height: 62, borderRadius: 6 }}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <View style={{ width: 44, height: 62, borderRadius: 6, backgroundColor: colors.background, alignItems: "center", justifyContent: "center" }}>
+                      <MaterialCommunityIcons name="cards-outline" size={18} color={colors.textTertiary} />
+                    </View>
+                  )}
+                  <View style={{ flex: 1, justifyContent: "center", gap: 2 }}>
+                    <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 14, color: colors.text }} numberOfLines={1}>
+                      {alt.name}
+                    </Text>
+                    <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 12, color: colors.textSecondary }} numberOfLines={1}>
+                      {alt.setName}{alt.localId ? ` #${alt.localId}` : ""}
+                    </Text>
+                  </View>
+                  <View style={{ justifyContent: "center" }}>
+                    <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+                  </View>
+                </Pressable>
+              ))}
             </View>
           )}
 
-          {isEditing ? (
+          <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+            <Pressable
+              style={({ pressed }) => ({
+                flex: 1,
+                flexDirection: "row" as const,
+                alignItems: "center" as const,
+                justifyContent: "center" as const,
+                gap: 6,
+                paddingVertical: 10,
+                borderRadius: 10,
+                backgroundColor: colors.surfaceAlt,
+                opacity: pressed ? 0.7 : 1,
+              })}
+              onPress={() => { setIsEditing(true); startEditing(); }}
+            >
+              <Ionicons name="pencil" size={14} color={colors.textSecondary} />
+              <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textSecondary }}>Search Manually</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => ({
+                flex: 1,
+                flexDirection: "row" as const,
+                alignItems: "center" as const,
+                justifyContent: "center" as const,
+                gap: 6,
+                paddingVertical: 10,
+                borderRadius: 10,
+                backgroundColor: colors.surfaceAlt,
+                opacity: pressed ? 0.7 : 1,
+              })}
+              onPress={resetScan}
+            >
+              <Ionicons name="camera-reverse" size={14} color={colors.textSecondary} />
+              <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textSecondary }}>Rescan</Text>
+            </Pressable>
+          </View>
+        </Animated.View>
+        );
+      })()}
+
+      {confirmedResult && (() => {
+        const activeResult = confirmedResult;
+        const isVerified = activeResult.verified === true;
+        const cardId = activeResult.verifiedCardId || `${activeResult.setId}-${activeResult.cardNumber}`;
+        const alreadyOwned = hasCard(activeResult.game, activeResult.setId, cardId);
+        const ownedQty = alreadyOwned ? cardQuantity(activeResult.game, activeResult.setId, cardId) : 0;
+        return (
+        <Animated.View entering={FadeInDown.duration(300).springify()} style={[dynamicStyles.resultCard, { backgroundColor: colors.surface, borderColor: colors.tint + "40" }]}>
+          <View style={{ gap: 14 }}>
+          <View style={dynamicStyles.resultHeader}>
+            <View style={dynamicStyles.resultInfo}>
+              <Text style={[dynamicStyles.resultName, { color: colors.text }]}>
+                {activeResult.englishName || activeResult.name}
+              </Text>
+              {activeResult.englishName && activeResult.englishName !== activeResult.name && (
+                <Text style={[dynamicStyles.resultSet, { color: colors.textTertiary }]}>
+                  {activeResult.name}
+                </Text>
+              )}
+              <Text style={[dynamicStyles.resultSet, { color: colors.textSecondary }]}>
+                {activeResult.englishSetName || activeResult.setName} - #{activeResult.cardNumber}
+              </Text>
+              <View style={dynamicStyles.resultMeta}>
+                <View style={[dynamicStyles.badge, { backgroundColor: colors[activeResult.game] + "20" }]}>
+                  <Text style={[dynamicStyles.badgeText, { color: colors[activeResult.game] }]}>
+                    {gameLabel(activeResult.game)}
+                  </Text>
+                </View>
+                <View style={[dynamicStyles.badge, { backgroundColor: colors.surfaceAlt }]}>
+                  <Text style={[dynamicStyles.badgeText, { color: colors.textSecondary }]}>
+                    {activeResult.rarity}
+                  </Text>
+                </View>
+                <View style={[dynamicStyles.badge, { backgroundColor: colors.success + "18" }]}>
+                  <Ionicons name="checkmark-circle" size={12} color={colors.success} />
+                  <Text style={[dynamicStyles.badgeText, { color: colors.success }]}>Selected</Text>
+                </View>
+              </View>
+            </View>
+            {activeResult.estimatedValue != null && activeResult.estimatedValue > 0 && (
+              <View style={dynamicStyles.priceTag}>
+                <Text style={[dynamicStyles.priceLabel, { color: colors.textTertiary }]}>Value</Text>
+                <Text style={[dynamicStyles.priceValue, { color: colors.success }]}>
+                  ${activeResult.estimatedValue?.toFixed(2) || "0.00"}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {alreadyOwned && (
+            <View style={[dynamicStyles.ownedBanner, { backgroundColor: colors.tint + "15" }]}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.tint} />
+              <Text style={[dynamicStyles.ownedBannerText, { color: colors.tint }]}>
+                Already in collection ({ownedQty} owned)
+              </Text>
+            </View>
+          )}
+
+          <View style={dynamicStyles.quantityRow}>
+            <Text style={[dynamicStyles.quantityLabel, { color: colors.textSecondary }]}>
+              {alreadyOwned ? "Add more" : "Quantity"}
+            </Text>
+            <View style={dynamicStyles.quantityStepper}>
+              <Pressable
+                style={[dynamicStyles.stepperButton, { backgroundColor: colors.surfaceAlt }]}
+                onPress={() => setAddQuantity((q) => Math.max(1, q - 1))}
+              >
+                <Ionicons name="remove" size={18} color={addQuantity <= 1 ? colors.textTertiary : colors.text} />
+              </Pressable>
+              <Text style={[dynamicStyles.quantityValue, { color: colors.text }]}>{addQuantity}</Text>
+              <Pressable
+                style={[dynamicStyles.stepperButton, { backgroundColor: colors.surfaceAlt }]}
+                onPress={() => setAddQuantity((q) => Math.min(99, q + 1))}
+              >
+                <Ionicons name="add" size={18} color={colors.text} />
+              </Pressable>
+            </View>
+          </View>
+          <Pressable
+            style={({ pressed }) => [dynamicStyles.addButton, { backgroundColor: colors.tint }, pressed && { opacity: 0.9 }]}
+            onPress={handleAddToCollection}
+          >
+            <Ionicons name={alreadyOwned ? "duplicate" : "add-circle"} size={20} color="#FFFFFF" />
+            <Text style={dynamicStyles.addButtonText}>
+              {alreadyOwned
+                ? `Add ${addQuantity} More`
+                : addQuantity > 1
+                  ? `Add ${addQuantity} to Collection`
+                  : "Add to Collection"}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => ({
+              flexDirection: "row" as const,
+              alignItems: "center" as const,
+              justifyContent: "center" as const,
+              gap: 6,
+              paddingVertical: 8,
+              opacity: pressed ? 0.6 : 1,
+            })}
+            onPress={() => { setConfirmedResult(null); setAddQuantity(1); }}
+          >
+            <Ionicons name="arrow-back" size={14} color={colors.textTertiary} />
+            <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textTertiary }}>Back to matches</Text>
+          </Pressable>
+          </View>
+        </Animated.View>
+        );
+      })()}
+
+      {scanResult && isEditing && (() => {
+        return (
+        <Animated.View entering={FadeInDown.duration(400).springify()} style={[dynamicStyles.resultCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
             <View style={{ gap: 12 }}>
               <View style={{ backgroundColor: colors.tint + "10", paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, flexDirection: "row", alignItems: "center", gap: 8 }}>
                 <Ionicons name="search" size={16} color={colors.tint} />
@@ -658,132 +925,6 @@ export default function ScanScreen() {
                 <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textTertiary }}>Retake Photo</Text>
               </Pressable>
             </View>
-          ) : (
-          <View style={{ gap: 14 }}>
-          <View style={dynamicStyles.resultHeader}>
-            <View style={dynamicStyles.resultInfo}>
-              <Text style={[dynamicStyles.resultName, { color: colors.text }]}>
-                {scanResult.englishName || scanResult.name}
-              </Text>
-              {scanResult.englishName && scanResult.englishName !== scanResult.name && (
-                <Text style={[dynamicStyles.resultSet, { color: colors.textTertiary }]}>
-                  {scanResult.name}
-                </Text>
-              )}
-              <Text style={[dynamicStyles.resultSet, { color: colors.textSecondary }]}>
-                {scanResult.englishSetName || scanResult.setName} - #{scanResult.cardNumber}
-              </Text>
-              <View style={dynamicStyles.resultMeta}>
-                <View style={[dynamicStyles.badge, { backgroundColor: colors[scanResult.game] + "20" }]}>
-                  <Text style={[dynamicStyles.badgeText, { color: colors[scanResult.game] }]}>
-                    {gameLabel(scanResult.game)}
-                  </Text>
-                </View>
-                <View style={[dynamicStyles.badge, { backgroundColor: colors.surfaceAlt }]}>
-                  <Text style={[dynamicStyles.badgeText, { color: colors.textSecondary }]}>
-                    {scanResult.rarity}
-                  </Text>
-                </View>
-                {isVerified && (
-                  <View style={[dynamicStyles.badge, { backgroundColor: colors.success + "18" }]}>
-                    <Ionicons name="checkmark-circle" size={12} color={colors.success} />
-                    <Text style={[dynamicStyles.badgeText, { color: colors.success }]}>Verified</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-            {isVerified && (
-              <View style={dynamicStyles.priceTag}>
-                <Text style={[dynamicStyles.priceLabel, { color: colors.textTertiary }]}>Value</Text>
-                <Text style={[dynamicStyles.priceValue, { color: colors.success }]}>
-                  ${scanResult.estimatedValue?.toFixed(2) || "0.00"}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {alreadyOwned && (
-            <View style={[dynamicStyles.ownedBanner, { backgroundColor: colors.tint + "15" }]}>
-              <Ionicons name="checkmark-circle" size={18} color={colors.tint} />
-              <Text style={[dynamicStyles.ownedBannerText, { color: colors.tint }]}>
-                Already in collection ({ownedQty} owned)
-              </Text>
-            </View>
-          )}
-
-          {isVerified ? (
-            <>
-              <View style={dynamicStyles.quantityRow}>
-                <Text style={[dynamicStyles.quantityLabel, { color: colors.textSecondary }]}>
-                  {alreadyOwned ? "Add more" : "Quantity"}
-                </Text>
-                <View style={dynamicStyles.quantityStepper}>
-                  <Pressable
-                    style={[dynamicStyles.stepperButton, { backgroundColor: colors.surfaceAlt }]}
-                    onPress={() => setAddQuantity((q) => Math.max(1, q - 1))}
-                  >
-                    <Ionicons name="remove" size={18} color={addQuantity <= 1 ? colors.textTertiary : colors.text} />
-                  </Pressable>
-                  <Text style={[dynamicStyles.quantityValue, { color: colors.text }]}>{addQuantity}</Text>
-                  <Pressable
-                    style={[dynamicStyles.stepperButton, { backgroundColor: colors.surfaceAlt }]}
-                    onPress={() => setAddQuantity((q) => Math.min(99, q + 1))}
-                  >
-                    <Ionicons name="add" size={18} color={colors.text} />
-                  </Pressable>
-                </View>
-              </View>
-              <Pressable
-                style={({ pressed }) => [dynamicStyles.addButton, { backgroundColor: colors.tint }, pressed && { opacity: 0.9 }]}
-                onPress={handleAddToCollection}
-              >
-                <Ionicons name={alreadyOwned ? "duplicate" : "add-circle"} size={20} color="#FFFFFF" />
-                <Text style={dynamicStyles.addButtonText}>
-                  {alreadyOwned
-                    ? `Add ${addQuantity} More`
-                    : addQuantity > 1
-                      ? `Add ${addQuantity} to Collection`
-                      : "Add to Collection"}
-                </Text>
-              </Pressable>
-            </>
-          ) : (
-            <View style={{ gap: 10 }}>
-              <Pressable
-                style={({ pressed }) => [dynamicStyles.addButton, { backgroundColor: colors.tint }, pressed && { opacity: 0.9 }]}
-                onPress={startEditing}
-              >
-                <Ionicons name="pencil" size={20} color="#FFFFFF" />
-                <Text style={dynamicStyles.addButtonText}>Edit Details</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [dynamicStyles.addButton, { backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.cardBorder }, pressed && { opacity: 0.9 }]}
-                onPress={resetScan}
-              >
-                <Ionicons name="refresh" size={18} color={colors.textSecondary} />
-                <Text style={[dynamicStyles.addButtonText, { color: colors.textSecondary }]}>Rescan Card</Text>
-              </Pressable>
-            </View>
-          )}
-
-          {isVerified && (
-            <Pressable
-              style={({ pressed }) => ({
-                flexDirection: "row" as const,
-                alignItems: "center" as const,
-                justifyContent: "center" as const,
-                gap: 6,
-                paddingVertical: 10,
-                opacity: pressed ? 0.6 : 1,
-              })}
-              onPress={startEditing}
-            >
-              <Ionicons name="pencil" size={14} color={colors.textTertiary} />
-              <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textTertiary }}>Wrong card? Edit details</Text>
-            </Pressable>
-          )}
-          </View>
-          )}
         </Animated.View>
         );
       })()}
