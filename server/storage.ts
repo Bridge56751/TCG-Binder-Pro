@@ -37,7 +37,7 @@ export const storage: IStorage = {
   },
 
   async createUser(insertUser: InsertUser) {
-    const [user] = await db.insert(users).values(insertUser).returning();
+    const [user] = await db.insert(users).values(insertUser as any).returning();
     return user;
   },
 
@@ -47,7 +47,7 @@ export const storage: IStorage = {
       password: "",
       appleId,
       isVerified: true,
-    }).returning();
+    } as any).returning();
     return user;
   },
 
@@ -71,10 +71,10 @@ export const storage: IStorage = {
     const [existing] = await db.select().from(userCollections).where(eq(userCollections.userId, userId));
     if (existing) {
       await db.update(userCollections)
-        .set({ data, updatedAt: new Date() })
+        .set({ data, updatedAt: new Date() } as any)
         .where(eq(userCollections.userId, userId));
     } else {
-      await db.insert(userCollections).values({ userId, data });
+      await db.insert(userCollections).values({ userId, data } as any);
     }
   },
 
