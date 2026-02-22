@@ -81,3 +81,4 @@ EXPO_PUBLIC_REVENUECAT_API_KEY = "test_uccVdMhfBxpmhUnHzqNeBFsYXXF"
 
 [userenv.production]
 NODE_ENV = "production"
+PORT = "8081"
