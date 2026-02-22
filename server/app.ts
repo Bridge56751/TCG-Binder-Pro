@@ -135,9 +135,7 @@ function setupSession(app: express.Application) {
   const isProduction = process.env.NODE_ENV === "production";
   const PgStore = connectPgSimple(session);
 
-  if (isProduction) {
-    app.set("trust proxy", 1);
-  }
+  app.set("trust proxy", 1);
 
   app.use(
     session({
@@ -163,10 +161,6 @@ async function createApp() {
   setupBodyParsing(app);
   setupSession(app);
   setupRequestLogging(app);
-
-  app.get("/", (_req: Request, res: Response) => {
-    res.json({ status: "ok", service: "TCG Binder Pro API" });
-  });
 
   await registerRoutes(app);
 
