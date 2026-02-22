@@ -309,10 +309,14 @@ export default function SetDetailScreen() {
   }, [game, id, pricesLoading]);
 
   useEffect(() => {
-    if (sortMode === "value" && !pricesFetched.current) {
+    if (!pricesFetched.current && activeData?.cards?.length) {
       fetchPrices();
     }
-  }, [sortMode, fetchPrices]);
+  }, [activeData?.cards, fetchPrices]);
+
+  useEffect(() => {
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [sortMode, filterMode]);
 
   const gameInfo = GAMES.find((g) => g.id === gameId);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
@@ -637,8 +641,11 @@ export default function SetDetailScreen() {
         keyExtractor={(item) => item.id}
         numColumns={NUM_COLUMNS}
         ListHeaderComponent={renderHeader}
+        removeClippedSubviews
+        maxToRenderPerBatch={15}
+        windowSize={5}
+        initialNumToRender={12}
         onScroll={(e) => {
-          if (sortDropdownVisible) setSortDropdownVisible(false);
           if (!needsScrollRestore.current) {
             scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
           }
