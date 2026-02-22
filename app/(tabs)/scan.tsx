@@ -604,58 +604,57 @@ export default function ScanScreen() {
 
       {confirmedResult && (() => {
         const activeResult = confirmedResult;
-        const isVerified = activeResult.verified === true;
         const cardId = activeResult.verifiedCardId || `${activeResult.setId}-${activeResult.cardNumber}`;
         const alreadyOwned = hasCard(activeResult.game, activeResult.setId, cardId);
         const ownedQty = alreadyOwned ? cardQuantity(activeResult.game, activeResult.setId, cardId) : 0;
         return (
-        <Animated.View entering={FadeInDown.duration(300).springify()} style={[dynamicStyles.resultCard, { backgroundColor: colors.surface, borderColor: colors.tint + "40" }]}>
-          <View style={{ gap: 14 }}>
-          <View style={dynamicStyles.resultHeader}>
-            <View style={dynamicStyles.resultInfo}>
-              <Text style={[dynamicStyles.resultName, { color: colors.text }]}>
-                {activeResult.englishName || activeResult.name}
+        <Animated.View entering={FadeInDown.duration(300).springify()} style={[dynamicStyles.resultCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+          <View style={{ alignItems: "center", gap: 4, paddingBottom: 4 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
+              <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+              <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 14, color: colors.success }}>Card Selected</Text>
+            </View>
+            <Text style={{ fontFamily: "DMSans_700Bold", fontSize: 20, color: colors.text, textAlign: "center" }} numberOfLines={2}>
+              {activeResult.englishName || activeResult.name}
+            </Text>
+            {activeResult.englishName && activeResult.englishName !== activeResult.name && (
+              <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 13, color: colors.textTertiary, textAlign: "center" }}>
+                {activeResult.name}
               </Text>
-              {activeResult.englishName && activeResult.englishName !== activeResult.name && (
-                <Text style={[dynamicStyles.resultSet, { color: colors.textTertiary }]}>
-                  {activeResult.name}
+            )}
+            <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 14, color: colors.textSecondary, textAlign: "center", marginTop: 1 }}>
+              {activeResult.englishSetName || activeResult.setName} #{activeResult.cardNumber}
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap", justifyContent: "center" }}>
+              <View style={[dynamicStyles.badge, { backgroundColor: colors[activeResult.game] + "20", flexDirection: "row", alignItems: "center", gap: 4 }]}>
+                <Text style={[dynamicStyles.badgeText, { color: colors[activeResult.game] }]}>
+                  {gameLabel(activeResult.game)}
                 </Text>
-              )}
-              <Text style={[dynamicStyles.resultSet, { color: colors.textSecondary }]}>
-                {activeResult.englishSetName || activeResult.setName} - #{activeResult.cardNumber}
-              </Text>
-              <View style={dynamicStyles.resultMeta}>
-                <View style={[dynamicStyles.badge, { backgroundColor: colors[activeResult.game] + "20" }]}>
-                  <Text style={[dynamicStyles.badgeText, { color: colors[activeResult.game] }]}>
-                    {gameLabel(activeResult.game)}
-                  </Text>
-                </View>
+              </View>
+              {activeResult.rarity ? (
                 <View style={[dynamicStyles.badge, { backgroundColor: colors.surfaceAlt }]}>
                   <Text style={[dynamicStyles.badgeText, { color: colors.textSecondary }]}>
                     {activeResult.rarity}
                   </Text>
                 </View>
-                <View style={[dynamicStyles.badge, { backgroundColor: colors.success + "18" }]}>
-                  <Ionicons name="checkmark-circle" size={12} color={colors.success} />
-                  <Text style={[dynamicStyles.badgeText, { color: colors.success }]}>Selected</Text>
+              ) : null}
+              {activeResult.estimatedValue != null && activeResult.estimatedValue > 0 && (
+                <View style={[dynamicStyles.badge, { backgroundColor: colors.success + "12" }]}>
+                  <Text style={[dynamicStyles.badgeText, { color: colors.success }]}>
+                    ${activeResult.estimatedValue.toFixed(2)}
+                  </Text>
                 </View>
-              </View>
+              )}
             </View>
-            {activeResult.estimatedValue != null && activeResult.estimatedValue > 0 && (
-              <View style={dynamicStyles.priceTag}>
-                <Text style={[dynamicStyles.priceLabel, { color: colors.textTertiary }]}>Value</Text>
-                <Text style={[dynamicStyles.priceValue, { color: colors.success }]}>
-                  ${activeResult.estimatedValue?.toFixed(2) || "0.00"}
-                </Text>
-              </View>
-            )}
           </View>
 
+          <View style={{ height: 1, backgroundColor: colors.cardBorder, marginVertical: 6 }} />
+
           {alreadyOwned && (
-            <View style={[dynamicStyles.ownedBanner, { backgroundColor: colors.tint + "15" }]}>
-              <Ionicons name="checkmark-circle" size={18} color={colors.tint} />
+            <View style={[dynamicStyles.ownedBanner, { backgroundColor: colors.tint + "10" }]}>
+              <Ionicons name="layers" size={16} color={colors.tint} />
               <Text style={[dynamicStyles.ownedBannerText, { color: colors.tint }]}>
-                Already in collection ({ownedQty} owned)
+                You already own {ownedQty}
               </Text>
             </View>
           )}
@@ -680,6 +679,7 @@ export default function ScanScreen() {
               </Pressable>
             </View>
           </View>
+
           <Pressable
             style={({ pressed }) => [dynamicStyles.addButton, { backgroundColor: colors.tint }, pressed && { opacity: 0.9 }]}
             onPress={handleAddToCollection}
@@ -700,7 +700,7 @@ export default function ScanScreen() {
               alignItems: "center" as const,
               justifyContent: "center" as const,
               gap: 6,
-              paddingVertical: 8,
+              paddingVertical: 6,
               opacity: pressed ? 0.6 : 1,
             })}
             onPress={() => { setConfirmedResult(null); setAddQuantity(1); }}
@@ -708,7 +708,6 @@ export default function ScanScreen() {
             <Ionicons name="arrow-back" size={14} color={colors.textTertiary} />
             <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textTertiary }}>Back to matches</Text>
           </Pressable>
-          </View>
         </Animated.View>
         );
       })()}
