@@ -63,6 +63,7 @@ export default function ScanScreen() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [confirmedResult, setConfirmedResult] = useState<CardIdentification | null>(null);
+  const lastScanMethod = useRef<"camera" | "library">("camera");
   const scrollViewRef = useRef<ScrollView>(null);
 
   const scrollToFocusedInput = useCallback(() => {
@@ -101,6 +102,7 @@ export default function ScanScreen() {
       base64: true,
     });
     if (!result.canceled && result.assets[0]) {
+      lastScanMethod.current = "camera";
       setImageUri(result.assets[0].uri);
       setScanResult(null);
       setConfirmedResult(null);
@@ -129,6 +131,7 @@ export default function ScanScreen() {
       base64: true,
     });
     if (!result.canceled && result.assets[0]) {
+      lastScanMethod.current = "library";
       setImageUri(result.assets[0].uri);
       setScanResult(null);
       setConfirmedResult(null);
@@ -137,6 +140,17 @@ export default function ScanScreen() {
       identifyCard(result.assets[0].base64!);
     }
   };
+
+  const batchScanNext = useCallback(() => {
+    resetScan();
+    setTimeout(() => {
+      if (lastScanMethod.current === "library") {
+        pickImage();
+      } else {
+        takePhoto();
+      }
+    }, 400);
+  }, []);
 
   const identifyCard = async (base64: string) => {
     setIsScanning(true);
@@ -209,7 +223,7 @@ export default function ScanScreen() {
     if (batchMode) {
       setBatchCount((c) => c + addQuantity);
       showToast(`${qtyLabel}${activeResult.name} added!`);
-      resetScan();
+      batchScanNext();
     } else {
       Alert.alert(
         "Added!",
@@ -346,7 +360,7 @@ export default function ScanScreen() {
     if (batchMode) {
       setBatchCount((c) => c + addQuantity);
       showToast(`${qtyLabel}${corrected.name} added!`);
-      resetScan();
+      batchScanNext();
     } else {
       setScanResult(null);
       resetScan();
