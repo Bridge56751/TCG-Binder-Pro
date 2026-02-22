@@ -444,6 +444,9 @@ export async function registerRoutes(app: Express): Promise<Express> {
       sendVerificationEmail(email.toLowerCase(), code).catch(e => console.error("Verification email failed:", e));
       if (req.session) {
         req.session.userId = user.id;
+      } else {
+        console.error("[Register] Session unavailable — user created but session not saved");
+        return res.status(503).json({ error: "Account created but session service unavailable. Please try logging in." });
       }
       res.json({ id: user.id, email: user.email, isPremium: user.isPremium, isVerified: false, needsVerification: true });
     } catch (error) {
@@ -521,7 +524,7 @@ export async function registerRoutes(app: Express): Promise<Express> {
       if (!user) {
         return res.json({ ok: true, message: "If an account with that email exists, a reset code has been sent." });
       }
-      if (user.appleId && !user.password) {
+      if (user.appleId && (!user.password || user.password === "")) {
         return res.status(400).json({ error: "This account uses Apple Sign-In. Please sign in with Apple instead." });
       }
       const code = generateCode();
@@ -576,8 +579,11 @@ export async function registerRoutes(app: Express): Promise<Express> {
       if (!user) {
         return res.status(401).json({ error: "Invalid email or password" });
       }
-      if (user.appleId && !user.password) {
+      if (user.appleId && (!user.password || user.password === "")) {
         return res.status(400).json({ error: "This account uses Apple Sign-In. Please use Apple to sign in." });
+      }
+      if (!user.password) {
+        return res.status(401).json({ error: "Invalid email or password" });
       }
       const valid = await bcrypt.compare(password, user.password);
       if (!valid) {
@@ -585,6 +591,9 @@ export async function registerRoutes(app: Express): Promise<Express> {
       }
       if (req.session) {
         req.session.userId = user.id;
+      } else {
+        console.error("[Login] Session unavailable — cannot save session");
+        return res.status(503).json({ error: "Session service temporarily unavailable. Please try again." });
       }
       if (!user.isVerified) {
         const code = generateCode();
@@ -648,7 +657,7 @@ export async function registerRoutes(app: Express): Promise<Express> {
       }
 
       if (!user) {
-        const email = tokenEmail?.toLowerCase() || `apple_${appleUserId.slice(0, 8)}@private.appleid.com`;
+        const email = tokenEmail?.toLowerCase() || `apple_${appleUserId.slice(0, 8)}@privaterelay.appleid.com`;
         user = await storage.createAppleUser(appleUserId, email);
         console.log(`[AppleAuth] Created new Apple user: ${user.id}`);
       }
@@ -700,11 +709,16 @@ export async function registerRoutes(app: Express): Promise<Express> {
     if (!req.session?.userId) {
       return res.status(401).json({ error: "Not logged in" });
     }
-    const user = await storage.getUser(req.session.userId);
-    if (!user) {
-      return res.status(401).json({ error: "User not found" });
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      res.json({ id: user.id, email: user.email, isPremium: user.isPremium, isVerified: user.isVerified });
+    } catch (error) {
+      console.error("Auth/me error:", error);
+      res.status(500).json({ error: "Failed to fetch user info" });
     }
-    res.json({ id: user.id, email: user.email, isPremium: user.isPremium, isVerified: user.isVerified });
   });
 
   app.post("/api/auth/upgrade-premium", async (req, res) => {

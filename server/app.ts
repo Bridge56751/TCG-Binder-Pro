@@ -142,7 +142,7 @@ function setupSession(app: express.Application) {
   const pgStore = new PgStore({
     conObject: {
       connectionString: dbUrl,
-      ssl: isProduction ? { rejectUnauthorized: false } : undefined,
+      ssl: dbUrl ? { rejectUnauthorized: false } : undefined,
     },
     createTableIfMissing: true,
     errorLog: (err: Error) => {
