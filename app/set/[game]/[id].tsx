@@ -480,35 +480,6 @@ export default function SetDetailScreen() {
           fontSize: 12,
           color: colors.textSecondary,
         },
-        sortDropdown: {
-          position: "absolute" as const,
-          top: 40,
-          right: 0,
-          backgroundColor: colors.surface,
-          borderRadius: 12,
-          paddingVertical: 4,
-          minWidth: 150,
-          zIndex: 100,
-          elevation: 5,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.2,
-          shadowRadius: 8,
-          borderWidth: 1,
-          borderColor: colors.border,
-        },
-        sortDropdownItem: {
-          flexDirection: "row" as const,
-          alignItems: "center" as const,
-          gap: 8,
-          paddingHorizontal: 14,
-          paddingVertical: 10,
-        },
-        sortDropdownItemText: {
-          fontFamily: "DMSans_500Medium",
-          fontSize: 13,
-          color: colors.textSecondary,
-        },
         filterCountText: {
           fontFamily: "DMSans_400Regular",
           fontSize: 12,
@@ -638,46 +609,6 @@ export default function SetDetailScreen() {
               color={sortMode !== "number" ? colors.tint : colors.textSecondary}
             />
           </Pressable>
-          {sortDropdownVisible && (
-            <View style={dynamicStyles.sortDropdown}>
-              {([
-                { key: "number" as SortMode, label: "#  Number", icon: "list-outline" as const },
-                { key: "name" as SortMode, label: "A-Z  Name", icon: "text-outline" as const },
-                { key: "value" as SortMode, label: "$  Value", icon: "trending-down" as const },
-              ]).map((opt) => (
-                <Pressable
-                  key={opt.key}
-                  style={[
-                    dynamicStyles.sortDropdownItem,
-                    sortMode === opt.key && { backgroundColor: colors.tint + "20" },
-                  ]}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setSortMode(opt.key);
-                    setSortDropdownVisible(false);
-                  }}
-                >
-                  <Ionicons
-                    name={opt.icon}
-                    size={14}
-                    color={sortMode === opt.key ? colors.tint : colors.textSecondary}
-                  />
-                  <Text style={[
-                    dynamicStyles.sortDropdownItemText,
-                    sortMode === opt.key && { color: colors.tint },
-                  ]}>
-                    {opt.label}
-                  </Text>
-                  {sortMode === opt.key && (
-                    <Ionicons name="checkmark" size={14} color={colors.tint} style={{ marginLeft: "auto" }} />
-                  )}
-                  {opt.key === "value" && pricesLoading && sortMode === "value" && (
-                    <ActivityIndicator size={10} color={colors.tint} style={{ marginLeft: 4 }} />
-                  )}
-                </Pressable>
-              ))}
-            </View>
-          )}
         </View>
       </ScrollView>
 
@@ -787,6 +718,54 @@ export default function SetDetailScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       />
+
+      <Modal
+        visible={sortDropdownVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSortDropdownVisible(false)}
+      >
+        <Pressable
+          style={styles.sortModalOverlay}
+          onPress={() => setSortDropdownVisible(false)}
+        >
+          <View style={[styles.sortModalContent, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {([
+              { key: "number" as SortMode, label: "#  Number", icon: "list-outline" as const },
+              { key: "name" as SortMode, label: "A-Z  Name", icon: "text-outline" as const },
+              { key: "value" as SortMode, label: "$  Value", icon: "trending-down" as const },
+            ]).map((opt) => (
+              <Pressable
+                key={opt.key}
+                style={[
+                  styles.sortModalItem,
+                  sortMode === opt.key && { backgroundColor: colors.tint + "20" },
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setSortMode(opt.key);
+                  setSortDropdownVisible(false);
+                }}
+              >
+                <Ionicons
+                  name={opt.icon}
+                  size={16}
+                  color={sortMode === opt.key ? colors.tint : colors.textSecondary}
+                />
+                <Text style={[
+                  styles.sortModalItemText,
+                  { color: sortMode === opt.key ? colors.tint : colors.text },
+                ]}>
+                  {opt.label}
+                </Text>
+                {sortMode === opt.key && (
+                  <Ionicons name="checkmark" size={16} color={colors.tint} style={{ marginLeft: "auto" }} />
+                )}
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
 
       <Modal
         visible={quickAddVisible}
@@ -1078,5 +1057,28 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
+  },
+  sortModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  sortModalContent: {
+    borderRadius: 14,
+    paddingVertical: 8,
+    minWidth: 200,
+    borderWidth: 1,
+  },
+  sortModalItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+  },
+  sortModalItemText: {
+    fontFamily: "DMSans_500Medium",
+    fontSize: 15,
   },
 });
