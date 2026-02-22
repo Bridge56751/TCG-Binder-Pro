@@ -1398,6 +1398,43 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
         }
       }
 
+      if (!result.error && result.game && result.verified) {
+        try {
+          const cardId = result.verifiedCardId || `${result.setId}-${result.cardNumber}`;
+          if (result.game === "pokemon") {
+            const imgRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${cardId}`);
+            if (imgRes.ok) {
+              const imgData = await imgRes.json();
+              if (imgData.image) result.image = `${imgData.image}/high.png`;
+            }
+          } else if (result.game === "yugioh") {
+            const ygoRes = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?name=${encodeURIComponent(result.name)}`);
+            if (ygoRes.ok) {
+              const ygoData = await ygoRes.json();
+              if (ygoData?.data?.[0]?.card_images?.[0]?.image_url) {
+                result.image = ygoData.data[0].card_images[0].image_url;
+              }
+            }
+          } else if (result.game === "onepiece") {
+            const opRes = await fetch(`https://optcgapi.com/api/sets/card/${cardId}/`);
+            if (opRes.ok) {
+              const opData = await opRes.json();
+              const opCard = Array.isArray(opData) ? opData[0] : opData;
+              if (opCard?.image_url) result.image = opCard.image_url;
+            }
+          } else if (result.game === "mtg") {
+            const mtgRes = await fetch(`https://api.scryfall.com/cards/${cardId}`);
+            if (mtgRes.ok) {
+              const mtgData = await mtgRes.json();
+              result.image = mtgData.image_uris?.normal || mtgData.card_faces?.[0]?.image_uris?.normal || null;
+            }
+          }
+          console.log(`[MainImage] ${result.game} image: ${result.image ? "found" : "not found"}`);
+        } catch (e) {
+          console.error("Error fetching main card image:", e);
+        }
+      }
+
       let alternatives: any[] = [];
       if (!result.error && result.game && result.name) {
         try {

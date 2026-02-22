@@ -447,46 +447,52 @@ export default function ScanScreen() {
 
           <Pressable
             style={({ pressed }) => ({
-              flexDirection: "row" as const,
-              gap: 12,
               padding: 12,
-              borderRadius: 12,
+              borderRadius: 14,
               backgroundColor: pressed ? colors.tint + "12" : colors.tint + "08",
               borderWidth: 2,
               borderColor: colors.tint + "40",
+              alignItems: "center" as const,
             })}
             onPress={confirmMainPick}
           >
-            <View style={{ justifyContent: "center" }}>
-              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.tint }} />
-            </View>
-            <View style={{ flex: 1, gap: 4 }}>
-              <Text style={{ fontFamily: "DMSans_700Bold", fontSize: 16, color: colors.text }} numberOfLines={1}>
-                {scanResult.englishName || scanResult.name}
-              </Text>
-              <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 13, color: colors.textSecondary }} numberOfLines={1}>
-                {scanResult.englishSetName || scanResult.setName} #{scanResult.cardNumber}
-              </Text>
-              <View style={{ flexDirection: "row", gap: 6, marginTop: 2 }}>
-                <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5, backgroundColor: colors[scanResult.game] + "20" }}>
-                  <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 10, color: colors[scanResult.game] }}>
-                    {gameLabel(scanResult.game)}
-                  </Text>
-                </View>
-                {scanResult.rarity ? (
-                  <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5, backgroundColor: colors.surfaceAlt }}>
-                    <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 10, color: colors.textTertiary }}>{scanResult.rarity}</Text>
-                  </View>
-                ) : null}
-                {scanResult.verified && (
-                  <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5, backgroundColor: colors.success + "18" }}>
-                    <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 10, color: colors.success }}>Verified</Text>
-                  </View>
-                )}
+            {scanResult.image ? (
+              <Image
+                source={{ uri: scanResult.image }}
+                style={{ width: 160, height: 224, borderRadius: 10, marginBottom: 10 }}
+                contentFit="contain"
+              />
+            ) : (
+              <View style={{ width: 160, height: 224, borderRadius: 10, marginBottom: 10, backgroundColor: colors.background, alignItems: "center", justifyContent: "center" }}>
+                <MaterialCommunityIcons name="cards-outline" size={48} color={colors.textTertiary} />
               </View>
+            )}
+            <Text style={{ fontFamily: "DMSans_700Bold", fontSize: 17, color: colors.text, textAlign: "center" }} numberOfLines={2}>
+              {scanResult.englishName || scanResult.name}
+            </Text>
+            <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 13, color: colors.textSecondary, textAlign: "center", marginTop: 2 }} numberOfLines={1}>
+              {scanResult.englishSetName || scanResult.setName} #{scanResult.cardNumber}
+            </Text>
+            <View style={{ flexDirection: "row", gap: 6, marginTop: 6, flexWrap: "wrap", justifyContent: "center" }}>
+              <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5, backgroundColor: colors[scanResult.game] + "20" }}>
+                <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 10, color: colors[scanResult.game] }}>
+                  {gameLabel(scanResult.game)}
+                </Text>
+              </View>
+              {scanResult.rarity ? (
+                <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5, backgroundColor: colors.surfaceAlt }}>
+                  <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 10, color: colors.textTertiary }}>{scanResult.rarity}</Text>
+                </View>
+              ) : null}
+              {scanResult.verified && (
+                <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5, backgroundColor: colors.success + "18" }}>
+                  <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 10, color: colors.success }}>Verified</Text>
+                </View>
+              )}
             </View>
-            <View style={{ justifyContent: "center" }}>
-              <Ionicons name="checkmark-circle" size={24} color={colors.tint} />
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8 }}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.tint} />
+              <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 13, color: colors.tint }}>Tap to confirm</Text>
             </View>
           </Pressable>
 

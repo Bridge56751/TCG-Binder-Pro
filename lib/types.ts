@@ -56,6 +56,7 @@ export interface CardIdentification {
   verifiedCardId?: string;
   verified?: boolean;
   language?: string;
+  image?: string | null;
   error?: string;
   alternatives?: CardAlternative[];
 }
