@@ -2,6 +2,7 @@ import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
+import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
 
 declare module "http" {
@@ -156,10 +157,37 @@ function setupSession(app: express.Application) {
   );
 }
 
+function setupRateLimiting(app: express.Application) {
+  const scanLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 15,
+    keyGenerator: (req) => {
+      return req.session?.userId || req.ip || "unknown";
+    },
+    message: { message: "Too many scans. Please wait a minute before scanning again." },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  const authLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 10,
+    message: { message: "Too many attempts. Please wait a minute and try again." },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  app.use("/api/identify-card", scanLimiter);
+  app.use("/api/auth/login", authLimiter);
+  app.use("/api/auth/register", authLimiter);
+  app.use("/api/auth/request-reset", authLimiter);
+}
+
 async function createApp() {
   setupCors(app);
   setupBodyParsing(app);
   setupSession(app);
+  setupRateLimiting(app);
   setupRequestLogging(app);
 
   await registerRoutes(app);
