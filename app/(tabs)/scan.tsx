@@ -49,8 +49,6 @@ export default function ScanScreen() {
   const [scanResult, setScanResult] = useState<CardIdentification | null>(null);
   const { addCard, hasCard, cardQuantity } = useCollection();
 
-  const [batchMode, setBatchMode] = useState(false);
-  const [batchCount, setBatchCount] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [addQuantity, setAddQuantity] = useState(1);
@@ -63,9 +61,6 @@ export default function ScanScreen() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [confirmedResult, setConfirmedResult] = useState<CardIdentification | null>(null);
-  const lastScanMethod = useRef<"camera" | "library">("camera");
-  const [batchQueue, setBatchQueue] = useState<{ uri: string; base64: string }[]>([]);
-  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const scrollToFocusedInput = useCallback(() => {
@@ -85,18 +80,6 @@ export default function ScanScreen() {
     }, 2000);
   }, []);
 
-  const takeSinglePhoto = async (): Promise<{ uri: string; base64: string } | null> => {
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ["images"],
-      quality: 0.7,
-      base64: true,
-    });
-    if (!result.canceled && result.assets[0] && result.assets[0].base64) {
-      return { uri: result.assets[0].uri, base64: result.assets[0].base64 };
-    }
-    return null;
-  };
-
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
@@ -110,46 +93,18 @@ export default function ScanScreen() {
       );
       return;
     }
-    lastScanMethod.current = "camera";
-
-    if (batchMode) {
-      const photos: { uri: string; base64: string }[] = [];
-      for (let i = 0; i < 5; i++) {
-        const photo = await takeSinglePhoto();
-        if (!photo) break;
-        photos.push(photo);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-      if (photos.length === 0) return;
-      if (photos.length === 1) {
-        setImageUri(photos[0].uri);
-        setScanResult(null);
-        setConfirmedResult(null);
-        setIsEditing(false);
-        setAddQuantity(1);
-        setBatchQueue([]);
-        setBatchProgress(null);
-        identifyCard(photos[0].base64);
-      } else {
-        setBatchProgress({ current: 1, total: photos.length });
-        setImageUri(photos[0].uri);
-        setScanResult(null);
-        setConfirmedResult(null);
-        setIsEditing(false);
-        setAddQuantity(1);
-        setBatchQueue(photos.slice(1));
-        identifyCard(photos[0].base64);
-      }
-    } else {
-      const photo = await takeSinglePhoto();
-      if (photo) {
-        setImageUri(photo.uri);
-        setScanResult(null);
-        setConfirmedResult(null);
-        setIsEditing(false);
-        setAddQuantity(1);
-        identifyCard(photo.base64);
-      }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ["images"],
+      quality: 0.7,
+      base64: true,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setImageUri(result.assets[0].uri);
+      setScanResult(null);
+      setConfirmedResult(null);
+      setIsEditing(false);
+      setAddQuantity(1);
+      identifyCard(result.assets[0].base64!);
     }
   };
 
@@ -170,72 +125,16 @@ export default function ScanScreen() {
       mediaTypes: ["images"],
       quality: 0.7,
       base64: true,
-      allowsMultipleSelection: batchMode,
-      selectionLimit: batchMode ? 5 : 1,
     });
-    if (!result.canceled && result.assets.length > 0) {
-      lastScanMethod.current = "library";
-      if (result.assets.length > 1) {
-        const queue = result.assets
-          .filter((a) => a.base64)
-          .map((a) => ({ uri: a.uri, base64: a.base64! }));
-        if (queue.length > 0) {
-          setBatchProgress({ current: 1, total: queue.length });
-          setImageUri(queue[0].uri);
-          setScanResult(null);
-          setConfirmedResult(null);
-          setIsEditing(false);
-          setAddQuantity(1);
-          setBatchQueue(queue.slice(1));
-          identifyCard(queue[0].base64);
-        }
-      } else {
-        setImageUri(result.assets[0].uri);
-        setScanResult(null);
-        setConfirmedResult(null);
-        setIsEditing(false);
-        setAddQuantity(1);
-        setBatchQueue([]);
-        setBatchProgress(null);
-        identifyCard(result.assets[0].base64!);
-      }
-    }
-  };
-
-  const processNextInQueue = useCallback(() => {
-    setBatchQueue((prev) => {
-      if (prev.length === 0) {
-        setBatchProgress(null);
-        return prev;
-      }
-      const next = prev[0];
-      const remaining = prev.slice(1);
-      setBatchProgress((p) => p ? { current: p.current + 1, total: p.total } : null);
-      setImageUri(next.uri);
+    if (!result.canceled && result.assets[0]) {
+      setImageUri(result.assets[0].uri);
       setScanResult(null);
       setConfirmedResult(null);
       setIsEditing(false);
       setAddQuantity(1);
-      identifyCard(next.base64);
-      return remaining;
-    });
-  }, []);
-
-  const batchScanNext = useCallback(() => {
-    if (batchQueue.length > 0) {
-      processNextInQueue();
-    } else {
-      setBatchProgress(null);
-      resetScan();
-      setTimeout(() => {
-        if (lastScanMethod.current === "library") {
-          pickImage();
-        } else {
-          takePhoto();
-        }
-      }, 400);
+      identifyCard(result.assets[0].base64!);
     }
-  }, [batchQueue.length]);
+  };
 
   const identifyCard = async (base64: string) => {
     setIsScanning(true);
@@ -305,27 +204,21 @@ export default function ScanScreen() {
 
     const qtyLabel = addQuantity > 1 ? `${addQuantity} copies of ` : "";
 
-    if (batchMode) {
-      setBatchCount((c) => c + addQuantity);
-      showToast(`${qtyLabel}${activeResult.name} added!`);
-      batchScanNext();
-    } else {
-      Alert.alert(
-        "Added!",
-        `${qtyLabel}${activeResult.name} has been added to your collection.`,
-        [
-          { text: "Scan Another", onPress: resetScan },
-          {
-            text: "View Set",
-            onPress: () =>
-              router.push({
-                pathname: "/set/[game]/[id]",
-                params: { game: activeResult.game, id: activeResult.setId, lang: activeResult.language || "en" },
-              }),
-          },
-        ]
-      );
-    }
+    Alert.alert(
+      "Added!",
+      `${qtyLabel}${activeResult.name} has been added to your collection.`,
+      [
+        { text: "Scan Another", onPress: resetScan },
+        {
+          text: "View Set",
+          onPress: () =>
+            router.push({
+              pathname: "/set/[game]/[id]",
+              params: { game: activeResult.game, id: activeResult.setId, lang: activeResult.language || "en" },
+            }),
+        },
+      ]
+    );
   };
 
   const resetScan = () => {
@@ -340,8 +233,6 @@ export default function ScanScreen() {
     setEditSetName("");
     setSearchResults([]);
     setHasSearched(false);
-    setBatchQueue([]);
-    setBatchProgress(null);
   };
 
   const confirmMainPick = () => {
@@ -444,15 +335,9 @@ export default function ScanScreen() {
     setIsEditing(false);
 
     const qtyLabel = addQuantity > 1 ? `${addQuantity} copies of ` : "";
-    if (batchMode) {
-      setBatchCount((c) => c + addQuantity);
-      showToast(`${qtyLabel}${corrected.name} added!`);
-      batchScanNext();
-    } else {
-      setScanResult(null);
-      resetScan();
-      showToast(`${qtyLabel}${corrected.name} added to collection!`);
-    }
+    setScanResult(null);
+    resetScan();
+    showToast(`${qtyLabel}${corrected.name} added to collection!`);
   };
 
   const dynamicStyles = getDynamicStyles(colors);
@@ -482,77 +367,9 @@ export default function ScanScreen() {
       )}
 
       <View style={dynamicStyles.header}>
-        <View style={dynamicStyles.headerRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={dynamicStyles.title}>Scan Card</Text>
-            <Text style={dynamicStyles.subtitle}>Take a photo or pick from your library</Text>
-          </View>
-          <View style={dynamicStyles.batchToggleArea}>
-            {batchMode && batchCount > 0 && (
-              <View style={[dynamicStyles.batchCounter, { backgroundColor: colors.success + "20" }]}>
-                <Text style={[dynamicStyles.batchCounterText, { color: colors.success }]}>
-                  {batchCount}
-                </Text>
-              </View>
-            )}
-            <Pressable
-              style={[
-                dynamicStyles.batchToggle,
-                {
-                  backgroundColor: batchMode ? colors.tint : colors.surfaceAlt,
-                },
-              ]}
-              onPress={() => {
-                setBatchMode((b) => !b);
-                if (!batchMode) setBatchCount(0);
-              }}
-            >
-              <Ionicons
-                name="layers"
-                size={16}
-                color={batchMode ? "#FFFFFF" : colors.textSecondary}
-              />
-              <Text
-                style={[
-                  dynamicStyles.batchToggleText,
-                  { color: batchMode ? "#FFFFFF" : colors.textSecondary },
-                ]}
-              >
-                Batch
-              </Text>
-            </Pressable>
-          </View>
-        </View>
+        <Text style={dynamicStyles.title}>Scan Card</Text>
+        <Text style={dynamicStyles.subtitle}>Take a photo or pick from your library</Text>
       </View>
-
-      {batchProgress && (
-        <Animated.View entering={FadeIn.duration(200)} style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 8,
-          marginHorizontal: 20,
-          marginBottom: 8,
-          paddingVertical: 10,
-          paddingHorizontal: 16,
-          borderRadius: 12,
-          backgroundColor: colors.tint + "12",
-        }}>
-          <Ionicons name="images" size={16} color={colors.tint} />
-          <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 14, color: colors.tint }}>
-            Photo {batchProgress.current} of {batchProgress.total}
-          </Text>
-          {batchQueue.length > 0 && (
-            <Pressable
-              onPress={() => processNextInQueue()}
-              style={{ marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 4 }}
-            >
-              <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textSecondary }}>Skip</Text>
-              <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
-            </Pressable>
-          )}
-        </Animated.View>
-      )}
 
       <View style={dynamicStyles.scanArea}>
         {imageUri ? (
@@ -561,9 +378,7 @@ export default function ScanScreen() {
             {isScanning && (
               <View style={dynamicStyles.scanningOverlay}>
                 <ActivityIndicator size="large" color={colors.tint} />
-                <Text style={[dynamicStyles.scanningText, { color: colors.text }]}>
-                  {batchProgress ? `Identifying card ${batchProgress.current} of ${batchProgress.total}...` : "Identifying card..."}
-                </Text>
+                <Text style={[dynamicStyles.scanningText, { color: colors.text }]}>Identifying card...</Text>
               </View>
             )}
             <Pressable style={dynamicStyles.clearButton} onPress={resetScan}>
@@ -1096,14 +911,14 @@ export default function ScanScreen() {
           onPress={takePhoto}
         >
           <Ionicons name="camera" size={24} color="#FFFFFF" />
-          <Text style={dynamicStyles.primaryActionText}>{batchMode ? "Take Photos" : "Take Photo"}</Text>
+          <Text style={dynamicStyles.primaryActionText}>Take Photo</Text>
         </Pressable>
         <Pressable
           style={({ pressed }) => [dynamicStyles.actionButton, dynamicStyles.secondaryAction, { backgroundColor: colors.surface, borderColor: colors.cardBorder }, pressed && { opacity: 0.9 }]}
           onPress={pickImage}
         >
           <Ionicons name="images" size={22} color={colors.tint} />
-          <Text style={[dynamicStyles.secondaryActionText, { color: colors.tint }]}>{batchMode ? "Select Photos" : "Library"}</Text>
+          <Text style={[dynamicStyles.secondaryActionText, { color: colors.tint }]}>Library</Text>
         </Pressable>
       </View>
 
@@ -1155,34 +970,6 @@ function getDynamicStyles(colors: any) {
       fontSize: 14,
       color: colors.textSecondary,
       marginTop: 2,
-    },
-    batchToggleArea: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-    },
-    batchCounter: {
-      width: 26,
-      height: 26,
-      borderRadius: 13,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    batchCounterText: {
-      fontFamily: "DMSans_700Bold",
-      fontSize: 12,
-    },
-    batchToggle: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 20,
-    },
-    batchToggleText: {
-      fontFamily: "DMSans_600SemiBold",
-      fontSize: 13,
     },
     scanArea: {
       height: 320,
