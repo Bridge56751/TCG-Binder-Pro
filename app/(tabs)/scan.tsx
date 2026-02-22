@@ -625,6 +625,11 @@ export default function ScanScreen() {
             <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 14, color: colors.textSecondary, textAlign: "center", marginTop: 1 }}>
               {activeResult.englishSetName || activeResult.setName} #{activeResult.cardNumber}
             </Text>
+            {activeResult.estimatedValue != null && activeResult.estimatedValue > 0 && (
+              <Text style={{ fontFamily: "DMSans_700Bold", fontSize: 28, color: colors.success, textAlign: "center", marginTop: 8 }}>
+                ${activeResult.estimatedValue.toFixed(2)}
+              </Text>
+            )}
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap", justifyContent: "center" }}>
               <View style={[dynamicStyles.badge, { backgroundColor: colors[activeResult.game] + "20", flexDirection: "row", alignItems: "center", gap: 4 }]}>
                 <Text style={[dynamicStyles.badgeText, { color: colors[activeResult.game] }]}>
@@ -638,13 +643,6 @@ export default function ScanScreen() {
                   </Text>
                 </View>
               ) : null}
-              {activeResult.estimatedValue != null && activeResult.estimatedValue > 0 && (
-                <View style={[dynamicStyles.badge, { backgroundColor: colors.success + "12" }]}>
-                  <Text style={[dynamicStyles.badgeText, { color: colors.success }]}>
-                    ${activeResult.estimatedValue.toFixed(2)}
-                  </Text>
-                </View>
-              )}
             </View>
           </View>
 
