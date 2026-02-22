@@ -20,7 +20,6 @@ function getGameColor(game: GameId, colors: any): string {
   switch (game) {
     case "pokemon": return colors.pokemon;
     case "yugioh": return colors.yugioh;
-    case "onepiece": return colors.onepiece;
     case "mtg": return colors.mtg;
     default: return colors.tint;
   }

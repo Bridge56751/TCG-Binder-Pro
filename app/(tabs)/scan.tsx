@@ -37,7 +37,7 @@ function gameLabel(game: GameId): string {
   if (game === "pokemon") return "Pokemon";
   if (game === "yugioh") return "Yu-Gi-Oh!";
   if (game === "mtg") return "Magic";
-  return "One Piece";
+  return game;
 }
 
 export default function ScanScreen() {
@@ -705,7 +705,7 @@ export default function ScanScreen() {
               <View style={{ gap: 6 }}>
                 <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textSecondary }}>Game</Text>
                 <View style={{ flexDirection: "row", gap: 6 }}>
-                  {(["pokemon", "yugioh", "onepiece", "mtg"] as GameId[]).map((g) => (
+                  {(["pokemon", "yugioh", "mtg"] as GameId[]).map((g) => (
                     <Pressable
                       key={g}
                       style={{

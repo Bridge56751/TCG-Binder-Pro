@@ -1,4 +1,4 @@
-export type GameId = "pokemon" | "yugioh" | "onepiece" | "mtg";
+export type GameId = "pokemon" | "yugioh" | "mtg";
 
 export interface TCGGame {
   id: GameId;
@@ -91,6 +91,5 @@ export interface CollectionData {
 export const GAMES: TCGGame[] = [
   { id: "pokemon", name: "Pokemon", iconName: "pokeball", color: "#E3573E" },
   { id: "yugioh", name: "Yu-Gi-Oh!", iconName: "pyramid", color: "#7B5EA7" },
-  { id: "onepiece", name: "One Piece", iconName: "anchor", color: "#2E86C1" },
   { id: "mtg", name: "Magic", iconName: "magic-staff", color: "#A8572E" },
 ];

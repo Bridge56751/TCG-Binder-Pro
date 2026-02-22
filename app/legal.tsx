@@ -60,13 +60,6 @@ export default function LegalScreen() {
 
         <View style={[styles.divider, { backgroundColor: colors.cardBorder }]} />
 
-        <Text style={[styles.heading, { color: colors.text }]}>One Piece Card Game</Text>
-        <Text style={[styles.body, { color: colors.textSecondary }]}>
-          One Piece{"\u00AE"}, One Piece Card Game{"\u00AE"}, and all related names, characters, images, artwork, logos, and trademarks are the property of Eiichiro Oda, Bandai Co., Ltd., Shueisha Inc., Toei Animation Co., Ltd., and Viz Media, LLC.{"\n\n"}One Piece card data displayed in this App is provided by onepiece-cardgame.dev (https://onepiece-cardgame.dev), a community-maintained database.
-        </Text>
-
-        <View style={[styles.divider, { backgroundColor: colors.cardBorder }]} />
-
         <Text style={[styles.heading, { color: colors.text }]}>General Disclaimer</Text>
         <Text style={[styles.body, { color: colors.textSecondary }]}>
           All card names, card images, card artwork, set names, set symbols, and other game-related content displayed in this App are the intellectual property of their respective owners.{"\n\n"}TCG Binder is a collection tracking, reference, and portfolio management tool. Card images and related content are displayed solely for identification, reference, and personal collection management purposes as part of the App's functionality.{"\n\n"}This App does not claim ownership of any card images, artwork, trademarks, or other copyrighted materials. All card images are fetched dynamically from third-party API services and are not hosted, stored, modified, or redistributed by this App.{"\n\n"}No content is sold, licensed, or monetized as intellectual property. Any fees charged for use of the App relate exclusively to software features, tools, and services, not to access to copyrighted content.

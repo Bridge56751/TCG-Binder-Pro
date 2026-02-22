@@ -25,7 +25,6 @@ import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "@/lib/legal-urls";
 const GAME_ICONS: Record<GameId, keyof typeof MaterialCommunityIcons.glyphMap> = {
   pokemon: "pokeball",
   yugioh: "cards",
-  onepiece: "sail-boat",
   mtg: "magic-staff",
 };
 
@@ -72,7 +71,6 @@ export default function SettingsScreen() {
         "cardvault_enabled_games",
         "cardvault_set_order_pokemon",
         "cardvault_set_order_yugioh",
-        "cardvault_set_order_onepiece",
         "cardvault_set_order_mtg",
         "cardvault_guest_mode",
         "cardvault_theme",

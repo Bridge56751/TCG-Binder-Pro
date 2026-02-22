@@ -48,7 +48,6 @@ function getMarketplaceLinks(card: CardDetail) {
   const tcgPlayerCategories: Record<GameId, string> = {
     pokemon: "pokemon",
     yugioh: "yugioh",
-    onepiece: "one-piece-card-game",
     mtg: "magic",
   };
   const tcgQuery = encodeURIComponent(`${cardName} ${setName}`);

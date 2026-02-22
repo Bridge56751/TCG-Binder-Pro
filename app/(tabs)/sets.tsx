@@ -208,7 +208,6 @@ export default function SetsScreen() {
   const gameColor = (game: string) => {
     if (game === "pokemon") return colors.pokemon;
     if (game === "yugioh") return colors.yugioh;
-    if (game === "onepiece") return colors.onepiece;
     if (game === "mtg") return colors.mtg;
     return colors.tint;
   };
@@ -216,7 +215,6 @@ export default function SetsScreen() {
   const gameLabel = (game: string) => {
     if (game === "pokemon") return "Pokemon";
     if (game === "yugioh") return "Yu-Gi-Oh!";
-    if (game === "onepiece") return "One Piece";
     if (game === "mtg") return "Magic";
     return game;
   };
