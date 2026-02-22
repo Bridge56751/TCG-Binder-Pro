@@ -62,7 +62,7 @@ export default function LegalScreen() {
 
         <Text style={[styles.heading, { color: colors.text }]}>One Piece Card Game</Text>
         <Text style={[styles.body, { color: colors.textSecondary }]}>
-          One Piece{"\u00AE"}, One Piece Card Game{"\u00AE"}, and all related names, characters, images, artwork, logos, and trademarks are the property of Eiichiro Oda, Bandai Co., Ltd., Shueisha Inc., Toei Animation Co., Ltd., and Viz Media, LLC.{"\n\n"}One Piece card data displayed in this App is provided by OPTCG API (https://optcgapi.com), a community-maintained database.
+          One Piece{"\u00AE"}, One Piece Card Game{"\u00AE"}, and all related names, characters, images, artwork, logos, and trademarks are the property of Eiichiro Oda, Bandai Co., Ltd., Shueisha Inc., Toei Animation Co., Ltd., and Viz Media, LLC.{"\n\n"}One Piece card data displayed in this App is provided by onepiece-cardgame.dev (https://onepiece-cardgame.dev), a community-maintained database.
         </Text>
 
         <View style={[styles.divider, { backgroundColor: colors.cardBorder }]} />
