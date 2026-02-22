@@ -46,27 +46,22 @@ export function CardGallery({ visible, cards, initialIndex, onClose }: CardGalle
   const insets = useSafeAreaInsets();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const flatListRef = useRef<FlatList>(null);
-  const hasScrolledRef = useRef(false);
+  const isSettledRef = useRef(false);
   const topInset = Platform.OS === "web" ? 20 : insets.top;
   const bottomInset = Platform.OS === "web" ? 20 : insets.bottom;
 
   useEffect(() => {
     if (visible) {
       setCurrentIndex(initialIndex);
-      hasScrolledRef.current = false;
-      const scrollToCard = () => {
-        if (initialIndex > 0 && flatListRef.current && !hasScrolledRef.current) {
-          flatListRef.current.scrollToIndex({ index: initialIndex, animated: false });
-          hasScrolledRef.current = true;
-        }
-      };
-      setTimeout(scrollToCard, 50);
-      setTimeout(scrollToCard, 150);
-      setTimeout(scrollToCard, 300);
+      isSettledRef.current = false;
+      setTimeout(() => {
+        isSettledRef.current = true;
+      }, 500);
     }
   }, [visible, initialIndex]);
 
   const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    if (!isSettledRef.current) return;
     if (viewableItems.length > 0 && viewableItems[0].index != null) {
       setCurrentIndex(viewableItems[0].index);
     }
@@ -142,7 +137,7 @@ export function CardGallery({ visible, cards, initialIndex, onClose }: CardGalle
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
-          initialScrollIndex={initialIndex > 0 ? initialIndex : undefined}
+          contentOffset={{ x: initialIndex * SCREEN_WIDTH, y: 0 }}
           getItemLayout={getItemLayout}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
@@ -150,7 +145,7 @@ export function CardGallery({ visible, cards, initialIndex, onClose }: CardGalle
           decelerationRate="fast"
           onScrollToIndexFailed={(info) => {
             setTimeout(() => {
-              flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
+              flatListRef.current?.scrollToOffset({ offset: info.index * SCREEN_WIDTH, animated: false });
             }, 100);
           }}
           style={styles.list}
