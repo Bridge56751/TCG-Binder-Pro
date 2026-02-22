@@ -103,6 +103,9 @@ export default function ScanScreen() {
     if (!result.canceled && result.assets[0]) {
       setImageUri(result.assets[0].uri);
       setScanResult(null);
+      setConfirmedResult(null);
+      setIsEditing(false);
+      setAddQuantity(1);
       identifyCard(result.assets[0].base64!);
     }
   };
@@ -128,6 +131,9 @@ export default function ScanScreen() {
     if (!result.canceled && result.assets[0]) {
       setImageUri(result.assets[0].uri);
       setScanResult(null);
+      setConfirmedResult(null);
+      setIsEditing(false);
+      setAddQuantity(1);
       identifyCard(result.assets[0].base64!);
     }
   };
