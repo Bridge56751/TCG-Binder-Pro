@@ -132,7 +132,7 @@ export default function ScanScreen() {
       quality: 0.7,
       base64: true,
       allowsMultipleSelection: batchMode,
-      selectionLimit: batchMode ? 20 : 1,
+      selectionLimit: batchMode ? 5 : 1,
     });
     if (!result.canceled && result.assets.length > 0) {
       lastScanMethod.current = "library";
