@@ -181,42 +181,100 @@ function setupSession(app: express.Application) {
 }
 
 function setupRateLimiting(app: express.Application) {
+  const limiterDefaults = {
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: false,
+  };
+
   const scanLimiter = rateLimit({
+    ...limiterDefaults,
     windowMs: 60 * 1000,
     max: 15,
     keyGenerator: (req) => {
       return req.session?.userId || req.ip || "unknown";
     },
     message: { message: "Too many scans. Please wait a minute before scanning again." },
-    standardHeaders: true,
-    legacyHeaders: false,
-    validate: false,
   });
 
   const authLimiter = rateLimit({
+    ...limiterDefaults,
     windowMs: 60 * 1000,
     max: 10,
     message: { message: "Too many attempts. Please wait a minute and try again." },
-    standardHeaders: true,
-    legacyHeaders: false,
-    validate: false,
+  });
+
+  const strictAuthLimiter = rateLimit({
+    ...limiterDefaults,
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    message: { message: "Too many attempts. Please wait 15 minutes and try again." },
   });
 
   const emailLimiter = rateLimit({
+    ...limiterDefaults,
     windowMs: 60 * 1000,
     max: 3,
     message: { message: "Too many email requests. Please wait a minute." },
-    standardHeaders: true,
-    legacyHeaders: false,
-    validate: false,
+  });
+
+  const aiLimiter = rateLimit({
+    ...limiterDefaults,
+    windowMs: 60 * 1000,
+    max: 10,
+    keyGenerator: (req) => {
+      return req.session?.userId || req.ip || "unknown";
+    },
+    message: { message: "Too many AI requests. Please wait a minute." },
+  });
+
+  const collectionLimiter = rateLimit({
+    ...limiterDefaults,
+    windowMs: 60 * 1000,
+    max: 30,
+    keyGenerator: (req) => {
+      return req.session?.userId || req.ip || "unknown";
+    },
+    message: { message: "Too many collection requests. Please slow down." },
+  });
+
+  const tcgApiLimiter = rateLimit({
+    ...limiterDefaults,
+    windowMs: 60 * 1000,
+    max: 60,
+    message: { message: "Too many requests. Please wait a moment." },
+  });
+
+  const destructiveLimiter = rateLimit({
+    ...limiterDefaults,
+    windowMs: 60 * 60 * 1000,
+    max: 3,
+    keyGenerator: (req) => {
+      return req.session?.userId || req.ip || "unknown";
+    },
+    message: { message: "Too many requests. Please wait before trying again." },
   });
 
   app.use("/api/identify-card", scanLimiter);
+  app.use("/api/correct-card", aiLimiter);
+  app.use("/api/search-cards", aiLimiter);
+
   app.use("/api/auth/login", authLimiter);
   app.use("/api/auth/register", authLimiter);
-  app.use("/api/auth/request-reset", authLimiter);
-  app.use("/api/auth/resend-verification", emailLimiter);
+  app.use("/api/auth/apple", authLimiter);
   app.use("/api/auth/verify-email", authLimiter);
+  app.use("/api/auth/request-reset", authLimiter);
+  app.use("/api/auth/reset-password", strictAuthLimiter);
+  app.use("/api/auth/resend-verification", emailLimiter);
+  app.use("/api/auth/upgrade-premium", authLimiter);
+  app.use("/api/auth/delete-account", destructiveLimiter);
+
+  app.use("/api/collection/sync", collectionLimiter);
+  app.use("/api/collection/cards-meta", collectionLimiter);
+  app.use("/api/collection/value", collectionLimiter);
+
+  app.use("/api/tcg", tcgApiLimiter);
+  app.use("/api/search", tcgApiLimiter);
 }
 
 async function createApp() {
