@@ -21,6 +21,7 @@ import { useCollection, FREE_CARD_LIMIT, GUEST_CARD_LIMIT } from "@/lib/Collecti
 import { GAMES } from "@/lib/types";
 import type { GameId } from "@/lib/types";
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "@/lib/legal-urls";
+import * as AppleAuthentication from "expo-apple-authentication";
 
 const GAME_ICONS: Record<GameId, keyof typeof MaterialCommunityIcons.glyphMap> = {
   pokemon: "pokeball",
@@ -102,7 +103,17 @@ export default function SettingsScreen() {
   const executeDeletion = async () => {
     setDeletionStep(null);
     try {
-      await deleteAccount();
+      let appleAuthCode: string | undefined;
+      if (user?.appleId && Platform.OS === "ios") {
+        try {
+          const credential = await AppleAuthentication.refreshAsync({
+            user: user.appleId,
+            requestedScopes: [],
+          });
+          appleAuthCode = credential.authorizationCode ?? undefined;
+        } catch {}
+      }
+      await deleteAccount(appleAuthCode);
       Alert.alert("Account Deleted", "Your account and all associated data have been permanently deleted.");
     } catch {
       Alert.alert("Error", "Failed to delete account. Please try again.");

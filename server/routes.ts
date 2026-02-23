@@ -601,7 +601,7 @@ export async function registerRoutes(app: Express): Promise<Express> {
         await storage.setVerificationCode(user.id, code, expiry);
         sendVerificationEmail(user.email, code).catch(e => console.error("Verification email failed:", e));
       }
-      res.json({ id: user.id, email: user.email, isPremium: user.isPremium, isVerified: user.isVerified });
+      res.json({ id: user.id, email: user.email, isPremium: user.isPremium, isVerified: user.isVerified, appleId: user.appleId || null });
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ error: "Login failed" });
@@ -673,6 +673,7 @@ export async function registerRoutes(app: Express): Promise<Express> {
         email: user.email,
         isPremium: user.isPremium,
         isVerified: true,
+        appleId: user.appleId || null,
       });
     } catch (error) {
       console.error("Apple auth error:", error);
@@ -703,7 +704,46 @@ export async function registerRoutes(app: Express): Promise<Express> {
       }
 
       const isAppleUser = !!user.appleId;
+      const { appleAuthCode } = req.body || {};
       console.log(`[DeleteAccount] Deleting user ${user.id} (email: ${user.email}, appleUser: ${isAppleUser})`);
+
+      if (isAppleUser && appleAuthCode) {
+        try {
+          const appleClientSecret = process.env.APPLE_CLIENT_SECRET || "";
+          if (appleClientSecret) {
+            const tokenRes = await fetch("https://appleid.apple.com/auth/token", {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: new URLSearchParams({
+                client_id: "com.tcgbinder",
+                client_secret: appleClientSecret,
+                code: appleAuthCode,
+                grant_type: "authorization_code",
+              }).toString(),
+            });
+            if (tokenRes.ok) {
+              const tokenData = await tokenRes.json() as { access_token?: string };
+              if (tokenData.access_token) {
+                await fetch("https://appleid.apple.com/auth/revoke", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                  body: new URLSearchParams({
+                    client_id: "com.tcgbinder",
+                    client_secret: appleClientSecret,
+                    token: tokenData.access_token,
+                    token_type_hint: "access_token",
+                  }).toString(),
+                });
+                console.log(`[DeleteAccount] Apple token revoked successfully`);
+              }
+            }
+          } else {
+            console.log(`[DeleteAccount] Apple user credentials cleared (client-side revocation via refreshAsync)`);
+          }
+        } catch (appleErr) {
+          console.error("[DeleteAccount] Apple token revocation failed (non-blocking):", appleErr);
+        }
+      }
 
       await storage.deleteUser(req.session.userId);
       console.log(`[DeleteAccount] User data deleted successfully`);
@@ -725,7 +765,7 @@ export async function registerRoutes(app: Express): Promise<Express> {
       if (!user) {
         return res.status(401).json({ error: "User not found" });
       }
-      res.json({ id: user.id, email: user.email, isPremium: user.isPremium, isVerified: user.isVerified });
+      res.json({ id: user.id, email: user.email, isPremium: user.isPremium, isVerified: user.isVerified, appleId: user.appleId || null });
     } catch (error) {
       console.error("Auth/me error:", error);
       res.status(500).json({ error: "Failed to fetch user info" });

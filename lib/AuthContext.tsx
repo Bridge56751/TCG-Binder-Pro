@@ -9,6 +9,7 @@ interface AuthUser {
   email: string;
   isPremium: boolean;
   isVerified: boolean;
+  appleId?: string | null;
 }
 
 interface AuthContextValue {
@@ -20,7 +21,7 @@ interface AuthContextValue {
   register: (email: string, password: string) => Promise<void>;
   appleSignIn: (identityToken: string, fullName?: { givenName?: string; familyName?: string } | null, email?: string | null) => Promise<void>;
   logout: () => Promise<void>;
-  deleteAccount: () => Promise<void>;
+  deleteAccount: (appleAuthCode?: string) => Promise<void>;
   continueAsGuest: () => void;
   setPremiumStatus: (status: boolean) => void;
   verifyEmail: (code: string) => Promise<void>;
@@ -137,8 +138,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await AsyncStorage.removeItem(GUEST_KEY);
   }, []);
 
-  const deleteAccount = useCallback(async () => {
-    await apiRequest("POST", "/api/auth/delete-account");
+  const deleteAccount = useCallback(async (appleAuthCode?: string) => {
+    await apiRequest("POST", "/api/auth/delete-account", appleAuthCode ? { appleAuthCode } : undefined);
     setUser(null);
     setIsGuest(false);
     setNeedsVerification(false);
