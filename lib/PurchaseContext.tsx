@@ -5,7 +5,7 @@ import { apiRequest } from "./query-client";
 import { router } from "expo-router";
 import { PremiumContext } from "./PremiumContext";
 const REVENUECAT_API_KEY = "appl_SSTytUsLoMQInalBawWscUFhGRp";
-const ENTITLEMENT_ID = "TCG Binder Pro Ultimate Pro";
+const ENTITLEMENT_ID = "TCG Binder Unlimited";
 
 let Purchases: any = null;
 if (Platform.OS !== "web") {
