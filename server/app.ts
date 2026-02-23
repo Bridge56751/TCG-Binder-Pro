@@ -204,6 +204,13 @@ function setupRateLimiting(app: express.Application) {
     message: { message: "Too many attempts. Please wait a minute and try again." },
   });
 
+  const passwordLimiter = rateLimit({
+    ...limiterDefaults,
+    windowMs: 60 * 60 * 1000,
+    max: 12,
+    message: { message: "Too many login attempts. Please wait an hour and try again." },
+  });
+
   const strictAuthLimiter = rateLimit({
     ...limiterDefaults,
     windowMs: 15 * 60 * 1000,
@@ -259,7 +266,7 @@ function setupRateLimiting(app: express.Application) {
   app.use("/api/correct-card", aiLimiter);
   app.use("/api/search-cards", aiLimiter);
 
-  app.use("/api/auth/login", authLimiter);
+  app.use("/api/auth/login", passwordLimiter, authLimiter);
   app.use("/api/auth/register", authLimiter);
   app.use("/api/auth/apple", authLimiter);
   app.use("/api/auth/verify-email", authLimiter);
