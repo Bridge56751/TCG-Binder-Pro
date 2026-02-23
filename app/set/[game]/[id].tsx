@@ -621,6 +621,13 @@ export default function SetDetailScreen() {
           Showing {filteredAndSortedCards.length} of {totalCards} cards
         </Text>
       )}
+
+      {sortMode === "value" && pricesLoading && (
+        <View style={[styles.priceLoadingBanner, { backgroundColor: colors.tint + "12" }]}>
+          <ActivityIndicator size="small" color={colors.tint} />
+          <Text style={[styles.priceLoadingText, { color: colors.tint }]}>Loading prices...</Text>
+        </View>
+      )}
     </View>
   );
 
@@ -765,7 +772,10 @@ export default function SetDetailScreen() {
                 ]}>
                   {opt.label}
                 </Text>
-                {sortMode === opt.key && (
+                {opt.key === "value" && pricesLoading && (
+                  <ActivityIndicator size="small" color={colors.tint} style={{ marginLeft: "auto" }} />
+                )}
+                {sortMode === opt.key && !(opt.key === "value" && pricesLoading) && (
                   <Ionicons name="checkmark" size={16} color={colors.tint} style={{ marginLeft: "auto" }} />
                 )}
               </Pressable>
@@ -1087,5 +1097,19 @@ const styles = StyleSheet.create({
   sortModalItemText: {
     fontFamily: "DMSans_500Medium",
     fontSize: 15,
+  },
+  priceLoadingBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 8,
+    marginHorizontal: 16,
+    marginBottom: 4,
+    borderRadius: 8,
+  },
+  priceLoadingText: {
+    fontFamily: "DMSans_500Medium",
+    fontSize: 13,
   },
 });
