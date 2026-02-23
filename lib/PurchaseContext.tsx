@@ -95,22 +95,26 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
       return false;
     }
     try {
-      if (packages.length === 0) {
+      let currentPackages = packages;
+      if (currentPackages.length === 0) {
         const offerings = await Purchases.getOfferings();
         if (!offerings.current || offerings.current.availablePackages.length === 0) {
-          Alert.alert("Not Available", "The premium upgrade is not available right now. Please try again later.");
+          Alert.alert("Not Available", "No subscription packages found. Please check your RevenueCat offerings are configured with at least one package.");
           return false;
         }
-        setPackages(offerings.current.availablePackages);
+        currentPackages = offerings.current.availablePackages;
+        setPackages(currentPackages);
       }
 
-      const targetPackage = packages[0];
+      const targetPackage = currentPackages[0];
       if (!targetPackage) {
         Alert.alert("Not Available", "The premium upgrade is not available right now.");
         return false;
       }
 
+      console.log("[Purchase] Attempting purchase of package:", targetPackage.identifier);
       const { customerInfo } = await Purchases.purchasePackage(targetPackage);
+      console.log("[Purchase] Active entitlements:", Object.keys(customerInfo.entitlements.active));
       const hasPremium = !!customerInfo.entitlements.active[ENTITLEMENT_ID];
 
       if (hasPremium) {
@@ -118,10 +122,12 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
         await syncPremiumToBackend();
         return true;
       }
+      Alert.alert("Purchase Issue", "Purchase completed but premium entitlement not found. Check that your RevenueCat entitlement ID matches: \"" + ENTITLEMENT_ID + "\"");
       return false;
     } catch (e: any) {
       if (!e.userCancelled) {
-        Alert.alert("Purchase Failed", "Something went wrong. Please try again.");
+        console.log("[Purchase] Error:", JSON.stringify(e, null, 2));
+        Alert.alert("Purchase Failed", e.message || "Something went wrong. Please try again.");
       }
       return false;
     }
