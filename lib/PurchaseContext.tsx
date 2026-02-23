@@ -5,7 +5,7 @@ import { apiRequest } from "./query-client";
 import { router } from "expo-router";
 import { PremiumContext } from "./PremiumContext";
 
-const REVENUECAT_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY || "";
+const REVENUECAT_API_KEY = "appl_SSTytUsLoMQInalBawWscUFhGRp";
 const ENTITLEMENT_ID = "TCG Binder Pro Unlimited";
 
 console.log("[RevenueCat] API key prefix:", REVENUECAT_API_KEY.substring(0, 8) + "...", "length:", REVENUECAT_API_KEY.length);
