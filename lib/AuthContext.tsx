@@ -20,7 +20,7 @@ interface AuthContextValue {
   register: (email: string, password: string) => Promise<void>;
   appleSignIn: (identityToken: string, fullName?: { givenName?: string; familyName?: string } | null, email?: string | null) => Promise<void>;
   logout: () => Promise<void>;
-  deleteAccount: () => Promise<void>;
+  deleteAccount: (authorizationCode?: string) => Promise<void>;
   continueAsGuest: () => void;
   setPremiumStatus: (status: boolean) => void;
   verifyEmail: (code: string) => Promise<void>;
@@ -137,24 +137,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await AsyncStorage.removeItem(GUEST_KEY);
   }, []);
 
-  const deleteAccount = useCallback(async () => {
-    await apiRequest("POST", "/api/auth/delete-account");
+  const deleteAccount = useCallback(async (authorizationCode?: string) => {
+    await apiRequest("POST", "/api/auth/delete-account", authorizationCode ? { authorizationCode } : undefined);
     setUser(null);
     setIsGuest(false);
     setNeedsVerification(false);
-    await AsyncStorage.multiRemove([
-      GUEST_KEY,
-      "cardvault_collection",
-      "cardvault_scan_history",
-      "cardvault_card_cache",
-      "cardvault_set_cache",
-      "cardvault_price_cache",
-      "cardvault_enabled_games",
-      "cardvault_set_order_pokemon",
-      "cardvault_set_order_yugioh",
-      "cardvault_set_order_mtg",
-      "cardvault_theme",
-    ]);
+    const allKeys = await AsyncStorage.getAllKeys();
+    const cardvaultKeys = allKeys.filter(k => k.startsWith("cardvault_"));
+    await AsyncStorage.multiRemove([GUEST_KEY, ...cardvaultKeys]);
   }, []);
 
   const continueAsGuest = useCallback(() => {

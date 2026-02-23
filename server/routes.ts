@@ -697,10 +697,38 @@ export async function registerRoutes(app: Express): Promise<Express> {
       return res.status(401).json({ error: "Not logged in" });
     }
     try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const isAppleUser = !!user.appleId;
+
+      if (isAppleUser && req.body?.authorizationCode) {
+        try {
+          console.log(`[DeleteAccount] Revoking Apple token for user ${user.id}`);
+          const revokeRes = await fetch("https://appleid.apple.com/auth/revoke", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              client_id: "com.tcgbinder",
+              client_secret: "", 
+              token: req.body.authorizationCode,
+              token_type_hint: "access_token",
+            }).toString(),
+          });
+          console.log(`[DeleteAccount] Apple revoke response: ${revokeRes.status}`);
+        } catch (appleErr) {
+          console.error("[DeleteAccount] Apple token revocation failed:", appleErr);
+        }
+      }
+
       await storage.deleteUser(req.session.userId);
+
       req.session?.destroy(() => {});
-      res.json({ ok: true });
+      res.json({ ok: true, wasAppleUser: isAppleUser });
     } catch (err) {
+      console.error("[DeleteAccount] Error:", err);
       res.status(500).json({ error: "Failed to delete account" });
     }
   });

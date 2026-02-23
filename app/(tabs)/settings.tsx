@@ -55,8 +55,29 @@ export default function SettingsScreen() {
     setConfirmingAction("logout");
   };
 
+  const [deletionStep, setDeletionStep] = useState<"info" | "confirm" | null>(null);
+
   const handleDeleteAccount = () => {
-    setConfirmingAction("delete");
+    if (isPremium) {
+      Alert.alert(
+        "Active Subscription",
+        "You have an active premium subscription. Deleting your account will not automatically cancel your subscription.\n\nPlease cancel your subscription in your Apple ID settings first, then come back to delete your account.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Manage Subscription",
+            onPress: () => Linking.openURL("https://apps.apple.com/account/subscriptions"),
+          },
+          {
+            text: "Continue Anyway",
+            style: "destructive",
+            onPress: () => setDeletionStep("info"),
+          },
+        ]
+      );
+    } else {
+      setDeletionStep("info");
+    }
   };
 
   const clearAllLocalData = async () => {
@@ -78,16 +99,32 @@ export default function SettingsScreen() {
     } catch {}
   };
 
+  const executeDeletion = async () => {
+    setDeletionStep(null);
+    try {
+      let authorizationCode: string | undefined;
+      if (Platform.OS === "ios" && user?.email?.includes("privaterelay.appleid.com")) {
+        try {
+          const AppleAuthentication = require("expo-apple-authentication");
+          const credential = await AppleAuthentication.signInAsync({
+            requestedScopes: [],
+          });
+          authorizationCode = credential.authorizationCode || undefined;
+        } catch {}
+      }
+      await deleteAccount(authorizationCode);
+      Alert.alert("Account Deleted", "Your account and all associated data have been permanently deleted.");
+    } catch {
+      Alert.alert("Error", "Failed to delete account. Please try again.");
+    }
+  };
+
   const executeConfirmedAction = async () => {
     const action = confirmingAction;
     setConfirmingAction(null);
     if (action === "logout") {
       try {
         await logout();
-      } catch {}
-    } else if (action === "delete") {
-      try {
-        await deleteAccount();
       } catch {}
     } else if (action === "clear_data") {
       try {
@@ -484,14 +521,12 @@ export default function SettingsScreen() {
         <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
           <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
-              {confirmingAction === "logout" ? "Log Out" : confirmingAction === "clear_data" ? "Clear All Data" : "Delete Account"}
+              {confirmingAction === "logout" ? "Log Out" : "Clear All Data"}
             </Text>
             <Text style={[styles.modalMessage, { color: colors.textSecondary }]}>
               {confirmingAction === "logout"
                 ? "Are you sure you want to log out?"
-                : confirmingAction === "clear_data"
-                ? "This will permanently remove your entire card collection, scan history, and all cached data from this device. This cannot be undone."
-                : "This will permanently delete your account and all cloud data. This cannot be undone."}
+                : "This will permanently remove your entire card collection, scan history, and all cached data from this device. This cannot be undone."}
             </Text>
             <View style={styles.modalButtons}>
               <Pressable
@@ -505,8 +540,68 @@ export default function SettingsScreen() {
                 onPress={executeConfirmedAction}
               >
                 <Text style={[styles.modalButtonText, { color: "#FFFFFF" }]}>
-                  {confirmingAction === "logout" ? "Log Out" : confirmingAction === "clear_data" ? "Clear Data" : "Delete"}
+                  {confirmingAction === "logout" ? "Log Out" : "Clear Data"}
                 </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {deletionStep === "info" && (
+        <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+            <Ionicons name="warning" size={32} color={colors.error} style={{ alignSelf: "center", marginBottom: 12 }} />
+            <Text style={[styles.modalTitle, { color: colors.text, textAlign: "center" }]}>
+              Delete Account
+            </Text>
+            <Text style={[styles.modalMessage, { color: colors.textSecondary }]}>
+              This will permanently delete:{"\n\n"}
+              {"\u2022"} Your account and login credentials{"\n"}
+              {"\u2022"} Your entire card collection stored on our servers{"\n"}
+              {"\u2022"} All local data on this device (collection, scan history, cached cards){"\n\n"}
+              {isPremium ? "Note: Your subscription will continue to bill until you cancel it through Apple. " : ""}
+              This action cannot be undone.
+            </Text>
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: colors.surfaceAlt }]}
+                onPress={() => setDeletionStep(null)}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.text }]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: colors.error }]}
+                onPress={() => setDeletionStep("confirm")}
+              >
+                <Text style={[styles.modalButtonText, { color: "#FFFFFF" }]}>Continue</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {deletionStep === "confirm" && (
+        <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.modalTitle, { color: colors.error, textAlign: "center" }]}>
+              Are you absolutely sure?
+            </Text>
+            <Text style={[styles.modalMessage, { color: colors.textSecondary }]}>
+              All your data will be permanently erased from our servers and this device. There is no way to recover your account after this.
+            </Text>
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: colors.surfaceAlt }]}
+                onPress={() => setDeletionStep(null)}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.text }]}>Go Back</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: colors.error }]}
+                onPress={executeDeletion}
+              >
+                <Text style={[styles.modalButtonText, { color: "#FFFFFF" }]}>Delete Forever</Text>
               </Pressable>
             </View>
           </View>
