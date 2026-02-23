@@ -4,15 +4,8 @@ import { useAuth } from "./AuthContext";
 import { apiRequest } from "./query-client";
 import { router } from "expo-router";
 import { PremiumContext } from "./PremiumContext";
-import Constants from "expo-constants";
-
-const APPLE_API_KEY = "appl_SSTytUsLoMQInalBawWscUFhGRp";
-const TEST_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY || "";
-const isExpoGo = Constants.appOwnership === "expo";
-const REVENUECAT_API_KEY = isExpoGo && TEST_API_KEY ? TEST_API_KEY : APPLE_API_KEY;
+const REVENUECAT_API_KEY = "appl_SSTytUsLoMQInalBawWscUFhGRp";
 const ENTITLEMENT_ID = "TCG Binder Pro Unlimited";
-
-console.log("[RevenueCat] Using", isExpoGo ? "Test Store" : "Apple", "key:", REVENUECAT_API_KEY.substring(0, 8) + "...");
 
 let Purchases: any = null;
 if (Platform.OS !== "web") {
