@@ -114,6 +114,15 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
       return false;
     }
     try {
+      if (!initialized) {
+        try {
+          Purchases.configure({ apiKey: REVENUECAT_API_KEY });
+          setInitialized(true);
+        } catch (configErr) {
+          console.log("[Purchase] Configure error:", configErr);
+        }
+      }
+
       let currentPackages = packages;
       if (currentPackages.length === 0) {
         const offerings = await Purchases.getOfferings();
@@ -160,7 +169,7 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
       }
       return false;
     }
-  }, [packages, syncPremiumToBackend]);
+  }, [packages, syncPremiumToBackend, initialized]);
 
   const restorePurchases = useCallback(async (): Promise<boolean> => {
     if (!Purchases) {
