@@ -36,7 +36,7 @@ export default function SettingsScreen() {
   const { totalCards, syncCollection, syncStatus, lastSyncTime, enabledGames, toggleGame, isAtGuestLimit, refresh } = useCollection();
 
   const [submitting, setSubmitting] = useState(false);
-  const [confirmingAction, setConfirmingAction] = useState<"logout" | "delete" | "clear_data" | null>(null);
+  const [confirmingAction, setConfirmingAction] = useState<"logout" | "clear_data" | null>(null);
 
   const formatTimeAgo = (timestamp: number) => {
     const seconds = Math.floor((Date.now() - timestamp) / 1000);
@@ -102,17 +102,7 @@ export default function SettingsScreen() {
   const executeDeletion = async () => {
     setDeletionStep(null);
     try {
-      let authorizationCode: string | undefined;
-      if (Platform.OS === "ios" && user?.email?.includes("privaterelay.appleid.com")) {
-        try {
-          const AppleAuthentication = require("expo-apple-authentication");
-          const credential = await AppleAuthentication.signInAsync({
-            requestedScopes: [],
-          });
-          authorizationCode = credential.authorizationCode || undefined;
-        } catch {}
-      }
-      await deleteAccount(authorizationCode);
+      await deleteAccount();
       Alert.alert("Account Deleted", "Your account and all associated data have been permanently deleted.");
     } catch {
       Alert.alert("Error", "Failed to delete account. Please try again.");

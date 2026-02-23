@@ -20,7 +20,7 @@ interface AuthContextValue {
   register: (email: string, password: string) => Promise<void>;
   appleSignIn: (identityToken: string, fullName?: { givenName?: string; familyName?: string } | null, email?: string | null) => Promise<void>;
   logout: () => Promise<void>;
-  deleteAccount: (authorizationCode?: string) => Promise<void>;
+  deleteAccount: () => Promise<void>;
   continueAsGuest: () => void;
   setPremiumStatus: (status: boolean) => void;
   verifyEmail: (code: string) => Promise<void>;
@@ -137,8 +137,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await AsyncStorage.removeItem(GUEST_KEY);
   }, []);
 
-  const deleteAccount = useCallback(async (authorizationCode?: string) => {
-    await apiRequest("POST", "/api/auth/delete-account", authorizationCode ? { authorizationCode } : undefined);
+  const deleteAccount = useCallback(async () => {
+    await apiRequest("POST", "/api/auth/delete-account");
     setUser(null);
     setIsGuest(false);
     setNeedsVerification(false);
