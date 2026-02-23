@@ -723,8 +723,7 @@ export default function ScanScreen() {
               </View>
 
               <View style={{ gap: 6 }}>
-                <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textSecondary }}>Card Number (optional)</Text>
-                <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 12, color: colors.textTertiary, lineHeight: 16 }}>If the card number couldn't be scanned, leave this blank and fill it in manually from your card.</Text>
+                <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textSecondary }}>Card Number</Text>
                 <TextInput
                   style={{
                     fontFamily: "DMSans_400Regular",
