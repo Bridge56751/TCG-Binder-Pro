@@ -59,10 +59,27 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
 
         try {
           const offerings = await Purchases.getOfferings();
+          console.log("[RevenueCat] Offerings:", JSON.stringify({
+            hasCurrent: !!offerings.current,
+            currentId: offerings.current?.identifier,
+            packageCount: offerings.current?.availablePackages?.length || 0,
+            allOfferingIds: Object.keys(offerings.all || {}),
+          }));
           if (offerings.current && offerings.current.availablePackages.length > 0) {
             setPackages(offerings.current.availablePackages);
+          } else {
+            const allOfferings = Object.values(offerings.all || {}) as any[];
+            for (const offering of allOfferings) {
+              if (offering.availablePackages?.length > 0) {
+                console.log("[RevenueCat] Using non-default offering:", offering.identifier);
+                setPackages(offering.availablePackages);
+                break;
+              }
+            }
           }
-        } catch {}
+        } catch (e) {
+          console.log("[RevenueCat] Offerings error:", e);
+        }
       } catch (e) {
         console.log("RevenueCat init (preview mode in Expo Go is normal):", e);
       }
@@ -98,11 +115,21 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
       let currentPackages = packages;
       if (currentPackages.length === 0) {
         const offerings = await Purchases.getOfferings();
-        if (!offerings.current || offerings.current.availablePackages.length === 0) {
-          Alert.alert("Not Available", "No subscription packages found. Please check your RevenueCat offerings are configured with at least one package.");
+        if (offerings.current && offerings.current.availablePackages.length > 0) {
+          currentPackages = offerings.current.availablePackages;
+        } else {
+          const allOfferings = Object.values(offerings.all || {}) as any[];
+          for (const offering of allOfferings) {
+            if (offering.availablePackages?.length > 0) {
+              currentPackages = offering.availablePackages;
+              break;
+            }
+          }
+        }
+        if (currentPackages.length === 0) {
+          Alert.alert("Not Available", "No subscription packages found. Please make sure your RevenueCat offering has a package with a linked App Store product.");
           return false;
         }
-        currentPackages = offerings.current.availablePackages;
         setPackages(currentPackages);
       }
 
