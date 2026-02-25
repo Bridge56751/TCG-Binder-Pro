@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   StyleSheet,
   Text,
@@ -78,6 +78,7 @@ export default function CardDetailScreen() {
   const { hasCard, removeCard, addCard, cardQuantity } = useCollection();
   const { galleryCardsRef } = useGallery();
   const [galleryVisible, setGalleryVisible] = useState(false);
+  const [detailImgFailed, setDetailImgFailed] = useState(false);
   const [galleryCards, setLocalGalleryCards] = useState<any[]>([]);
   const [galleryStartIndex, setGalleryStartIndex] = useState(0);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
@@ -228,13 +229,15 @@ export default function CardDetailScreen() {
           }}
         >
           <Animated.View style={flipStyle}>
-            {card.image ? (
+            {card.image && !detailImgFailed ? (
               <Image
                 source={{ uri: card.image }}
                 style={styles.cardImage}
                 contentFit="contain"
                 transition={300}
                 cachePolicy="disk"
+                recyclingKey={cardId as string}
+                onError={() => setDetailImgFailed(true)}
               />
             ) : (
               <View style={[styles.cardImage, styles.noImage, { backgroundColor: colors.surfaceAlt }]}>

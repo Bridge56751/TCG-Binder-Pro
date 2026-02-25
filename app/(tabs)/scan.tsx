@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, memo } from "react";
 import {
   StyleSheet,
   Text,
@@ -33,6 +33,33 @@ import Animated, {
   SlideInUp,
   SlideOutUp,
 } from "react-native-reanimated";
+
+const SCAN_IMG_SIZES = {
+  large: { width: 160, height: 224, borderRadius: 10, marginBottom: 10, iconSize: 48 },
+  medium: { width: 50, height: 70, borderRadius: 6, marginBottom: 0, iconSize: 20 },
+  small: { width: 44, height: 62, borderRadius: 6, marginBottom: 0, iconSize: 18 },
+} as const;
+
+function ScanResultImage({ uri, size, colors }: { uri: string | null; size: keyof typeof SCAN_IMG_SIZES; colors: any }) {
+  const [failed, setFailed] = useState(false);
+  const s = SCAN_IMG_SIZES[size];
+  if (uri && !failed) {
+    return (
+      <Image
+        source={{ uri }}
+        style={{ width: s.width, height: s.height, borderRadius: s.borderRadius, marginBottom: s.marginBottom }}
+        contentFit={size === "large" ? "contain" : "cover"}
+        cachePolicy="disk"
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  return (
+    <View style={{ width: s.width, height: s.height, borderRadius: s.borderRadius, marginBottom: s.marginBottom, backgroundColor: colors.background, alignItems: "center", justifyContent: "center" }}>
+      <MaterialCommunityIcons name="cards-outline" size={s.iconSize} color={colors.textTertiary} />
+    </View>
+  );
+}
 
 function gameLabel(game: GameId): string {
   if (game === "pokemon") return "Pokemon";
@@ -429,17 +456,8 @@ export default function ScanScreen() {
             })}
             onPress={confirmMainPick}
           >
-            {scanResult.image ? (
-              <Image
-                source={{ uri: scanResult.image }}
-                style={{ width: 160, height: 224, borderRadius: 10, marginBottom: 10 }}
-                contentFit="contain"
-              />
-            ) : (
-              <View style={{ width: 160, height: 224, borderRadius: 10, marginBottom: 10, backgroundColor: colors.background, alignItems: "center", justifyContent: "center" }}>
-                <MaterialCommunityIcons name="cards-outline" size={48} color={colors.textTertiary} />
-              </View>
-            )}
+            <ScanResultImage uri={scanResult.image} size="large" colors={colors} />
+            
             <Text style={{ fontFamily: "DMSans_700Bold", fontSize: 17, color: colors.text, textAlign: "center" }} numberOfLines={2}>
               {scanResult.englishName || scanResult.name}
             </Text>
@@ -488,17 +506,8 @@ export default function ScanScreen() {
                   })}
                   onPress={() => confirmAlternative(alt)}
                 >
-                  {alt.image ? (
-                    <Image
-                      source={{ uri: alt.image }}
-                      style={{ width: 44, height: 62, borderRadius: 6 }}
-                      contentFit="cover"
-                    />
-                  ) : (
-                    <View style={{ width: 44, height: 62, borderRadius: 6, backgroundColor: colors.background, alignItems: "center", justifyContent: "center" }}>
-                      <MaterialCommunityIcons name="cards-outline" size={18} color={colors.textTertiary} />
-                    </View>
-                  )}
+                  <ScanResultImage uri={alt.image} size="small" colors={colors} />
+                  
                   <View style={{ flex: 1, justifyContent: "center", gap: 2 }}>
                     <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 14, color: colors.text }} numberOfLines={1}>
                       {alt.name}
@@ -845,17 +854,8 @@ export default function ScanScreen() {
                       })}
                       onPress={() => selectSearchResult(r)}
                     >
-                      {r.image ? (
-                        <Image
-                          source={{ uri: r.image }}
-                          style={{ width: 50, height: 70, borderRadius: 6 }}
-                          contentFit="cover"
-                        />
-                      ) : (
-                        <View style={{ width: 50, height: 70, borderRadius: 6, backgroundColor: colors.background, alignItems: "center", justifyContent: "center" }}>
-                          <MaterialCommunityIcons name="cards-outline" size={20} color={colors.textTertiary} />
-                        </View>
-                      )}
+                      <ScanResultImage uri={r.image} size="medium" colors={colors} />
+                      
                       <View style={{ flex: 1, justifyContent: "center", gap: 2 }}>
                         <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 14, color: colors.text }} numberOfLines={1}>
                           {r.name}

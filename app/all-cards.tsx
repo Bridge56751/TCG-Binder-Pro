@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, memo } from "react";
 import {
   StyleSheet,
   Text,
@@ -71,6 +71,28 @@ function gameColor(game: string): string {
   return GAMES.find((g) => g.id === game)?.color || "#888";
 }
 
+function ListThumbImage({ uri, colors, cardId }: { uri: string | null; colors: any; cardId: string }) {
+  const [failed, setFailed] = useState(false);
+  if (uri && !failed) {
+    return (
+      <Image
+        source={{ uri }}
+        style={styles.listThumb}
+        contentFit="cover"
+        transition={200}
+        cachePolicy="disk"
+        recyclingKey={cardId}
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  return (
+    <View style={[styles.listThumb, { backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center" }]}>
+      <Ionicons name="image-outline" size={18} color={colors.textTertiary} />
+    </View>
+  );
+}
+
 function BinderCard({
   card,
   meta,
@@ -91,6 +113,7 @@ function BinderCard({
   const displayName = meta?.name || priceInfo?.name || card.cardId;
   const price = priceInfo?.price;
   const image = meta?.image;
+  const [binderImgFailed, setBinderImgFailed] = useState(false);
 
   return (
     <Pressable
@@ -104,13 +127,15 @@ function BinderCard({
       ]}
       onPress={onPress}
     >
-      {image ? (
+      {image && !binderImgFailed ? (
         <Image
           source={{ uri: image }}
           style={styles.binderImage}
           contentFit="cover"
           transition={200}
           cachePolicy="disk"
+          recyclingKey={card.cardId}
+          onError={() => setBinderImgFailed(true)}
         />
       ) : (
         <View style={[styles.binderImage, styles.binderNoImage, { backgroundColor: colors.surfaceAlt }]}>
@@ -422,19 +447,8 @@ export default function AllCardsScreen() {
             {isSelected && <Ionicons name="checkmark" size={14} color="#FFF" />}
           </View>
         )}
-        {meta?.image ? (
-          <Image
-            source={{ uri: meta.image }}
-            style={styles.listThumb}
-            contentFit="cover"
-            transition={200}
-            cachePolicy="disk"
-          />
-        ) : (
-          <View style={[styles.listThumb, { backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center" }]}>
-            <Ionicons name="image-outline" size={18} color={colors.textTertiary} />
-          </View>
-        )}
+        <ListThumbImage uri={meta?.image || null} colors={colors} cardId={item.cardId} />
+        
         <View style={styles.listInfo}>
           <Text style={[styles.listName, { color: colors.text }]} numberOfLines={1}>{displayName}</Text>
           <Text style={[styles.listMeta, { color: colors.textTertiary }]} numberOfLines={1}>

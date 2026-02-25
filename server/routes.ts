@@ -756,7 +756,7 @@ export async function registerRoutes(app: Express): Promise<Express> {
         try {
           const appleClientSecret = process.env.APPLE_CLIENT_SECRET || "";
           if (appleClientSecret) {
-            const tokenRes = await fetch("https://appleid.apple.com/auth/token", {
+            const tokenRes = await fetchWithTimeout("https://appleid.apple.com/auth/token", 15000, {
               method: "POST",
               headers: { "Content-Type": "application/x-www-form-urlencoded" },
               body: new URLSearchParams({
@@ -769,7 +769,7 @@ export async function registerRoutes(app: Express): Promise<Express> {
             if (tokenRes.ok) {
               const tokenData = await tokenRes.json() as { access_token?: string };
               if (tokenData.access_token) {
-                await fetch("https://appleid.apple.com/auth/revoke", {
+                await fetchWithTimeout("https://appleid.apple.com/auth/revoke", 15000, {
                   method: "POST",
                   headers: { "Content-Type": "application/x-www-form-urlencoded" },
                   body: new URLSearchParams({
@@ -833,7 +833,7 @@ export async function registerRoutes(app: Express): Promise<Express> {
         return res.status(500).json({ error: "Payment verification not configured" });
       }
 
-      const rcRes = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(rcUserId)}`, {
+      const rcRes = await fetchWithTimeout(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(rcUserId)}`, 15000, {
         headers: {
           "Authorization": `Bearer ${rcSecretKey}`,
           "Content-Type": "application/json",
@@ -2149,7 +2149,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
         const allCards: any[] = [];
         let url: string | null = `https://api.scryfall.com/cards/search?order=set&q=set:${encodeURIComponent(id)}&unique=prints`;
         while (url) {
-          const pageRes: Response = await fetch(url);
+          const pageRes: Response = await fetchWithTimeout(url, 15000);
           if (!pageRes.ok) break;
           const pageData: any = await pageRes.json();
           if (pageData.data) {
@@ -2583,10 +2583,10 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
           const allSets = await fetchSetsForGame("yugioh");
           const setMeta = (allSets as any[]).find((s: any) => s.set_code === setCode);
           const setName = setMeta?.set_name || setCode;
-          const response = await fetch(
+          const response = await fetchWithTimeout(
             `https://db.ygoprodeck.com/api/v7/cardinfo.php?cardset=${encodeURIComponent(setName)}`
           );
-          const data = await response.json();
+          const data = response.ok ? await response.json() : null;
           if (data?.data) {
             const found = data.data.find((c: any) =>
               c.card_sets?.some((s: any) => s.set_code === card.cardId)

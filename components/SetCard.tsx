@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useCallback } from "react";
 import { View, Pressable, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -19,6 +19,7 @@ export function SetCard({ set, collectedCount, onPress }: SetCardProps) {
   const progress = set.totalCards > 0 ? collectedCount / set.totalCards : 0;
   const isComplete = progress >= 1;
   const imageUrl = set.logo || set.symbol;
+  const [logoFailed, setLogoFailed] = useState(false);
 
   return (
     <Pressable
@@ -29,13 +30,15 @@ export function SetCard({ set, collectedCount, onPress }: SetCardProps) {
       }}
     >
       <View style={[styles.accentBar, { backgroundColor: game?.color || colors.tint }]} />
-      {imageUrl ? (
+      {imageUrl && !logoFailed ? (
         <View style={styles.logoContainer}>
           <Image
             source={{ uri: imageUrl }}
             style={styles.logo}
             contentFit="contain"
             transition={200}
+            cachePolicy="disk"
+            onError={() => setLogoFailed(true)}
           />
         </View>
       ) : (

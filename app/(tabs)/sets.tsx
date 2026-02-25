@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback, memo } from "react";
 import {
   StyleSheet,
   Text,
@@ -22,6 +22,26 @@ import { useTheme } from "@/lib/ThemeContext";
 import { apiRequest } from "@/lib/query-client";
 import { getCachedSets, cacheSets, type CachedSet } from "@/lib/card-cache";
 import type { GameId, TCGSet } from "@/lib/types";
+
+function SearchResultImage({ uri, colors }: { uri: string | null; colors: any }) {
+  const [failed, setFailed] = useState(false);
+  if (uri && !failed) {
+    return (
+      <Image
+        source={{ uri }}
+        style={{ width: 40, height: 55 }}
+        contentFit="cover"
+        cachePolicy="disk"
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  return (
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+      <Ionicons name="image-outline" size={18} color={colors.textTertiary} />
+    </View>
+  );
+}
 
 type SearchMode = "sets" | "cards";
 type SetSortOption = "default" | "oldest" | "name_az" | "name_za" | "most_completed" | "least_completed" | "most_cards" | "least_cards";
@@ -243,23 +263,8 @@ export default function SetsScreen() {
           marginRight: 12,
         }}
       >
-        {item.image ? (
-          <Image
-            source={{ uri: item.image }}
-            style={{ width: 40, height: 55 }}
-            contentFit="cover"
-          />
-        ) : (
-          <View
-            style={{
-              flex: 1,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Ionicons name="image-outline" size={18} color={colors.textTertiary} />
-          </View>
-        )}
+        <SearchResultImage uri={item.image} colors={colors} />
+        
       </View>
       <View style={{ flex: 1 }}>
         <Text
