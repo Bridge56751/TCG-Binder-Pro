@@ -42,6 +42,30 @@ interface CardGalleryProps {
   onClose: (lastIndex: number) => void;
 }
 
+function GalleryImage({ highResUri, lowResUri, cardId }: { highResUri: string; lowResUri: string | null; cardId: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <View style={styles.noImageContainer}>
+        <Ionicons name="image-outline" size={64} color="rgba(255,255,255,0.3)" />
+        <Text style={styles.noImageText}>Failed to load image</Text>
+      </View>
+    );
+  }
+  return (
+    <Image
+      source={{ uri: highResUri }}
+      style={styles.fullImage}
+      contentFit="contain"
+      transition={200}
+      cachePolicy="disk"
+      recyclingKey={cardId}
+      placeholder={lowResUri ? { uri: lowResUri } : undefined}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 export function CardGallery({ visible, cards, initialIndex, onClose }: CardGalleryProps) {
   const insets = useSafeAreaInsets();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -74,14 +98,7 @@ export function CardGallery({ visible, cards, initialIndex, onClose }: CardGalle
     return (
       <View style={styles.slide}>
         {highResUri ? (
-          <Image
-            source={{ uri: highResUri }}
-            style={styles.fullImage}
-            contentFit="contain"
-            transition={200}
-            cachePolicy="disk"
-            placeholder={item.image ? { uri: item.image } : undefined}
-          />
+          <GalleryImage highResUri={highResUri} lowResUri={item.image} cardId={item.id} />
         ) : (
           <View style={styles.noImageContainer}>
             <Ionicons name="image-outline" size={64} color="rgba(255,255,255,0.3)" />

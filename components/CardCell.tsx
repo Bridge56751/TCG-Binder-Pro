@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useCallback } from "react";
 import { View, Text, StyleSheet, Platform, Pressable } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,11 +19,14 @@ interface CardCellProps {
 
 function CardCellInner({ cardId, localId, name, imageUrl, isCollected, quantity, price, selected, onPress, onLongPress }: CardCellProps) {
   const { colors } = useTheme();
+  const [imageFailed, setImageFailed] = useState(false);
+  const handleImageError = useCallback(() => setImageFailed(true), []);
+  const showImage = imageUrl && !imageFailed;
   return (
     <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={400} style={styles.container}>
 
       <View style={[styles.cardWrapper, { backgroundColor: colors.surface, borderColor: colors.cardBorder, ...Platform.select({ ios: { shadowColor: colors.shadow }, default: {} }) }, !isCollected && { borderColor: colors.borderLight }, selected && { borderColor: colors.error, borderWidth: 2 }]}>
-        {imageUrl ? (
+        {showImage ? (
           <>
             <Image
               source={{ uri: imageUrl }}
@@ -31,6 +34,8 @@ function CardCellInner({ cardId, localId, name, imageUrl, isCollected, quantity,
               contentFit="contain"
               transition={300}
               cachePolicy="disk"
+              recyclingKey={cardId}
+              onError={handleImageError}
             />
             {!isCollected && <View style={styles.grayOverlay} />}
           </>
