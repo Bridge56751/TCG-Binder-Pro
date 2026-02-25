@@ -73,17 +73,22 @@ function pruneSetCardsCache() {
   for (const [key] of toRemove) setCardsCache.delete(key);
 }
 const pokemonReleaseDateCache: Record<string, string | null> = {};
-let pokemonReleaseDatesFetched = false;
+let pokemonReleaseDatesFetchedAt = 0;
+const RELEASE_DATE_CACHE_TTL = 30 * 60 * 1000;
 
 async function fetchPokemonReleaseDates(setIds: string[], lang: string = "en"): Promise<Record<string, string | null>> {
-  if (pokemonReleaseDatesFetched) return pokemonReleaseDateCache;
+  if (pokemonReleaseDatesFetchedAt > 0 && Date.now() - pokemonReleaseDatesFetchedAt < RELEASE_DATE_CACHE_TTL) {
+    return pokemonReleaseDateCache;
+  }
   const batchSize = 20;
+  let successCount = 0;
+  let totalCount = 0;
   for (let i = 0; i < setIds.length; i += batchSize) {
     const batch = setIds.slice(i, i + batchSize);
     const results = await Promise.allSettled(
       batch.map(async (id) => {
         try {
-          const res = await fetchWithTimeout(`https://api.tcgdex.net/v2/${lang}/sets/${id}`, 10000);
+          const res = await fetchWithTimeout(`https://api.tcgdex.net/v2/${lang}/sets/${id}`, 15000);
           if (res.ok) {
             const data = await res.json();
             return { id, releaseDate: data.releaseDate || null };
@@ -96,11 +101,15 @@ async function fetchPokemonReleaseDates(setIds: string[], lang: string = "en"): 
     );
     for (const result of results) {
       if (result.status === "fulfilled") {
+        totalCount++;
         pokemonReleaseDateCache[result.value.id] = result.value.releaseDate;
+        if (result.value.releaseDate) successCount++;
       }
     }
   }
-  pokemonReleaseDatesFetched = true;
+  if (totalCount === 0 || successCount / totalCount >= 0.5) {
+    pokemonReleaseDatesFetchedAt = Date.now();
+  }
   return pokemonReleaseDateCache;
 }
 

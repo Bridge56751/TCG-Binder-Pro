@@ -69,6 +69,7 @@ export default function SetsScreen() {
 
   const { data: sets, isLoading, isError } = useQuery<TCGSet[]>({
     queryKey: [setsQueryPath],
+    staleTime: 5 * 60 * 1000,
   });
 
   const [offlineSets, setOfflineSets] = useState<TCGSet[] | null>(null);
