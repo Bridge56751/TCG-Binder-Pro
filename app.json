@@ -2,7 +2,7 @@
   "expo": {
     "name": "TCG Binder",
     "slug": "tcg-binder",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "cardvault",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.tcgbinder",
-      "buildNumber": "10",
+      "buildNumber": "11",
       "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "TCG Binder needs camera access to scan and identify your trading cards using AI recognition.",
