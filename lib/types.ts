@@ -23,11 +23,13 @@ export interface TCGCard {
   name: string;
   englishName?: string | null;
   image: string | null;
+  rarity?: string | null;
 }
 
 export interface SetDetail {
   id: string;
   name: string;
+  game?: string;
   totalCards: number;
   cards: TCGCard[];
 }

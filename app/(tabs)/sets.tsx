@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback, memo } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import {
   StyleSheet,
   Text,

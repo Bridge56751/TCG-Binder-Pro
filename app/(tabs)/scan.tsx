@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, memo } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   StyleSheet,
   Text,
@@ -332,6 +332,7 @@ export default function ScanScreen() {
       verified: true,
       verifiedCardId: result.cardId,
       rarity: result.rarity || scanResult?.rarity || "",
+      estimatedValue: scanResult?.estimatedValue || 0,
       language: "en",
     };
     const cardId = corrected.verifiedCardId || `${corrected.setId}-${corrected.cardNumber}`;
@@ -456,7 +457,7 @@ export default function ScanScreen() {
             })}
             onPress={confirmMainPick}
           >
-            <ScanResultImage uri={scanResult.image} size="large" colors={colors} />
+            <ScanResultImage uri={scanResult.image ?? null} size="large" colors={colors} />
             
             <Text style={{ fontFamily: "DMSans_700Bold", fontSize: 17, color: colors.text, textAlign: "center" }} numberOfLines={2}>
               {scanResult.englishName || scanResult.name}

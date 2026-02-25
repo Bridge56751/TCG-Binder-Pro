@@ -2132,7 +2132,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
         const setMeta = (allSets as any[]).find((s: any) => s.set_code === id);
         const setName = setMeta?.set_name || id;
         const response = await fetchWithTimeout(`https://db.ygoprodeck.com/api/v7/cardinfo.php?cardset=${encodeURIComponent(setName)}`);
-        const data = await response.json();
+        const data = response.ok ? await response.json() : null;
         if (data?.data) {
           for (const card of data.data) {
             if (!card.card_sets) continue;
@@ -2271,6 +2271,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
       const cardNum = parts[parts.length - 1];
 
       const setsRes = await fetchWithTimeout("https://db.ygoprodeck.com/api/v7/cardsets.php");
+      if (!setsRes.ok) return res.status(502).json({ error: "Failed to fetch Yu-Gi-Oh sets" });
       const allSets = await setsRes.json();
       const setMeta = (allSets as any[]).find((s: any) => s.set_code === setCode);
       const setName = setMeta?.set_name || setCode;
@@ -2278,6 +2279,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
       const response = await fetchWithTimeout(
         `https://db.ygoprodeck.com/api/v7/cardinfo.php?cardset=${encodeURIComponent(setName)}`
       );
+      if (!response.ok) return res.status(502).json({ error: "Failed to fetch Yu-Gi-Oh card data" });
       const data = await response.json();
       if (!data?.data) return res.status(404).json({ error: "Card not found" });
 

@@ -175,7 +175,7 @@ export default function CollectionScreen() {
   useEffect(() => {
     if (sets && sets.length > 0) {
       cacheSets(selectedGame, sets.map(s => ({
-        id: s.id, name: s.name, game: s.game || selectedGame, totalCards: s.totalCards, logo: s.logo
+        id: s.id, name: s.name, game: s.game || selectedGame, totalCards: s.totalCards, logo: s.logo, cachedAt: Date.now()
       })));
     } else if (setsError || (!sets && !isLoading)) {
       getCachedSets(selectedGame).then(cached => {
