@@ -27,11 +27,11 @@ function countCollectionCards(collection: any): number {
   return total;
 }
 
-async function fetchWithTimeout(url: string, timeoutMs: number = 15000): Promise<Response> {
+async function fetchWithTimeout(url: string, timeoutMs: number = 15000, init?: RequestInit): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { signal: controller.signal });
+    const res = await fetch(url, { ...init, signal: controller.signal });
     return res;
   } finally {
     clearTimeout(timer);
@@ -235,7 +235,7 @@ async function verifyPokemonCard(name: string, setId: string, rawCardNumber: str
   for (const num of numberVariants) {
     const directId = `${setId}-${num}`;
     try {
-      const res = await fetch(`https://api.tcgdex.net/v2/${lang}/cards/${encodeURIComponent(directId)}`);
+      const res = await fetchWithTimeout(`https://api.tcgdex.net/v2/${lang}/cards/${encodeURIComponent(directId)}`);
       if (res.ok) {
         const card = await res.json();
         if (namesMatch(name, card.name)) {
@@ -253,7 +253,7 @@ async function verifyPokemonCard(name: string, setId: string, rawCardNumber: str
 
   console.log(`[Pokemon Verify] No name+number match, searching by name in set ${setId}...`);
   try {
-    const setRes = await fetch(`https://api.tcgdex.net/v2/${lang}/sets/${encodeURIComponent(setId)}`);
+    const setRes = await fetchWithTimeout(`https://api.tcgdex.net/v2/${lang}/sets/${encodeURIComponent(setId)}`);
     if (setRes.ok) {
       const setData = await setRes.json();
       if (setData.cards) {
@@ -282,7 +282,7 @@ async function verifyPokemonCard(name: string, setId: string, rawCardNumber: str
 
   console.log(`[Pokemon Verify] Not found in set ${setId}, doing global name search...`);
   try {
-    const searchByName = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(name)}`);
+    const searchByName = await fetchWithTimeout(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(name)}`);
     if (searchByName.ok) {
       const searchData = await searchByName.json();
       if (Array.isArray(searchData) && searchData.length > 0) {
@@ -310,7 +310,7 @@ async function verifyPokemonCard(name: string, setId: string, rawCardNumber: str
     const baseName = words.length > 1 ? words.slice(0, -1).join(" ") : name;
     if (baseName.toLowerCase() !== name.toLowerCase()) {
       console.log(`[Pokemon Verify] Trying partial name search: "${baseName}"`);
-      const partialSearch = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(baseName)}`);
+      const partialSearch = await fetchWithTimeout(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(baseName)}`);
       if (partialSearch.ok) {
         const partialData = await partialSearch.json();
         if (Array.isArray(partialData) && partialData.length > 0) {
@@ -350,7 +350,7 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
     } else if (game === "yugioh") {
       const rarity = result.rarity?.toLowerCase() || "";
       const extractSetPrefix = (code: string) => code.split("-")[0] || code;
-      const res = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?name=${encodeURIComponent(name)}`);
+      const res = await fetchWithTimeout(`https://db.ygoprodeck.com/api/v7/cardinfo.php?name=${encodeURIComponent(name)}`);
       if (res.ok) {
         const data = await res.json();
         if (data?.data?.[0]) {
@@ -383,7 +383,7 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
           }
         }
       }
-      const fuzzyRes = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(name)}`);
+      const fuzzyRes = await fetchWithTimeout(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(name)}`);
       if (fuzzyRes.ok) {
         const fuzzyData = await fuzzyRes.json();
         if (fuzzyData?.data?.[0]) {
@@ -399,13 +399,13 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
       }
     } else if (game === "mtg") {
       console.log(`[MTG Verify] Trying: ${setId}/${cardNumber}`);
-      const res = await fetch(`https://api.scryfall.com/cards/${encodeURIComponent(setId)}/${encodeURIComponent(cardNumber)}`);
+      const res = await fetchWithTimeout(`https://api.scryfall.com/cards/${encodeURIComponent(setId)}/${encodeURIComponent(cardNumber)}`);
       if (res.ok) {
         const card = await res.json();
         console.log(`[MTG Verify] EXACT HIT: ${card.name} (${card.set})`);
         return { name: card.name, cardId: card.id, setId: card.set || setId };
       }
-      const searchRes = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${name}" set:${setId} cn:${cardNumber}`)}&unique=prints`);
+      const searchRes = await fetchWithTimeout(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${name}" set:${setId} cn:${cardNumber}`)}&unique=prints`);
       if (searchRes.ok) {
         const searchData = await searchRes.json();
         if (searchData?.data?.[0]) {
@@ -413,7 +413,7 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
           return { name: searchData.data[0].name, cardId: searchData.data[0].id, setId: searchData.data[0].set || setId };
         }
       }
-      const broadSearchRes = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${name}" set:${setId}`)}&unique=prints`);
+      const broadSearchRes = await fetchWithTimeout(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${name}" set:${setId}`)}&unique=prints`);
       if (broadSearchRes.ok) {
         const broadData = await broadSearchRes.json();
         if (broadData?.data?.length > 0) {
@@ -423,7 +423,7 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
         }
       }
       console.log(`[MTG Verify] Searching across all sets for "${name}"...`);
-      const anySetSearch = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${name}"`)}&unique=prints&order=released&dir=desc`);
+      const anySetSearch = await fetchWithTimeout(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${name}"`)}&unique=prints&order=released&dir=desc`);
       if (anySetSearch.ok) {
         const anyData = await anySetSearch.json();
         if (anyData?.data?.length > 0) {
@@ -433,7 +433,7 @@ async function verifyCardInDatabase(result: any): Promise<{ name: string; cardId
           return { name: match.name, cardId: match.id, setId: match.set };
         }
       }
-      const fuzzySearch = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`${name}`)}&unique=prints&order=released&dir=desc`);
+      const fuzzySearch = await fetchWithTimeout(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`${name}`)}&unique=prints&order=released&dir=desc`);
       if (fuzzySearch.ok) {
         const fuzzyData = await fuzzySearch.json();
         if (fuzzyData?.data?.length > 0) {
@@ -898,7 +898,7 @@ export async function registerRoutes(app: Express): Promise<Express> {
   async function nameSearchPokemon(name: string, lang: string): Promise<any[] | null> {
     const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
     try {
-      const res = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(name)}`);
+      const res = await fetchWithTimeout(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(name)}`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) return data;
@@ -909,7 +909,7 @@ export async function registerRoutes(app: Express): Promise<Express> {
       for (let drop = 1; drop <= Math.min(2, words.length - 1); drop++) {
         const partial = words.slice(0, words.length - drop).join(" ");
         try {
-          const res = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(partial)}`);
+          const res = await fetchWithTimeout(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(partial)}`);
           if (res.ok) {
             const data = await res.json();
             if (Array.isArray(data) && data.length > 0) {
@@ -926,14 +926,14 @@ export async function registerRoutes(app: Express): Promise<Express> {
 
   async function nameSearchYugioh(name: string): Promise<any | null> {
     try {
-      const res = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?name=${encodeURIComponent(name)}`);
+      const res = await fetchWithTimeout(`https://db.ygoprodeck.com/api/v7/cardinfo.php?name=${encodeURIComponent(name)}`);
       if (res.ok) {
         const data = await res.json();
         if (data?.data?.[0]) return data.data[0];
       }
     } catch {}
     try {
-      const res = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(name)}`);
+      const res = await fetchWithTimeout(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(name)}`);
       if (res.ok) {
         const data = await res.json();
         if (data?.data?.length > 0) {
@@ -950,14 +950,14 @@ export async function registerRoutes(app: Express): Promise<Express> {
     try {
       let query = `!"${name}"`;
       if (setHint) query += ` set:${setHint}`;
-      const res = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&unique=prints`);
+      const res = await fetchWithTimeout(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&unique=prints`);
       if (res.ok) {
         const data = await res.json();
         if (data?.data?.length > 0) return data.data;
       }
     } catch {}
     try {
-      const res = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(name)}&unique=prints`);
+      const res = await fetchWithTimeout(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(name)}&unique=prints`);
       if (res.ok) {
         const data = await res.json();
         if (data?.data?.length > 0) {
@@ -1071,7 +1071,7 @@ export async function registerRoutes(app: Express): Promise<Express> {
 
     } else if (game === "mtg") {
       try {
-        const res = await fetch(`https://api.scryfall.com/cards/${encodeURIComponent(setId)}/${encodeURIComponent(cardNumber)}`);
+        const res = await fetchWithTimeout(`https://api.scryfall.com/cards/${encodeURIComponent(setId)}/${encodeURIComponent(cardNumber)}`);
         if (res.ok) {
           const card = await res.json();
           if (namesMatch(name, card.name)) {
@@ -1263,7 +1263,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
 
           if (result.language === "ja" && result.game === "pokemon" && deepResult.verified && deepResult.cardId) {
             try {
-              const enRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${deepResult.cardId}`);
+              const enRes = await fetchWithTimeout(`https://api.tcgdex.net/v2/en/cards/${deepResult.cardId}`);
               if (enRes.ok) {
                 const enCard = await enRes.json();
                 if (enCard.name) result.englishName = enCard.name;
@@ -1283,7 +1283,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
                 const cleanNum = cleanCardNumber(result.cardNumber);
                 const paddedNum = cleanNum.length < 3 ? cleanNum.padStart(3, "0") : cleanNum;
                 try {
-                  const enMappedRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${enSetId}-${paddedNum}`);
+                  const enMappedRes = await fetchWithTimeout(`https://api.tcgdex.net/v2/en/cards/${enSetId}-${paddedNum}`);
                   if (enMappedRes.ok) {
                     const enMappedCard = await enMappedRes.json();
                     if (enMappedCard.name) result.englishName = enMappedCard.name;
@@ -1362,7 +1362,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
 
                 if (result.language === "ja" && result.game === "pokemon" && retryDeep.cardId) {
                   try {
-                    const enRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${retryDeep.cardId}`);
+                    const enRes = await fetchWithTimeout(`https://api.tcgdex.net/v2/en/cards/${retryDeep.cardId}`);
                     if (enRes.ok) {
                       const enCard = await enRes.json();
                       if (enCard.name) result.englishName = enCard.name;
@@ -1384,13 +1384,13 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
         try {
           const cardId = result.verifiedCardId || `${result.setId}-${result.cardNumber}`;
           if (result.game === "pokemon") {
-            const imgRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${cardId}`);
+            const imgRes = await fetchWithTimeout(`https://api.tcgdex.net/v2/en/cards/${cardId}`);
             if (imgRes.ok) {
               const imgData = await imgRes.json();
               if (imgData.image) result.image = `${imgData.image}/high.png`;
             }
           } else if (result.game === "yugioh") {
-            const ygoRes = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?name=${encodeURIComponent(result.name)}`);
+            const ygoRes = await fetchWithTimeout(`https://db.ygoprodeck.com/api/v7/cardinfo.php?name=${encodeURIComponent(result.name)}`);
             if (ygoRes.ok) {
               const ygoData = await ygoRes.json();
               if (ygoData?.data?.[0]?.card_images?.[0]?.image_url) {
@@ -1398,7 +1398,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
               }
             }
           } else if (result.game === "mtg") {
-            const mtgRes = await fetch(`https://api.scryfall.com/cards/${cardId}`);
+            const mtgRes = await fetchWithTimeout(`https://api.scryfall.com/cards/${cardId}`);
             if (mtgRes.ok) {
               const mtgData = await mtgRes.json();
               result.image = mtgData.image_uris?.normal || mtgData.card_faces?.[0]?.image_uris?.normal || null;
@@ -1418,13 +1418,13 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
           let altCards: any[] = [];
 
           if (result.game === "pokemon") {
-            const r = await fetch(`https://api.tcgdex.net/v2/en/cards?name=${encodeURIComponent(searchName)}`);
+            const r = await fetchWithTimeout(`https://api.tcgdex.net/v2/en/cards?name=${encodeURIComponent(searchName)}`);
             if (r.ok) {
               const data = await r.json();
               if (Array.isArray(data)) altCards = data.slice(0, altLimit * 3);
             }
           } else if (result.game === "yugioh") {
-            const r = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(searchName)}&num=15&offset=0`);
+            const r = await fetchWithTimeout(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(searchName)}&num=15&offset=0`);
             if (r.ok) {
               const data = await r.json();
               if (data?.data) {
@@ -1446,7 +1446,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
               }
             }
           } else if (result.game === "mtg") {
-            const r = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(searchName)}&unique=prints&order=released&dir=desc`);
+            const r = await fetchWithTimeout(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(searchName)}&unique=prints&order=released&dir=desc`);
             if (r.ok) {
               const data = await r.json();
               if (data?.data) altCards = data.data.slice(0, altLimit * 2);
@@ -1572,7 +1572,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
 
         if (lang === "ja" && game === "pokemon" && deepResult.cardId) {
           try {
-            const enRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${deepResult.cardId}`);
+            const enRes = await fetchWithTimeout(`https://api.tcgdex.net/v2/en/cards/${deepResult.cardId}`);
             if (enRes.ok) {
               const enCard = await enRes.json();
               if (enCard.name) result.englishName = enCard.name;
@@ -1622,19 +1622,19 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
         let cards: any[] = [];
         if (query) {
           try {
-            const r = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(query)}`);
+            const r = await fetchWithTimeout(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(query)}`);
             if (r.ok) cards = await r.json();
           } catch {}
           if ((!cards || cards.length === 0) && query.split(/\s+/).length > 1) {
             const partial = query.split(/\s+/).slice(0, -1).join(" ");
             try {
-              const r = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(partial)}`);
+              const r = await fetchWithTimeout(`https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(partial)}`);
               if (r.ok) cards = await r.json();
             } catch {}
           }
         } else if (cleanNumber) {
           try {
-            const r = await fetch(`https://api.tcgdex.net/v2/${lang}/cards?localId=${encodeURIComponent(cardNumber.split("/")[0])}`);
+            const r = await fetchWithTimeout(`https://api.tcgdex.net/v2/${lang}/cards?localId=${encodeURIComponent(cardNumber.split("/")[0])}`);
             if (r.ok) cards = await r.json();
           } catch {}
         }
@@ -1667,7 +1667,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
         let cards: any[] = [];
         if (query) {
           try {
-            const r = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}&num=20&offset=0`);
+            const r = await fetchWithTimeout(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}&num=20&offset=0`);
             if (r.ok) {
               const data = await r.json();
               if (data?.data) cards = data.data;
@@ -1726,7 +1726,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
         scryfallQuery = scryfallQuery.trim();
         if (scryfallQuery) {
           try {
-            const r = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(scryfallQuery)}&unique=prints&order=released&dir=desc`);
+            const r = await fetchWithTimeout(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(scryfallQuery)}&unique=prints&order=released&dir=desc`);
             if (r.ok) {
               const data = await r.json();
               if (data?.data) cards = data.data;
@@ -1827,7 +1827,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
       let englishNameMap: Record<string, string> = {};
       if (lang === "ja") {
         try {
-          const enResponse = await fetch(`https://api.tcgdex.net/v2/en/sets/${id}`);
+          const enResponse = await fetchWithTimeout(`https://api.tcgdex.net/v2/en/sets/${id}`);
           if (enResponse.ok) {
             const enData = await enResponse.json();
             if (enData?.cards) {
@@ -1848,7 +1848,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
           const enSetId = jaToEnSetMap[id];
           if (enSetId) {
             try {
-              const enMappedRes = await fetch(`https://api.tcgdex.net/v2/en/sets/${enSetId}`);
+              const enMappedRes = await fetchWithTimeout(`https://api.tcgdex.net/v2/en/sets/${enSetId}`);
               if (enMappedRes.ok) {
                 const enMappedData = await enMappedRes.json();
                 if (enMappedData?.cards) {
@@ -2092,7 +2092,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
       const prices: Record<string, number | null> = {};
 
       if (game === "pokemon") {
-        const setRes = await fetch(`https://api.tcgdex.net/v2/${lang}/sets/${id}`);
+        const setRes = await fetchWithTimeout(`https://api.tcgdex.net/v2/${lang}/sets/${id}`);
         if (!setRes.ok) return res.json({ prices: {} });
         const setData = await setRes.json();
         const cardIds = (setData.cards || []).map((c: any) => c.id);
@@ -2101,7 +2101,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
           const batch = cardIds.slice(i, i + batchSize);
           const results = await Promise.allSettled(
             batch.map(async (cid: string) => {
-              const r = await fetch(`https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(cid)}`);
+              const r = await fetchWithTimeout(`https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(cid)}`);
               if (!r.ok) return { id: cid, price: null };
               const c = await r.json();
               const tcgPrice = c.pricing?.tcgplayer;
@@ -2122,7 +2122,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
         const allSets = await fetchSetsForGame("yugioh");
         const setMeta = (allSets as any[]).find((s: any) => s.set_code === id);
         const setName = setMeta?.set_name || id;
-        const response = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?cardset=${encodeURIComponent(setName)}`);
+        const response = await fetchWithTimeout(`https://db.ygoprodeck.com/api/v7/cardinfo.php?cardset=${encodeURIComponent(setName)}`);
         const data = await response.json();
         if (data?.data) {
           for (const card of data.data) {
@@ -2171,7 +2171,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
     try {
       const { cardId } = req.params;
       const lang = req.query.lang === "ja" ? "ja" : "en";
-      const response = await fetch(`https://api.tcgdex.net/v2/${lang}/cards/${cardId}`);
+      const response = await fetchWithTimeout(`https://api.tcgdex.net/v2/${lang}/cards/${cardId}`);
       if (!response.ok) return res.status(404).json({ error: "Card not found" });
       const c = await response.json();
 
@@ -2189,7 +2189,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
           "SV8": "sv07", "SV8a": "sv07",
         };
         try {
-          const enRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${cardId}`);
+          const enRes = await fetchWithTimeout(`https://api.tcgdex.net/v2/en/cards/${cardId}`);
           if (enRes.ok) {
             enCard = await enRes.json();
           }
@@ -2199,7 +2199,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
           const enSetId = jaToEnSetMap[jaSetId];
           if (enSetId && c.localId) {
             try {
-              const enMappedRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${enSetId}-${c.localId}`);
+              const enMappedRes = await fetchWithTimeout(`https://api.tcgdex.net/v2/en/cards/${enSetId}-${c.localId}`);
               if (enMappedRes.ok) {
                 enCard = await enMappedRes.json();
               }
@@ -2261,12 +2261,12 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
       const setCode = parts.slice(0, -1).join("-");
       const cardNum = parts[parts.length - 1];
 
-      const setsRes = await fetch("https://db.ygoprodeck.com/api/v7/cardsets.php");
+      const setsRes = await fetchWithTimeout("https://db.ygoprodeck.com/api/v7/cardsets.php");
       const allSets = await setsRes.json();
       const setMeta = (allSets as any[]).find((s: any) => s.set_code === setCode);
       const setName = setMeta?.set_name || setCode;
 
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         `https://db.ygoprodeck.com/api/v7/cardinfo.php?cardset=${encodeURIComponent(setName)}`
       );
       const data = await response.json();
@@ -2310,7 +2310,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
   app.get("/api/tcg/mtg/card/:cardId", async (req, res) => {
     try {
       const { cardId } = req.params;
-      const response = await fetch(`https://api.scryfall.com/cards/${cardId}`);
+      const response = await fetchWithTimeout(`https://api.scryfall.com/cards/${cardId}`);
       if (!response.ok) return res.status(404).json({ error: "Card not found" });
       const c = await response.json();
 
@@ -2372,7 +2372,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
 
         try {
           if (card.game === "pokemon") {
-            const r = await fetch(`https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(card.cardId)}`);
+            const r = await fetchWithTimeout(`https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(card.cardId)}`);
             if (r.ok) {
               const c = await r.json();
               name = c.name || card.cardId;
@@ -2386,7 +2386,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
             const allSets = await fetchSetsForGame("yugioh");
             const setMeta = (allSets as any[]).find((s: any) => s.set_code === setCode);
             const ygSetName = setMeta?.set_name || setCode;
-            const r = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?cardset=${encodeURIComponent(ygSetName)}&num=100&offset=0`);
+            const r = await fetchWithTimeout(`https://db.ygoprodeck.com/api/v7/cardinfo.php?cardset=${encodeURIComponent(ygSetName)}&num=100&offset=0`);
             if (r.ok) {
               const data = await r.json();
               const c = data.data?.find((d: any) =>
@@ -2401,7 +2401,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
               }
             }
           } else if (card.game === "mtg") {
-            const r = await fetch(`https://api.scryfall.com/cards/${encodeURIComponent(card.cardId)}`);
+            const r = await fetchWithTimeout(`https://api.scryfall.com/cards/${encodeURIComponent(card.cardId)}`);
             if (r.ok) {
               const c = await r.json();
               name = c.name || card.cardId;
@@ -2474,7 +2474,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
           const chunk = identifiers.slice(i, i + chunkSize);
           const chunkCards = mtgCards.slice(i, i + chunkSize);
           try {
-            const response = await fetch("https://api.scryfall.com/cards/collection", {
+            const response = await fetchWithTimeout("https://api.scryfall.com/cards/collection", 15000, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ identifiers: chunk }),
@@ -2520,7 +2520,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
         let result: { cardId: string; name: string; price: number | null } = { cardId: card.cardId, name: card.cardId, price: null };
 
         if (card.game === "pokemon") {
-          const response = await fetch(`https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(card.cardId)}`);
+          const response = await fetchWithTimeout(`https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(card.cardId)}`);
           if (response.ok) {
             const c = await response.json();
             const price = extractPokemonPrice(c);
@@ -2538,7 +2538,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
               const enSetId = jaToEnSetMap[setCode];
               if (enSetId) {
                 try {
-                  const enRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${enSetId}-${localId}`);
+                  const enRes = await fetchWithTimeout(`https://api.tcgdex.net/v2/en/cards/${enSetId}-${localId}`);
                   if (enRes.ok) {
                     const c = await enRes.json();
                     const price = extractPokemonPrice(c);
@@ -2549,13 +2549,13 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
               }
               if (result.price == null) {
                 try {
-                  const setRes = await fetch(`https://api.tcgdex.net/v2/en/sets/${encodeURIComponent(setCode)}`);
+                  const setRes = await fetchWithTimeout(`https://api.tcgdex.net/v2/en/sets/${encodeURIComponent(setCode)}`);
                   if (setRes.ok) {
                     const setData = await setRes.json();
                     const match = setData.cards?.find((c: any) => c.localId === localId);
                     if (match) {
                       if (result.name === card.cardId && match.name) result.name = match.name;
-                      const cardRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(match.id)}`);
+                      const cardRes = await fetchWithTimeout(`https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(match.id)}`);
                       if (cardRes.ok) {
                         const c = await cardRes.json();
                         const price = extractPokemonPrice(c);
@@ -2654,7 +2654,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
 
       async function searchPokemon(): Promise<typeof results> {
         try {
-          const response = await fetch(`https://api.tcgdex.net/v2/en/cards?name=${encodeURIComponent(searchTerm)}`);
+          const response = await fetchWithTimeout(`https://api.tcgdex.net/v2/en/cards?name=${encodeURIComponent(searchTerm)}`);
           if (!response.ok) return [];
           const cards = await response.json();
           if (!Array.isArray(cards)) return [];
@@ -2671,7 +2671,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
 
       async function searchYugioh(): Promise<typeof results> {
         try {
-          const response = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(searchTerm)}`);
+          const response = await fetchWithTimeout(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(searchTerm)}`);
           if (!response.ok) return [];
           const data = await response.json();
           if (!data?.data || !Array.isArray(data.data)) return [];
@@ -2693,7 +2693,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
 
       async function searchMtg(): Promise<typeof results> {
         try {
-          const response = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(searchTerm)}&unique=cards`);
+          const response = await fetchWithTimeout(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(searchTerm)}&unique=cards`);
           if (!response.ok) return [];
           const data = await response.json();
           if (!data?.data || !Array.isArray(data.data)) return [];
