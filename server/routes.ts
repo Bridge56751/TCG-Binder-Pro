@@ -80,11 +80,16 @@ async function fetchPokemonReleaseDates(setIds: string[], lang: string = "en"): 
   if (pokemonReleaseDatesFetchedAt > 0 && Date.now() - pokemonReleaseDatesFetchedAt < RELEASE_DATE_CACHE_TTL) {
     return pokemonReleaseDateCache;
   }
-  const batchSize = 20;
+  const missingIds = setIds.filter(id => !(id in pokemonReleaseDateCache));
+  if (missingIds.length === 0) {
+    pokemonReleaseDatesFetchedAt = Date.now();
+    return pokemonReleaseDateCache;
+  }
+  const batchSize = 10;
   let successCount = 0;
   let totalCount = 0;
-  for (let i = 0; i < setIds.length; i += batchSize) {
-    const batch = setIds.slice(i, i + batchSize);
+  for (let i = 0; i < missingIds.length; i += batchSize) {
+    const batch = missingIds.slice(i, i + batchSize);
     const results = await Promise.allSettled(
       batch.map(async (id) => {
         try {
@@ -106,6 +111,7 @@ async function fetchPokemonReleaseDates(setIds: string[], lang: string = "en"): 
         if (result.value.releaseDate) successCount++;
       }
     }
+    if (i + batchSize < missingIds.length) await new Promise(r => setTimeout(r, 300));
   }
   if (totalCount === 0 || successCount / totalCount >= 0.5) {
     pokemonReleaseDatesFetchedAt = Date.now();
@@ -1797,6 +1803,11 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
           return true;
         });
 
+      for (const s of formatted) {
+        if (s.releaseDate) {
+          pokemonReleaseDateCache[s.id] = s.releaseDate;
+        }
+      }
       const setIds = formatted.map((s: any) => s.id);
       const releaseDates = await fetchPokemonReleaseDates(setIds, lang);
       for (const s of formatted) {
