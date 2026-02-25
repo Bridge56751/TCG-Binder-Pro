@@ -27,6 +27,40 @@ function countCollectionCards(collection: any): number {
   return total;
 }
 
+async function fetchWithTimeout(url: string, timeoutMs: number = 15000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchWithRetry(url: string, options: { timeout?: number; retries?: number } = {}): Promise<Response> {
+  const { timeout = 15000, retries = 2 } = options;
+  let lastError: any;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetchWithTimeout(url, timeout);
+      if (!res.ok && res.status !== 404 && attempt < retries) {
+        lastError = new Error(`HTTP ${res.status} from ${url}`);
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+        continue;
+      }
+      return res;
+    } catch (err: any) {
+      lastError = err;
+      if (attempt < retries) {
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+        continue;
+      }
+    }
+  }
+  throw lastError;
+}
+
 const setsCache: Record<string, any[]> = {};
 const setCardsCache = new Map<string, { data: any; ts: number }>();
 const SET_CARDS_CACHE_TTL = 60 * 60 * 1000;
@@ -49,7 +83,7 @@ async function fetchPokemonReleaseDates(setIds: string[], lang: string = "en"): 
     const results = await Promise.allSettled(
       batch.map(async (id) => {
         try {
-          const res = await fetch(`https://api.tcgdex.net/v2/${lang}/sets/${id}`);
+          const res = await fetchWithTimeout(`https://api.tcgdex.net/v2/${lang}/sets/${id}`, 10000);
           if (res.ok) {
             const data = await res.json();
             return { id, releaseDate: data.releaseDate || null };
@@ -76,15 +110,17 @@ async function fetchSetsForGame(game: string, lang: string = "en"): Promise<any[
   let sets: any[] = [];
   try {
     if (game === "pokemon") {
-      const res = await fetch(`https://api.tcgdex.net/v2/${lang}/sets`);
-      sets = await res.json();
+      const res = await fetchWithRetry(`https://api.tcgdex.net/v2/${lang}/sets`);
+      if (res.ok) sets = await res.json();
     } else if (game === "yugioh") {
-      const res = await fetch("https://db.ygoprodeck.com/api/v7/cardsets.php");
-      sets = await res.json();
+      const res = await fetchWithRetry("https://db.ygoprodeck.com/api/v7/cardsets.php");
+      if (res.ok) sets = await res.json();
     } else if (game === "mtg") {
-      const res = await fetch("https://api.scryfall.com/sets");
-      const data = await res.json();
-      sets = Array.isArray(data?.data) ? data.data : [];
+      const res = await fetchWithRetry("https://api.scryfall.com/sets");
+      if (res.ok) {
+        const data = await res.json();
+        sets = Array.isArray(data?.data) ? data.data : [];
+      }
     }
   } catch (_) {}
   setsCache[cacheKey] = sets;
@@ -1728,7 +1764,10 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
   app.get("/api/tcg/pokemon/sets", async (req, res) => {
     try {
       const lang = req.query.lang === "ja" ? "ja" : "en";
-      const response = await fetch(`https://api.tcgdex.net/v2/${lang}/sets`);
+      const response = await fetchWithRetry(`https://api.tcgdex.net/v2/${lang}/sets`);
+      if (!response.ok) {
+        return res.status(502).json({ error: `Pokemon API returned ${response.status}` });
+      }
       const sets = await response.json();
       const seen = new Set<string>();
       const phantomSets = new Set(["wp", "jumbo"]);
@@ -1774,7 +1813,11 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
       if (cached && Date.now() - cached.ts < SET_CARDS_CACHE_TTL) {
         return res.json(cached.data);
       }
-      const response = await fetch(`https://api.tcgdex.net/v2/${lang}/sets/${id}`);
+      const response = await fetchWithRetry(`https://api.tcgdex.net/v2/${lang}/sets/${id}`);
+      if (!response.ok) {
+        const status = response.status === 404 ? 404 : 502;
+        return res.status(status).json({ error: status === 404 ? "Set not found" : `Pokemon API returned ${response.status}` });
+      }
       const setData = await response.json();
 
       if (!setData || !setData.cards) {
@@ -1853,7 +1896,10 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
 
   app.get("/api/tcg/yugioh/sets", async (_req, res) => {
     try {
-      const response = await fetch("https://db.ygoprodeck.com/api/v7/cardsets.php");
+      const response = await fetchWithRetry("https://db.ygoprodeck.com/api/v7/cardsets.php");
+      if (!response.ok) {
+        return res.status(502).json({ error: `Yu-Gi-Oh API returned ${response.status}` });
+      }
       const sets = await response.json();
       const seen = new Set<string>();
       const formatted = sets
@@ -1893,9 +1939,13 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
       const setMeta = (allSets as any[]).find((s: any) => s.set_code === id);
       const setName = setMeta?.set_name || id;
 
-      const response = await fetch(
+      const response = await fetchWithRetry(
         `https://db.ygoprodeck.com/api/v7/cardinfo.php?cardset=${encodeURIComponent(setName)}`
       );
+      if (!response.ok) {
+        const status = response.status === 404 ? 404 : 502;
+        return res.status(status).json({ error: status === 404 ? "Set not found" : `Yu-Gi-Oh API returned ${response.status}` });
+      }
       const data = await response.json();
 
       if (!data || !data.data) {
@@ -1971,7 +2021,7 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
       let url: string | null = `https://api.scryfall.com/cards/search?order=set&q=set:${encodeURIComponent(id)}&unique=prints`;
 
       while (url) {
-        const pageRes: Response = await fetch(url);
+        const pageRes: Response = await fetchWithTimeout(url, 15000);
         if (!pageRes.ok) break;
         const pageData: any = await pageRes.json();
         if (pageData.data) allCards.push(...pageData.data);
