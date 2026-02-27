@@ -14,8 +14,31 @@ import { ThemeProvider, useTheme } from "@/lib/ThemeContext";
 import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold } from "@expo-google-fonts/dm-sans";
 import { StatusBar } from "expo-status-bar";
 import { GalleryProvider } from "@/lib/GalleryContext";
+import { Platform } from "react-native";
 
 SplashScreen.preventAutoHideAsync();
+
+let FBSettings: any = null;
+if (Platform.OS !== "web") {
+  try {
+    FBSettings = require("react-native-fbsdk-next").Settings;
+  } catch {}
+}
+
+function useTrackingTransparency() {
+  useEffect(() => {
+    if (Platform.OS !== "ios") return;
+    (async () => {
+      try {
+        const { requestTrackingPermissionsAsync } = require("expo-tracking-transparency");
+        const { status } = await requestTrackingPermissionsAsync();
+        if (status === "granted" && FBSettings) {
+          FBSettings.setAdvertiserTrackingEnabled(true);
+        }
+      } catch {}
+    })();
+  }, []);
+}
 
 function ThemedStatusBar() {
   const { isDark } = useTheme();
@@ -48,6 +71,7 @@ function RootLayoutNav() {
   const { loading } = useAuth();
   const { colors } = useTheme();
   useProtectedRoute();
+  useTrackingTransparency();
 
   if (loading) {
     return (
