@@ -34,7 +34,7 @@ import { useCollection } from "@/lib/CollectionContext";
 import { useGallery } from "@/lib/GalleryContext";
 import { CardGallery } from "@/components/CardGallery";
 import type { CardDetail, GameId } from "@/lib/types";
-import { GAMES } from "@/lib/types";
+import { GAMES, isFoilCardId, getBaseCardId, makeFoilCardId } from "@/lib/types";
 import { CollectionProgressToast } from "@/components/CollectionProgressToast";
 
 const screenWidth = Dimensions.get("window").width;
@@ -73,8 +73,12 @@ function getMarketplaceLinks(card: CardDetail) {
 export default function CardDetailScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
-  const { game, cardId, lang } = useLocalSearchParams<{ game: string; cardId: string; lang?: string }>();
+  const { game, cardId: rawCardId, lang } = useLocalSearchParams<{ game: string; cardId: string; lang?: string }>();
   const gameId = game as GameId;
+  const isInitiallyFoil = isFoilCardId(rawCardId || "");
+  const baseCardId = getBaseCardId(rawCardId || "");
+  const cardId = baseCardId;
+  const [viewFoil, setViewFoil] = useState(isInitiallyFoil);
   const { hasCard, removeCard, addCard, cardQuantity } = useCollection();
   const { galleryCardsRef } = useGallery();
   const [galleryVisible, setGalleryVisible] = useState(false);
@@ -85,6 +89,7 @@ export default function CardDetailScreen() {
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
 
   const gameInfo = GAMES.find((g) => g.id === gameId);
+  const effectiveCardId = (viewFoil && gameId === "mtg") ? makeFoilCardId(cardId || "") : (cardId || "");
 
   const [justAdded, setJustAdded] = useState(false);
   const [limitReached, setLimitReached] = useState(false);
@@ -124,20 +129,21 @@ export default function CardDetailScreen() {
     queryKey: [cardQueryPath],
   });
 
-  const isInCollection = card ? hasCard(gameId, card.setId, cardId || "") : false;
+  const isInCollection = card ? hasCard(gameId, card.setId, effectiveCardId) : false;
 
   const handleRemoveCard = () => {
     if (!card) return;
+    const label = viewFoil && gameId === "mtg" ? `${card.name} (Foil)` : card.name;
     Alert.alert(
       "Remove Card",
-      `Remove ${card.name} from your collection?`,
+      `Remove ${label} from your collection?`,
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Remove",
           style: "destructive",
           onPress: async () => {
-            await removeCard(gameId, card.setId, cardId || "");
+            await removeCard(gameId, card.setId, effectiveCardId);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
             router.back();
           },
@@ -174,11 +180,14 @@ export default function CardDetailScreen() {
     );
   }
 
-  const hasPrice = card.currentPrice != null && card.currentPrice > 0;
-  const priceChangePercent = card.priceLow != null && card.currentPrice != null && card.priceLow > 0
-    ? Math.round(((card.currentPrice - card.priceLow) / card.priceLow) * 100)
+  const displayPrice = (viewFoil && gameId === "mtg" && card.foilPrice != null) ? card.foilPrice : card.currentPrice;
+  const hasPrice = displayPrice != null && displayPrice > 0;
+  const priceLowForDisplay = displayPrice ? displayPrice * 0.7 : null;
+  const priceChangePercent = priceLowForDisplay != null && displayPrice != null && priceLowForDisplay > 0
+    ? Math.round(((displayPrice - priceLowForDisplay) / priceLowForDisplay) * 100)
     : 0;
   const priceUp = priceChangePercent >= 0;
+  const hasFoilOption = gameId === "mtg" && (card.finishes?.includes("foil") || card.foilPrice != null);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -252,10 +261,52 @@ export default function CardDetailScreen() {
         </Pressable>
 
         <View style={styles.infoSection}>
+          {hasFoilOption && (
+            <View style={{ flexDirection: "row", gap: 0, marginBottom: 4 }}>
+              <Pressable
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  borderTopRightRadius: 0,
+                  borderBottomRightRadius: 0,
+                  alignItems: "center" as const,
+                  backgroundColor: !viewFoil ? colors.tint : colors.surfaceAlt,
+                  borderWidth: 1,
+                  borderColor: !viewFoil ? colors.tint : colors.cardBorder,
+                }}
+                onPress={() => { setViewFoil(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+              >
+                <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 13, color: !viewFoil ? "#FFFFFF" : colors.textSecondary }}>Normal</Text>
+              </Pressable>
+              <Pressable
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  borderTopLeftRadius: 0,
+                  borderBottomLeftRadius: 0,
+                  alignItems: "center" as const,
+                  flexDirection: "row" as const,
+                  justifyContent: "center" as const,
+                  gap: 5,
+                  backgroundColor: viewFoil ? "#9B59B6" : colors.surfaceAlt,
+                  borderWidth: 1,
+                  borderColor: viewFoil ? "#9B59B6" : colors.cardBorder,
+                  borderLeftWidth: 0,
+                }}
+                onPress={() => { setViewFoil(true); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+              >
+                <Ionicons name="sparkles" size={14} color={viewFoil ? "#FFFFFF" : colors.textSecondary} />
+                <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 13, color: viewFoil ? "#FFFFFF" : colors.textSecondary }}>Foil</Text>
+              </Pressable>
+            </View>
+          )}
+
           {isInCollection && (
             <View style={styles.badgeRow}>
               {(() => {
-                const qty = cardQuantity(gameId, card.setId, cardId || "");
+                const qty = cardQuantity(gameId, card.setId, effectiveCardId);
                 return justAdded ? (
                   <Animated.View
                     style={[styles.badge, { backgroundColor: colors.success + "18" }, ownedBadgeStyle]}
@@ -279,10 +330,10 @@ export default function CardDetailScreen() {
 
           {!isInCollection && !limitReached && (
             <Pressable
-              style={[styles.addBinderBtn, { backgroundColor: colors.tint }]}
+              style={[styles.addBinderBtn, { backgroundColor: viewFoil && gameId === "mtg" ? "#9B59B6" : colors.tint }]}
               onPress={async () => {
                 try {
-                  await addCard(gameId, card.setId, cardId || "");
+                  await addCard(gameId, card.setId, effectiveCardId);
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                   setJustAdded(true);
                   addScale.value = withSequence(
@@ -303,7 +354,7 @@ export default function CardDetailScreen() {
               }}
             >
               <Ionicons name="add-circle" size={20} color="#FFFFFF" />
-              <Text style={styles.addBinderBtnText}>Add to Binder</Text>
+              <Text style={styles.addBinderBtnText}>{viewFoil && gameId === "mtg" ? "Add Foil to Binder" : "Add to Binder"}</Text>
             </Pressable>
           )}
 
@@ -372,13 +423,15 @@ export default function CardDetailScreen() {
 
         {hasPrice && (
           <View style={styles.priceSection}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Market Price</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              {viewFoil && gameId === "mtg" ? "Foil Price" : "Market Price"}
+            </Text>
 
             <View style={[styles.priceCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
               <View style={styles.priceMain}>
                 <Text style={[styles.priceValue, { color: colors.text }]}>
                   {card.priceUnit === "EUR" ? "\u20AC" : "$"}
-                  {card.currentPrice!.toFixed(2)}
+                  {displayPrice!.toFixed(2)}
                 </Text>
                 <View style={[styles.changeBadge, priceUp ? styles.changeUp : styles.changeDown]}>
                   <Ionicons
@@ -393,21 +446,23 @@ export default function CardDetailScreen() {
               </View>
 
               <View style={[styles.priceRange, { borderTopColor: colors.surfaceAlt }]}>
-                {card.priceLow != null && (
+                {priceLowForDisplay != null && (
                   <View style={styles.priceRangeItem}>
                     <Text style={[styles.priceRangeLabel, { color: colors.textTertiary }]}>Low</Text>
                     <Text style={[styles.priceRangeValue, { color: colors.text }]}>
-                      ${card.priceLow.toFixed(2)}
+                      ${priceLowForDisplay.toFixed(2)}
                     </Text>
                   </View>
                 )}
                 <View style={styles.priceRangeItem}>
-                  <Text style={[styles.priceRangeLabel, { color: colors.textTertiary }]}>Market</Text>
-                  <Text style={[styles.priceRangeValue, { color: colors.tint }]}>
-                    ${card.currentPrice!.toFixed(2)}
+                  <Text style={[styles.priceRangeLabel, { color: colors.textTertiary }]}>
+                    {viewFoil && gameId === "mtg" ? "Foil" : "Market"}
+                  </Text>
+                  <Text style={[styles.priceRangeValue, { color: viewFoil && gameId === "mtg" ? "#9B59B6" : colors.tint }]}>
+                    ${displayPrice!.toFixed(2)}
                   </Text>
                 </View>
-                {card.priceHigh != null && (
+                {card.priceHigh != null && !viewFoil && (
                   <View style={styles.priceRangeItem}>
                     <Text style={[styles.priceRangeLabel, { color: colors.textTertiary }]}>High</Text>
                     <Text style={[styles.priceRangeValue, { color: colors.text }]}>

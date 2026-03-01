@@ -79,6 +79,8 @@ export interface CardDetail {
   description: string | null;
   artist: string | null;
   currentPrice: number | null;
+  foilPrice?: number | null;
+  finishes?: string[];
   priceUnit: string;
   priceLow: number | null;
   priceHigh: number | null;
@@ -88,6 +90,18 @@ export interface CollectionData {
   [game: string]: {
     [setId: string]: string[];
   };
+}
+
+export function isFoilCardId(cardId: string): boolean {
+  return cardId.endsWith(":foil");
+}
+
+export function getBaseCardId(cardId: string): string {
+  return cardId.endsWith(":foil") ? cardId.slice(0, -5) : cardId;
+}
+
+export function makeFoilCardId(cardId: string): string {
+  return cardId.endsWith(":foil") ? cardId : `${cardId}:foil`;
 }
 
 export const GAMES: TCGGame[] = [

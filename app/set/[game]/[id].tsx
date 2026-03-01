@@ -25,7 +25,7 @@ import { useGallery } from "@/lib/GalleryContext";
 import { getApiUrl, queryClient } from "@/lib/query-client";
 import { cacheCards, getCachedSetCards, getCachedSets, type CachedCard } from "@/lib/card-cache";
 import type { GameId, SetDetail, TCGCard } from "@/lib/types";
-import { GAMES } from "@/lib/types";
+import { GAMES, makeFoilCardId, isFoilCardId, getBaseCardId } from "@/lib/types";
 
 const NUM_COLUMNS = 3;
 
@@ -45,6 +45,7 @@ export default function SetDetailScreen() {
   const [sortDropdownVisible, setSortDropdownVisible] = useState(false);
   const [quickAddVisible, setQuickAddVisible] = useState(false);
   const [quickAddSearch, setQuickAddSearch] = useState("");
+  const [quickAddFoil, setQuickAddFoil] = useState(false);
   const [cardPrices, setCardPrices] = useState<Record<string, number | null>>({});
   const [pricesLoading, setPricesLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -222,11 +223,12 @@ export default function SetDetailScreen() {
   }, [selectedCards, removeCard, gameId, id]);
 
   const handleQuickAdd = useCallback(
-    async (cardId: string) => {
+    async (cardId: string, foil?: boolean) => {
       if (isAddingRef.current) return;
       isAddingRef.current = true;
+      const finalId = (foil && gameId === "mtg") ? makeFoilCardId(cardId) : cardId;
       try {
-        await addCard(gameId, id || "", cardId);
+        await addCard(gameId, id || "", finalId);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch (err: any) {
         if (err?.message === "FREE_LIMIT" || err?.message === "GUEST_LIMIT") {
@@ -333,6 +335,8 @@ export default function SetDetailScreen() {
       const setData = gameData[id || ""];
       if (Array.isArray(setData)) {
         for (const cardId of setData) {
+          const baseId = getBaseCardId(cardId);
+          map[baseId] = (map[baseId] || 0) + 1;
           map[cardId] = (map[cardId] || 0) + 1;
         }
       }
@@ -797,6 +801,47 @@ export default function SetDetailScreen() {
               <Ionicons name="close" size={24} color={colors.text} />
             </Pressable>
           </View>
+          {gameId === "mtg" && (
+            <View style={{ flexDirection: "row", marginHorizontal: 20, marginBottom: 12, gap: 0 }}>
+              <Pressable
+                style={{
+                  flex: 1,
+                  paddingVertical: 9,
+                  borderRadius: 10,
+                  borderTopRightRadius: 0,
+                  borderBottomRightRadius: 0,
+                  alignItems: "center" as const,
+                  backgroundColor: !quickAddFoil ? colors.tint : colors.surfaceAlt,
+                  borderWidth: 1,
+                  borderColor: !quickAddFoil ? colors.tint : colors.cardBorder,
+                }}
+                onPress={() => { setQuickAddFoil(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+              >
+                <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 13, color: !quickAddFoil ? "#FFFFFF" : colors.textSecondary }}>Normal</Text>
+              </Pressable>
+              <Pressable
+                style={{
+                  flex: 1,
+                  paddingVertical: 9,
+                  borderRadius: 10,
+                  borderTopLeftRadius: 0,
+                  borderBottomLeftRadius: 0,
+                  alignItems: "center" as const,
+                  flexDirection: "row" as const,
+                  justifyContent: "center" as const,
+                  gap: 5,
+                  backgroundColor: quickAddFoil ? "#9B59B6" : colors.surfaceAlt,
+                  borderWidth: 1,
+                  borderColor: quickAddFoil ? "#9B59B6" : colors.cardBorder,
+                  borderLeftWidth: 0,
+                }}
+                onPress={() => { setQuickAddFoil(true); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+              >
+                <Ionicons name="sparkles" size={14} color={quickAddFoil ? "#FFFFFF" : colors.textSecondary} />
+                <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 13, color: quickAddFoil ? "#FFFFFF" : colors.textSecondary }}>Foil</Text>
+              </Pressable>
+            </View>
+          )}
           <View style={[styles.searchBar, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardBorder }]}>
             <Ionicons name="search" size={18} color={colors.textTertiary} />
             <TextInput
@@ -819,7 +864,8 @@ export default function SetDetailScreen() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 40 }}
             renderItem={({ item }) => {
-              const qty = setCollectionMap[item.id] || 0;
+              const effectiveId = (quickAddFoil && gameId === "mtg") ? makeFoilCardId(item.id) : item.id;
+              const qty = setCollectionMap[effectiveId] || 0;
               return (
                 <View style={[styles.quickAddRow, { borderBottomColor: colors.cardBorder }]}>
                   <View style={styles.quickAddInfo}>
@@ -830,8 +876,8 @@ export default function SetDetailScreen() {
                       {item.englishName || item.name}
                     </Text>
                     {qty > 0 && (
-                      <View style={[styles.qtyBadge, { backgroundColor: colors.tint + "20" }]}>
-                        <Text style={[styles.qtyBadgeText, { color: colors.tint }]}>x{qty}</Text>
+                      <View style={[styles.qtyBadge, { backgroundColor: (quickAddFoil ? "#9B59B6" : colors.tint) + "20" }]}>
+                        <Text style={[styles.qtyBadgeText, { color: quickAddFoil ? "#9B59B6" : colors.tint }]}>x{qty}</Text>
                       </View>
                     )}
                   </View>
@@ -839,16 +885,16 @@ export default function SetDetailScreen() {
                     {qty > 0 && (
                       <Pressable
                         style={[styles.quickAddBtn, { backgroundColor: colors.error + "15" }]}
-                        onPress={() => handleQuickRemove(item.id, item.englishName || item.name)}
+                        onPress={() => handleQuickRemove(effectiveId, item.englishName || item.name)}
                       >
                         <Ionicons name="remove" size={20} color={colors.error} />
                       </Pressable>
                     )}
                     <Pressable
-                      style={[styles.quickAddBtn, { backgroundColor: colors.tint + "15" }]}
-                      onPress={() => handleQuickAdd(item.id)}
+                      style={[styles.quickAddBtn, { backgroundColor: (quickAddFoil ? "#9B59B6" : colors.tint) + "15" }]}
+                      onPress={() => handleQuickAdd(item.id, quickAddFoil)}
                     >
-                      <Ionicons name="add" size={20} color={colors.tint} />
+                      <Ionicons name="add" size={20} color={quickAddFoil ? "#9B59B6" : colors.tint} />
                     </Pressable>
                   </View>
                 </View>

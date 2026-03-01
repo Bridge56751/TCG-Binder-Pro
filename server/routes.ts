@@ -2058,12 +2058,16 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
         const price = prices.usd ? parseFloat(prices.usd)
           : (prices.usd_foil ? parseFloat(prices.usd_foil)
           : (prices.eur ? Math.round(parseFloat(prices.eur) * 108) / 100 : null));
+        const foilPrice = prices.usd_foil ? parseFloat(prices.usd_foil) : null;
+        const finishes: string[] = c.finishes || [];
         return {
           id: c.id,
           localId: c.collector_number || "0",
           name: c.name,
           image: c.image_uris?.small || c.card_faces?.[0]?.image_uris?.small || null,
           price,
+          foilPrice,
+          finishes,
         };
       });
 
@@ -2170,6 +2174,10 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
                 : (p.usd_foil ? parseFloat(p.usd_foil)
                 : (p.eur ? Math.round(parseFloat(p.eur) * 108) / 100 : null));
               prices[c.id] = price;
+              const foilPrice = p.usd_foil ? parseFloat(p.usd_foil) : null;
+              if (foilPrice !== null) {
+                prices[`${c.id}:foil`] = foilPrice;
+              }
             }
           }
           url = pageData.has_more ? pageData.next_page : null;
@@ -2341,6 +2349,8 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
         : (prices.usd_foil ? parseFloat(prices.usd_foil)
         : (prices.eur ? Math.round(parseFloat(prices.eur) * 108) / 100
         : (prices.eur_foil ? Math.round(parseFloat(prices.eur_foil) * 108) / 100 : null)));
+      const foilPrice = prices.usd_foil ? parseFloat(prices.usd_foil) : null;
+      const finishes: string[] = c.finishes || [];
       res.json({
         id: c.id,
         localId: c.collector_number || "0",
@@ -2355,6 +2365,8 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
         description: c.oracle_text || c.card_faces?.[0]?.oracle_text || null,
         artist: c.artist || null,
         currentPrice,
+        foilPrice,
+        finishes,
         priceUnit: "USD",
         priceLow: currentPrice ? currentPrice * 0.7 : null,
         priceHigh: prices.usd_foil ? parseFloat(prices.usd_foil) : (currentPrice ? currentPrice * 1.5 : null),

@@ -22,6 +22,7 @@ import { apiRequest } from "@/lib/query-client";
 import { useCollection } from "@/lib/CollectionContext";
 import { useTheme } from "@/lib/ThemeContext";
 import type { CardIdentification, CardAlternative, GameId } from "@/lib/types";
+import { makeFoilCardId } from "@/lib/types";
 import {
   addToScanHistory,
 } from "@/lib/scan-history-storage";
@@ -88,6 +89,7 @@ export default function ScanScreen() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [confirmedResult, setConfirmedResult] = useState<CardIdentification | null>(null);
+  const [isFoil, setIsFoil] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const scrollToFocusedInput = useCallback(() => {
@@ -197,7 +199,10 @@ export default function ScanScreen() {
   const handleAddToCollection = async () => {
     const activeResult = confirmedResult || scanResult;
     if (!activeResult) return;
-    const cardId = activeResult.verifiedCardId || `${activeResult.setId}-${activeResult.cardNumber}`;
+    let cardId = activeResult.verifiedCardId || `${activeResult.setId}-${activeResult.cardNumber}`;
+    if (isFoil && activeResult.game === "mtg") {
+      cardId = makeFoilCardId(cardId);
+    }
     try {
       await addCard(
         activeResult.game,
@@ -254,6 +259,7 @@ export default function ScanScreen() {
     setConfirmedResult(null);
     setIsScanning(false);
     setAddQuantity(1);
+    setIsFoil(false);
     setIsEditing(false);
     setEditName("");
     setEditCardNumber("");
@@ -567,7 +573,8 @@ export default function ScanScreen() {
 
       {confirmedResult && (() => {
         const activeResult = confirmedResult;
-        const cardId = activeResult.verifiedCardId || `${activeResult.setId}-${activeResult.cardNumber}`;
+        const baseCardId = activeResult.verifiedCardId || `${activeResult.setId}-${activeResult.cardNumber}`;
+        const cardId = (isFoil && activeResult.game === "mtg") ? makeFoilCardId(baseCardId) : baseCardId;
         const alreadyOwned = hasCard(activeResult.game, activeResult.setId, cardId);
         const ownedQty = alreadyOwned ? cardQuantity(activeResult.game, activeResult.setId, cardId) : 0;
         return (
@@ -611,6 +618,48 @@ export default function ScanScreen() {
 
           <View style={{ height: 1, backgroundColor: colors.cardBorder, marginVertical: 6 }} />
 
+          {activeResult.game === "mtg" && (
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 0, marginVertical: 4 }}>
+              <Pressable
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  borderTopRightRadius: 0,
+                  borderBottomRightRadius: 0,
+                  alignItems: "center" as const,
+                  backgroundColor: !isFoil ? colors.tint : colors.surfaceAlt,
+                  borderWidth: 1,
+                  borderColor: !isFoil ? colors.tint : colors.cardBorder,
+                }}
+                onPress={() => { setIsFoil(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+              >
+                <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 13, color: !isFoil ? "#FFFFFF" : colors.textSecondary }}>Normal</Text>
+              </Pressable>
+              <Pressable
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  borderTopLeftRadius: 0,
+                  borderBottomLeftRadius: 0,
+                  alignItems: "center" as const,
+                  flexDirection: "row" as const,
+                  justifyContent: "center" as const,
+                  gap: 5,
+                  backgroundColor: isFoil ? "#9B59B6" : colors.surfaceAlt,
+                  borderWidth: 1,
+                  borderColor: isFoil ? "#9B59B6" : colors.cardBorder,
+                  borderLeftWidth: 0,
+                }}
+                onPress={() => { setIsFoil(true); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+              >
+                <Ionicons name="sparkles" size={14} color={isFoil ? "#FFFFFF" : colors.textSecondary} />
+                <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 13, color: isFoil ? "#FFFFFF" : colors.textSecondary }}>Foil</Text>
+              </Pressable>
+            </View>
+          )}
+
           {alreadyOwned && (
             <View style={[dynamicStyles.ownedBanner, { backgroundColor: colors.tint + "10" }]}>
               <Ionicons name="layers" size={16} color={colors.tint} />
@@ -648,10 +697,10 @@ export default function ScanScreen() {
             <Ionicons name={alreadyOwned ? "duplicate" : "add-circle"} size={20} color="#FFFFFF" />
             <Text style={dynamicStyles.addButtonText}>
               {alreadyOwned
-                ? `Add ${addQuantity} More`
+                ? `Add ${addQuantity} More${isFoil && activeResult.game === "mtg" ? " (Foil)" : ""}`
                 : addQuantity > 1
-                  ? `Add ${addQuantity} to Collection`
-                  : "Add to Collection"}
+                  ? `Add ${addQuantity}${isFoil && activeResult.game === "mtg" ? " Foil" : ""} to Collection`
+                  : isFoil && activeResult.game === "mtg" ? "Add Foil to Collection" : "Add to Collection"}
             </Text>
           </Pressable>
 
