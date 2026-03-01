@@ -1403,6 +1403,13 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
             if (imgRes.ok) {
               const imgData = await imgRes.json();
               if (imgData.image) result.image = `${imgData.image}/high.png`;
+              const tcgPrice = imgData.pricing?.tcgplayer;
+              if (tcgPrice) {
+                const realPrice = tcgPrice.marketPrice ?? tcgPrice.midPrice ?? tcgPrice.lowPrice ?? null;
+                if (realPrice != null && realPrice > 0) {
+                  result.estimatedValue = realPrice;
+                }
+              }
             }
           } else if (result.game === "yugioh") {
             const ygoRes = await fetchWithTimeout(`https://db.ygoprodeck.com/api/v7/cardinfo.php?name=${encodeURIComponent(result.name)}`);
@@ -1411,15 +1418,29 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
               if (ygoData?.data?.[0]?.card_images?.[0]?.image_url) {
                 result.image = ygoData.data[0].card_images[0].image_url;
               }
+              const prices = ygoData?.data?.[0]?.card_prices?.[0];
+              if (prices) {
+                const realPrice = prices.tcgplayer_price ? parseFloat(prices.tcgplayer_price) : null;
+                if (realPrice != null && realPrice > 0) {
+                  result.estimatedValue = realPrice;
+                }
+              }
             }
           } else if (result.game === "mtg") {
             const mtgRes = await fetchWithTimeout(`https://api.scryfall.com/cards/${cardId}`);
             if (mtgRes.ok) {
               const mtgData = await mtgRes.json();
               result.image = mtgData.image_uris?.normal || mtgData.card_faces?.[0]?.image_uris?.normal || null;
+              const prices = mtgData.prices || {};
+              const realPrice = prices.usd ? parseFloat(prices.usd)
+                : (prices.usd_foil ? parseFloat(prices.usd_foil)
+                : (prices.eur ? Math.round(parseFloat(prices.eur) * 108) / 100 : null));
+              if (realPrice != null && realPrice > 0) {
+                result.estimatedValue = realPrice;
+              }
             }
           }
-          console.log(`[MainImage] ${result.game} image: ${result.image ? "found" : "not found"}`);
+          console.log(`[MainImage] ${result.game} image: ${result.image ? "found" : "not found"}, price: ${result.estimatedValue}`);
         } catch (e) {
           console.error("Error fetching main card image:", e);
         }
@@ -1594,6 +1615,48 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
               if (enCard.set?.name) result.englishSetName = enCard.set.name;
             }
           } catch {}
+        }
+
+        try {
+          const cId = deepResult.cardId || `${result.setId}-${correctionInput.cardNumber}`;
+          if (game === "pokemon") {
+            const imgRes = await fetchWithTimeout(`https://api.tcgdex.net/v2/en/cards/${cId}`);
+            if (imgRes.ok) {
+              const imgData = await imgRes.json();
+              if (imgData.image) result.image = `${imgData.image}/high.png`;
+              const tcgPrice = imgData.pricing?.tcgplayer;
+              if (tcgPrice) {
+                const realPrice = tcgPrice.marketPrice ?? tcgPrice.midPrice ?? tcgPrice.lowPrice ?? null;
+                if (realPrice != null && realPrice > 0) result.estimatedValue = realPrice;
+              }
+            }
+          } else if (game === "yugioh") {
+            const ygoRes = await fetchWithTimeout(`https://db.ygoprodeck.com/api/v7/cardinfo.php?name=${encodeURIComponent(result.name)}`);
+            if (ygoRes.ok) {
+              const ygoData = await ygoRes.json();
+              if (ygoData?.data?.[0]?.card_images?.[0]?.image_url) {
+                result.image = ygoData.data[0].card_images[0].image_url;
+              }
+              const prices = ygoData?.data?.[0]?.card_prices?.[0];
+              if (prices) {
+                const realPrice = prices.tcgplayer_price ? parseFloat(prices.tcgplayer_price) : null;
+                if (realPrice != null && realPrice > 0) result.estimatedValue = realPrice;
+              }
+            }
+          } else if (game === "mtg") {
+            const mtgRes = await fetchWithTimeout(`https://api.scryfall.com/cards/${cId}`);
+            if (mtgRes.ok) {
+              const mtgData = await mtgRes.json();
+              result.image = mtgData.image_uris?.normal || mtgData.card_faces?.[0]?.image_uris?.normal || null;
+              const prices = mtgData.prices || {};
+              const realPrice = prices.usd ? parseFloat(prices.usd)
+                : (prices.usd_foil ? parseFloat(prices.usd_foil)
+                : (prices.eur ? Math.round(parseFloat(prices.eur) * 108) / 100 : null));
+              if (realPrice != null && realPrice > 0) result.estimatedValue = realPrice;
+            }
+          }
+        } catch (e) {
+          console.error("Error fetching card image/price in correct-card:", e);
         }
 
         res.json(result);
