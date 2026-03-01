@@ -68,7 +68,6 @@ export default function BatchScanScreen() {
   const cameraRef = useRef<CameraView>(null);
   const [scannedCards, setScannedCards] = useState<ScannedCard[]>([]);
   const [isCapturing, setIsCapturing] = useState(false);
-  const [isFocusing, setIsFocusing] = useState(false);
   const [addedCount, setAddedCount] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const cameraLayoutRef = useRef({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
@@ -92,13 +91,7 @@ export default function BatchScanScreen() {
   }, [permission]);
 
   const captureAndIdentify = useCallback(async () => {
-    if (isCapturing || isFocusing || !cameraRef.current) return;
-    setIsFocusing(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-    await new Promise(resolve => setTimeout(resolve, 600));
-
-    setIsFocusing(false);
+    if (isCapturing || !cameraRef.current) return;
     setIsCapturing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
@@ -229,7 +222,7 @@ export default function BatchScanScreen() {
     } catch {
       setIsCapturing(false);
     }
-  }, [isCapturing, isFocusing]);
+  }, [isCapturing]);
 
   const handleAddCard = useCallback(async (card: ScannedCard): Promise<boolean> => {
     if (!card.game || !card.cardId || card.added || !card.setId) return false;
@@ -420,7 +413,7 @@ export default function BatchScanScreen() {
         facing="back"
         autofocus="on"
         flash="off"
-        zoom={0}
+        zoom={0.02}
         onLayout={(e) => {
           cameraLayoutRef.current = { width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height };
         }}
@@ -438,15 +431,10 @@ export default function BatchScanScreen() {
 
       <View style={styles.frameOverlay} pointerEvents="none">
         <View style={[styles.frameContainer, { width: FRAME_WIDTH, height: FRAME_HEIGHT }]}>
-          <View style={[styles.frameCorner, styles.cTopLeft, isFocusing && { borderColor: "#FFD700" }]} />
-          <View style={[styles.frameCorner, styles.cTopRight, isFocusing && { borderColor: "#FFD700" }]} />
-          <View style={[styles.frameCorner, styles.cBottomLeft, isFocusing && { borderColor: "#FFD700" }]} />
-          <View style={[styles.frameCorner, styles.cBottomRight, isFocusing && { borderColor: "#FFD700" }]} />
-          {isFocusing && (
-            <View style={{ position: "absolute", top: "50%", left: 0, right: 0, alignItems: "center", marginTop: -12 }}>
-              <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 14, color: "#FFD700", textAlign: "center" }}>Focusing...</Text>
-            </View>
-          )}
+          <View style={[styles.frameCorner, styles.cTopLeft]} />
+          <View style={[styles.frameCorner, styles.cTopRight]} />
+          <View style={[styles.frameCorner, styles.cBottomLeft]} />
+          <View style={[styles.frameCorner, styles.cBottomRight]} />
         </View>
       </View>
 
@@ -456,9 +444,7 @@ export default function BatchScanScreen() {
         </Pressable>
         <View style={styles.topBarCenter} pointerEvents="none">
           <Text style={styles.topBarTitle}>Batch Scan</Text>
-          {isFocusing ? (
-            <Text style={[styles.topBarCount, { color: "#FFD700" }]}>Hold steady — focusing...</Text>
-          ) : scannedCards.length > 0 ? (
+          {scannedCards.length > 0 ? (
             <Text style={styles.topBarCount}>
               {identifiedCount} identified{scanningCount > 0 ? ` · ${scanningCount} scanning` : ""}
             </Text>
@@ -472,13 +458,11 @@ export default function BatchScanScreen() {
       <View style={[styles.bottomContainer, { paddingBottom: bottomInset + 8 }]}>
         <View style={styles.captureBar}>
           <Pressable
-            style={[styles.captureBtn, (isCapturing || isFocusing) && styles.captureBtnDisabled]}
+            style={[styles.captureBtn, isCapturing && styles.captureBtnDisabled]}
             onPress={captureAndIdentify}
-            disabled={isCapturing || isFocusing}
+            disabled={isCapturing}
           >
-            {isFocusing ? (
-              <ActivityIndicator size="small" color="#FFD700" />
-            ) : isCapturing ? (
+            {isCapturing ? (
               <ActivityIndicator size="small" color="#000" />
             ) : (
               <View style={styles.captureBtnInner} />
