@@ -10,6 +10,10 @@ import {
   FlatList,
   Linking,
   Dimensions,
+  TextInput,
+  ScrollView,
+  KeyboardAvoidingView,
+  Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -67,6 +71,15 @@ export default function BatchScanScreen() {
   const [addedCount, setAddedCount] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const cameraLayoutRef = useRef({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
+
+  const [verifyCard, setVerifyCard] = useState<ScannedCard | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editCardNumber, setEditCardNumber] = useState("");
+  const [editSetName, setEditSetName] = useState("");
+  const [editGame, setEditGame] = useState<GameId>("pokemon");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
@@ -250,6 +263,92 @@ export default function BatchScanScreen() {
   const removeScannedCard = useCallback((id: string) => {
     setScannedCards(prev => prev.filter(c => c.id !== id));
   }, []);
+
+  const openVerify = useCallback((card: ScannedCard) => {
+    if (card.status !== "identified") return;
+    setVerifyCard(card);
+    setEditName(card.name || "");
+    setEditCardNumber(card.cardNumber || "");
+    setEditSetName(card.setName || "");
+    setEditGame(card.game || "pokemon");
+    setSearchResults([]);
+    setHasSearched(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
+  const closeVerify = useCallback(() => {
+    setVerifyCard(null);
+    setSearchResults([]);
+    setHasSearched(false);
+    setIsSearching(false);
+  }, []);
+
+  const searchCards = useCallback(async () => {
+    if (!editName.trim() && !editCardNumber.trim()) return;
+    setIsSearching(true);
+    setSearchResults([]);
+    setHasSearched(false);
+    try {
+      const res = await apiRequest("POST", "/api/search-cards", {
+        game: editGame,
+        query: editName.trim() || undefined,
+        setName: editSetName.trim() || undefined,
+        cardNumber: editCardNumber.trim() || undefined,
+      });
+      const data = await res.json();
+      setSearchResults(data.results || []);
+      setHasSearched(true);
+      if (!data.results || data.results.length === 0) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+    } catch {
+      Alert.alert("Error", "Failed to search. Please try again.");
+    } finally {
+      setIsSearching(false);
+    }
+  }, [editName, editCardNumber, editSetName, editGame]);
+
+  const selectSearchResult = useCallback(async (result: any) => {
+    if (!verifyCard) return;
+    const cardId = result.cardId || `${result.setId}-${result.localId}`;
+    try {
+      await addCard(result.game, result.setId, cardId);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setScannedCards(prev =>
+        prev.map(c => c.id === verifyCard.id ? {
+          ...c,
+          name: result.name,
+          setName: result.setName,
+          setId: result.setId,
+          cardNumber: result.localId || c.cardNumber,
+          game: result.game,
+          cardId: cardId,
+          verifiedCardId: cardId,
+          verified: true,
+          apiImage: result.image || c.apiImage,
+          rarity: result.rarity || c.rarity,
+          added: true,
+        } : c)
+      );
+      setAddedCount(prev => prev + 1);
+      cacheCard({
+        id: cardId,
+        localId: result.localId || "",
+        name: result.name,
+        image: result.image || null,
+        game: result.game,
+        setId: result.setId,
+        setName: result.setName,
+        rarity: result.rarity || null,
+        cachedAt: Date.now(),
+      });
+      closeVerify();
+    } catch (err: any) {
+      if (err?.message === "FREE_LIMIT" || err?.message === "GUEST_LIMIT") {
+        Alert.alert("Card Limit Reached", "Upgrade to Premium for unlimited cards.");
+      }
+    }
+  }, [verifyCard, addCard, closeVerify]);
 
   const identifiedCount = scannedCards.filter(c => c.status === "identified").length;
   const scanningCount = scannedCards.filter(c => c.status === "scanning").length;
