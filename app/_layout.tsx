@@ -128,6 +128,13 @@ function RootLayoutNav() {
             presentation: "card",
           }}
         />
+        <Stack.Screen
+          name="batch-scan"
+          options={{
+            headerShown: false,
+            presentation: "fullScreenModal",
+          }}
+        />
       </Stack>
     </>
   );

@@ -448,8 +448,7 @@ export default function ScanScreen() {
             <Pressable
               style={({ pressed }) => [dynamicStyles.scanOptionBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder, opacity: pressed ? 0.8 : 1 }]}
               onPress={() => {
-                showToast("Batch Scan coming soon!");
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push("/batch-scan");
               }}
             >
               <View style={[dynamicStyles.scanOptionIcon, { backgroundColor: colors.tint + "15" }]}>
