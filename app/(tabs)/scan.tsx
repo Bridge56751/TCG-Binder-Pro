@@ -400,42 +400,83 @@ export default function ScanScreen() {
         </Animated.View>
       )}
 
-      <View style={dynamicStyles.header}>
-        <Text style={dynamicStyles.title}>Scan Card</Text>
-        <Text style={dynamicStyles.subtitle}>Take a photo or pick from your library</Text>
-      </View>
+      {imageUri ? (
+        <>
+          <View style={dynamicStyles.header}>
+            <Text style={dynamicStyles.title}>Scan Card</Text>
+          </View>
+          <View style={dynamicStyles.scanArea}>
+            <Animated.View entering={FadeIn.duration(300)} style={[dynamicStyles.previewWrapper, { backgroundColor: colors.surfaceAlt }]}>
+              <Image source={{ uri: imageUri }} style={dynamicStyles.preview} contentFit="contain" />
+              {isScanning && (
+                <View style={[dynamicStyles.scanningOverlay, { backgroundColor: colors.background + "DD" }]}>
+                  <ActivityIndicator size="large" color={colors.tint} />
+                  <Text style={[dynamicStyles.scanningText, { color: colors.text }]}>Identifying card...</Text>
+                </View>
+              )}
+              <Pressable style={dynamicStyles.clearButton} onPress={resetScan}>
+                <Ionicons name="close" size={20} color="#FFFFFF" />
+              </Pressable>
+            </Animated.View>
+          </View>
+        </>
+      ) : (
+        <Animated.View entering={FadeIn.duration(300)} style={dynamicStyles.emptyState}>
+          <Pressable
+            style={({ pressed }) => [dynamicStyles.scanHeroBtn, { backgroundColor: colors.tint, opacity: pressed ? 0.9 : 1 }]}
+            onPress={takePhoto}
+          >
+            <View style={dynamicStyles.scanHeroIcon}>
+              <Ionicons name="camera" size={44} color="#FFFFFF" />
+            </View>
+            <Text style={dynamicStyles.scanHeroTitle}>Scan a Card</Text>
+            <Text style={dynamicStyles.scanHeroSub}>Take a photo to identify it instantly</Text>
+          </Pressable>
 
-      <View style={dynamicStyles.scanArea}>
-        {imageUri ? (
-          <Animated.View entering={FadeIn.duration(300)} style={[dynamicStyles.previewWrapper, { backgroundColor: colors.surfaceAlt }]}>
-            <Image source={{ uri: imageUri }} style={dynamicStyles.preview} contentFit="contain" />
-            {isScanning && (
-              <View style={dynamicStyles.scanningOverlay}>
-                <ActivityIndicator size="large" color={colors.tint} />
-                <Text style={[dynamicStyles.scanningText, { color: colors.text }]}>Identifying card...</Text>
+          <View style={dynamicStyles.scanOptions}>
+            <Pressable
+              style={({ pressed }) => [dynamicStyles.scanOptionBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder, opacity: pressed ? 0.8 : 1 }]}
+              onPress={pickImage}
+            >
+              <View style={[dynamicStyles.scanOptionIcon, { backgroundColor: colors.tint + "15" }]}>
+                <Ionicons name="images" size={22} color={colors.tint} />
               </View>
-            )}
-            <Pressable style={dynamicStyles.clearButton} onPress={resetScan}>
-              <Ionicons name="close" size={20} color="#FFFFFF" />
+              <Text style={[dynamicStyles.scanOptionLabel, { color: colors.text }]}>Photo Library</Text>
+              <Text style={[dynamicStyles.scanOptionDesc, { color: colors.textTertiary }]}>Pick from saved photos</Text>
             </Pressable>
-          </Animated.View>
-        ) : (
-          <View style={[dynamicStyles.placeholder, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardBorder }]}>
-            <View style={dynamicStyles.crosshairContainer}>
-              <View style={[dynamicStyles.corner, dynamicStyles.topLeft, { borderColor: colors.tint }]} />
-              <View style={[dynamicStyles.corner, dynamicStyles.topRight, { borderColor: colors.tint }]} />
-              <View style={[dynamicStyles.corner, dynamicStyles.bottomLeft, { borderColor: colors.tint }]} />
-              <View style={[dynamicStyles.corner, dynamicStyles.bottomRight, { borderColor: colors.tint }]} />
-              <MaterialCommunityIcons
-                name="cards-outline"
-                size={48}
-                color={colors.textTertiary}
-              />
-              <Text style={[dynamicStyles.placeholderText, { color: colors.textTertiary }]}>Position card within frame</Text>
+
+            <Pressable
+              style={({ pressed }) => [dynamicStyles.scanOptionBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder, opacity: pressed ? 0.8 : 1 }]}
+              onPress={() => {
+                showToast("Batch Scan coming soon!");
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }}
+            >
+              <View style={[dynamicStyles.scanOptionIcon, { backgroundColor: colors.tint + "15" }]}>
+                <MaterialCommunityIcons name="cards-outline" size={22} color={colors.tint} />
+              </View>
+              <Text style={[dynamicStyles.scanOptionLabel, { color: colors.text }]}>Batch Scan</Text>
+              <Text style={[dynamicStyles.scanOptionDesc, { color: colors.textTertiary }]}>Scan multiple cards</Text>
+            </Pressable>
+          </View>
+
+          <View style={dynamicStyles.scanTips}>
+            <Text style={[dynamicStyles.scanTipsTitle, { color: colors.textSecondary }]}>Tips for best results</Text>
+            <View style={dynamicStyles.scanTipRow}>
+              <Ionicons name="sunny-outline" size={16} color={colors.textTertiary} />
+              <Text style={[dynamicStyles.scanTipText, { color: colors.textTertiary }]}>Use good lighting, avoid glare</Text>
+            </View>
+            <View style={dynamicStyles.scanTipRow}>
+              <Ionicons name="scan-outline" size={16} color={colors.textTertiary} />
+              <Text style={[dynamicStyles.scanTipText, { color: colors.textTertiary }]}>Fill the frame with the card</Text>
+            </View>
+            <View style={dynamicStyles.scanTipRow}>
+              <Ionicons name="hand-left-outline" size={16} color={colors.textTertiary} />
+              <Text style={[dynamicStyles.scanTipText, { color: colors.textTertiary }]}>Hold steady for a clear shot</Text>
             </View>
           </View>
-        )}
-      </View>
+        </Animated.View>
+      )}
 
       {scanResult && !confirmedResult && !isEditing && (() => {
         const alternatives = scanResult.alternatives || [];
@@ -955,22 +996,24 @@ export default function ScanScreen() {
         );
       })()}
 
-      <View style={dynamicStyles.actions}>
-        <Pressable
-          style={({ pressed }) => [dynamicStyles.actionButton, dynamicStyles.primaryAction, { backgroundColor: colors.tint }, pressed && { opacity: 0.9 }]}
-          onPress={takePhoto}
-        >
-          <Ionicons name="camera" size={24} color="#FFFFFF" />
-          <Text style={dynamicStyles.primaryActionText}>Take Photo</Text>
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [dynamicStyles.actionButton, dynamicStyles.secondaryAction, { backgroundColor: colors.surface, borderColor: colors.cardBorder }, pressed && { opacity: 0.9 }]}
-          onPress={pickImage}
-        >
-          <Ionicons name="images" size={22} color={colors.tint} />
-          <Text style={[dynamicStyles.secondaryActionText, { color: colors.tint }]}>Library</Text>
-        </Pressable>
-      </View>
+      {imageUri && (
+        <View style={dynamicStyles.actions}>
+          <Pressable
+            style={({ pressed }) => [dynamicStyles.actionButton, dynamicStyles.primaryAction, { backgroundColor: colors.tint }, pressed && { opacity: 0.9 }]}
+            onPress={takePhoto}
+          >
+            <Ionicons name="camera" size={24} color="#FFFFFF" />
+            <Text style={dynamicStyles.primaryActionText}>Scan Another</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [dynamicStyles.actionButton, dynamicStyles.secondaryAction, { backgroundColor: colors.surface, borderColor: colors.cardBorder }, pressed && { opacity: 0.9 }]}
+            onPress={pickImage}
+          >
+            <Ionicons name="images" size={22} color={colors.tint} />
+            <Text style={[dynamicStyles.secondaryActionText, { color: colors.tint }]}>Library</Text>
+          </Pressable>
+        </View>
+      )}
 
     </ScrollView>
     </KeyboardAvoidingView>
@@ -1028,55 +1071,80 @@ function getDynamicStyles(colors: any) {
       borderRadius: 20,
       overflow: "hidden",
     },
-    placeholder: {
+    emptyState: {
       flex: 1,
-      borderRadius: 20,
-      borderWidth: 2,
-      borderStyle: "dashed",
-      alignItems: "center",
-      justifyContent: "center",
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      gap: 16,
     },
-    crosshairContainer: {
-      width: 200,
-      height: 280,
+    scanHeroBtn: {
+      alignItems: "center",
+      paddingVertical: 32,
+      borderRadius: 20,
+      gap: 8,
+    },
+    scanHeroIcon: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: "rgba(255,255,255,0.2)",
       alignItems: "center",
       justifyContent: "center",
+      marginBottom: 4,
+    },
+    scanHeroTitle: {
+      fontFamily: "DMSans_700Bold",
+      fontSize: 22,
+      color: "#FFFFFF",
+    },
+    scanHeroSub: {
+      fontFamily: "DMSans_400Regular",
+      fontSize: 14,
+      color: "rgba(255,255,255,0.8)",
+    },
+    scanOptions: {
+      flexDirection: "row",
       gap: 12,
     },
-    corner: {
-      position: "absolute",
-      width: 30,
-      height: 30,
+    scanOptionBtn: {
+      flex: 1,
+      alignItems: "center",
+      paddingVertical: 16,
+      borderRadius: 16,
+      borderWidth: 1,
+      gap: 6,
     },
-    topLeft: {
-      top: 0,
-      left: 0,
-      borderTopWidth: 3,
-      borderLeftWidth: 3,
-      borderTopLeftRadius: 8,
+    scanOptionIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 2,
     },
-    topRight: {
-      top: 0,
-      right: 0,
-      borderTopWidth: 3,
-      borderRightWidth: 3,
-      borderTopRightRadius: 8,
+    scanOptionLabel: {
+      fontFamily: "DMSans_600SemiBold",
+      fontSize: 14,
     },
-    bottomLeft: {
-      bottom: 0,
-      left: 0,
-      borderBottomWidth: 3,
-      borderLeftWidth: 3,
-      borderBottomLeftRadius: 8,
+    scanOptionDesc: {
+      fontFamily: "DMSans_400Regular",
+      fontSize: 11,
     },
-    bottomRight: {
-      bottom: 0,
-      right: 0,
-      borderBottomWidth: 3,
-      borderRightWidth: 3,
-      borderBottomRightRadius: 8,
+    scanTips: {
+      paddingHorizontal: 4,
+      paddingTop: 8,
+      gap: 8,
     },
-    placeholderText: {
+    scanTipsTitle: {
+      fontFamily: "DMSans_600SemiBold",
+      fontSize: 13,
+    },
+    scanTipRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    scanTipText: {
       fontFamily: "DMSans_400Regular",
       fontSize: 13,
     },
