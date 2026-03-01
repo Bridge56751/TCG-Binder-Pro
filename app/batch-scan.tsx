@@ -59,7 +59,6 @@ export default function BatchScanScreen() {
   const [scannedCards, setScannedCards] = useState<ScannedCard[]>([]);
   const [isCapturing, setIsCapturing] = useState(false);
   const [addedCount, setAddedCount] = useState(0);
-  const [torchOn, setTorchOn] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
@@ -265,13 +264,12 @@ export default function BatchScanScreen() {
         facing="back"
         autofocus="on"
         flash="off"
-        enableTorch={torchOn}
       >
-        <View style={[styles.topBar, { paddingTop: topInset + 4 }]}>
-          <Pressable style={styles.topBarBtn} onPress={() => router.back()}>
+        <View style={[styles.topBar, { paddingTop: topInset + 4 }]} pointerEvents="box-none">
+          <Pressable style={styles.topBarBtn} onPress={() => router.dismiss()} hitSlop={16}>
             <Ionicons name="close" size={24} color="#FFFFFF" />
           </Pressable>
-          <View style={styles.topBarCenter}>
+          <View style={styles.topBarCenter} pointerEvents="none">
             <Text style={styles.topBarTitle}>Batch Scan</Text>
             {scannedCards.length > 0 && (
               <Text style={styles.topBarCount}>
@@ -279,12 +277,7 @@ export default function BatchScanScreen() {
               </Text>
             )}
           </View>
-          <Pressable
-            style={[styles.topBarBtn, torchOn && { backgroundColor: "rgba(255,200,0,0.4)" }]}
-            onPress={() => { setTorchOn(t => !t); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
-          >
-            <Ionicons name={torchOn ? "flash" : "flash-outline"} size={20} color="#FFFFFF" />
-          </Pressable>
+          <View style={{ width: 40 }} />
         </View>
 
         <View style={styles.crosshairOverlay}>
