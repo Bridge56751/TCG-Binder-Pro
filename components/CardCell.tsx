@@ -32,7 +32,7 @@ function CardCellInner({ cardId, localId, name, imageUrl, isCollected, quantity,
               source={{ uri: imageUrl }}
               style={[styles.cardImage, !isCollected && styles.grayedImage]}
               contentFit="contain"
-              transition={150}
+              transition={300}
               cachePolicy="disk"
               recyclingKey={cardId}
               onError={handleImageError}

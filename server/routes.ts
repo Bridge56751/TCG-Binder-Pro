@@ -65,6 +65,17 @@ const setsCache: Record<string, any[]> = {};
 const setCardsCache = new Map<string, { data: any; ts: number }>();
 const SET_CARDS_CACHE_TTL = 60 * 60 * 1000;
 const SET_CARDS_CACHE_MAX = 500;
+const cardDetailCache = new Map<string, { data: any; ts: number }>();
+const CARD_DETAIL_CACHE_TTL = 30 * 60 * 1000;
+const CARD_DETAIL_CACHE_MAX = 1000;
+
+function pruneCardDetailCache() {
+  if (cardDetailCache.size <= CARD_DETAIL_CACHE_MAX) return;
+  const entries = [...cardDetailCache.entries()].sort((a, b) => a[1].ts - b[1].ts);
+  const toRemove = entries.slice(0, entries.length - CARD_DETAIL_CACHE_MAX);
+  for (const [key] of toRemove) cardDetailCache.delete(key);
+}
+
 function pruneSetCardsCache() {
   if (setCardsCache.size <= SET_CARDS_CACHE_MAX) return;
   const entries = [...setCardsCache.entries()].sort((a, b) => a[1].ts - b[1].ts);
@@ -2269,6 +2280,11 @@ Return ONLY JSON: {"game":"pokemon"|"yugioh"|"mtg","name":"corrected name","setN
     try {
       const { cardId } = req.params;
       const lang = req.query.lang === "ja" ? "ja" : "en";
+      const detailCacheKey = `pokemon:${lang}:${cardId}`;
+      const cachedDetail = cardDetailCache.get(detailCacheKey);
+      if (cachedDetail && Date.now() - cachedDetail.ts < CARD_DETAIL_CACHE_TTL) {
+        return res.json(cachedDetail.data);
+      }
       const response = await fetchWithTimeout(`https://api.tcgdex.net/v2/${lang}/cards/${cardId}`);
       if (!response.ok) return res.status(404).json({ error: "Card not found" });
       const c = await response.json();
@@ -2326,7 +2342,7 @@ Return ONLY JSON: {"game":"pokemon"|"yugioh"|"mtg","name":"corrected name","setN
       const jaDescription = c.attacks?.map((a: any) => `${a.name}: ${a.effect || `${a.damage} damage`}`).join("\n") ||
         c.abilities?.map((a: any) => `${a.name}: ${a.effect}`).join("\n") || null;
 
-      res.json({
+      const result = {
         id: c.id,
         localId: c.localId,
         name: c.name,
@@ -2345,7 +2361,10 @@ Return ONLY JSON: {"game":"pokemon"|"yugioh"|"mtg","name":"corrected name","setN
         priceUnit: "USD",
         priceLow,
         priceHigh,
-      });
+      };
+      cardDetailCache.set(detailCacheKey, { data: result, ts: Date.now() });
+      pruneCardDetailCache();
+      res.json(result);
     } catch (error) {
       console.error("Error fetching Pokemon card detail:", error);
       res.status(500).json({ error: "Failed to fetch card detail" });
@@ -2355,6 +2374,11 @@ Return ONLY JSON: {"game":"pokemon"|"yugioh"|"mtg","name":"corrected name","setN
   app.get("/api/tcg/yugioh/card/:cardId", async (req, res) => {
     try {
       const { cardId } = req.params;
+      const detailCacheKey = `yugioh:${cardId}`;
+      const cachedDetail = cardDetailCache.get(detailCacheKey);
+      if (cachedDetail && Date.now() - cachedDetail.ts < CARD_DETAIL_CACHE_TTL) {
+        return res.json(cachedDetail.data);
+      }
       const parts = cardId.split("-");
       const setCode = parts.slice(0, -1).join("-");
       const cardNum = parts[parts.length - 1];
@@ -2383,7 +2407,7 @@ Return ONLY JSON: {"game":"pokemon"|"yugioh"|"mtg","name":"corrected name","setN
       const currentPrice = price && price > 0 ? price :
         (prices.tcgplayer_price ? parseFloat(prices.tcgplayer_price) : null);
 
-      res.json({
+      const result = {
         id: cardId,
         localId: cardNum,
         name: card.name,
@@ -2400,7 +2424,10 @@ Return ONLY JSON: {"game":"pokemon"|"yugioh"|"mtg","name":"corrected name","setN
         priceUnit: "USD",
         priceLow: prices.tcgplayer_price ? parseFloat(prices.tcgplayer_price) * 0.7 : null,
         priceHigh: prices.tcgplayer_price ? parseFloat(prices.tcgplayer_price) * 1.5 : null,
-      });
+      };
+      cardDetailCache.set(detailCacheKey, { data: result, ts: Date.now() });
+      pruneCardDetailCache();
+      res.json(result);
     } catch (error) {
       console.error("Error fetching Yu-Gi-Oh! card detail:", error);
       res.status(500).json({ error: "Failed to fetch card detail" });
@@ -2410,6 +2437,11 @@ Return ONLY JSON: {"game":"pokemon"|"yugioh"|"mtg","name":"corrected name","setN
   app.get("/api/tcg/mtg/card/:cardId", async (req, res) => {
     try {
       const { cardId } = req.params;
+      const detailCacheKey = `mtg:${cardId}`;
+      const cachedDetail = cardDetailCache.get(detailCacheKey);
+      if (cachedDetail && Date.now() - cachedDetail.ts < CARD_DETAIL_CACHE_TTL) {
+        return res.json(cachedDetail.data);
+      }
       const response = await fetchWithTimeout(`https://api.scryfall.com/cards/${cardId}`);
       if (!response.ok) return res.status(404).json({ error: "Card not found" });
       const c = await response.json();
@@ -2421,7 +2453,7 @@ Return ONLY JSON: {"game":"pokemon"|"yugioh"|"mtg","name":"corrected name","setN
         : (prices.eur_foil ? Math.round(parseFloat(prices.eur_foil) * 108) / 100 : null)));
       const foilPrice = prices.usd_foil ? parseFloat(prices.usd_foil) : null;
       const finishes: string[] = c.finishes || [];
-      res.json({
+      const result = {
         id: c.id,
         localId: c.collector_number || "0",
         name: c.name,
@@ -2440,7 +2472,10 @@ Return ONLY JSON: {"game":"pokemon"|"yugioh"|"mtg","name":"corrected name","setN
         priceUnit: "USD",
         priceLow: currentPrice ? currentPrice * 0.7 : null,
         priceHigh: prices.usd_foil ? parseFloat(prices.usd_foil) : (currentPrice ? currentPrice * 1.5 : null),
-      });
+      };
+      cardDetailCache.set(detailCacheKey, { data: result, ts: Date.now() });
+      pruneCardDetailCache();
+      res.json(result);
     } catch (error) {
       console.error("Error fetching MTG card detail:", error);
       res.status(500).json({ error: "Failed to fetch card detail" });
