@@ -15,14 +15,9 @@ import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSa
 import { StatusBar } from "expo-status-bar";
 import { GalleryProvider } from "@/lib/GalleryContext";
 let requestTrackingPermissionsAsync: any = null;
-let FBSettings: any = null;
 if (Platform.OS !== "web") {
   try {
     requestTrackingPermissionsAsync = require("expo-tracking-transparency").requestTrackingPermissionsAsync;
-  } catch {}
-  try {
-    const fbsdk = require("react-native-fbsdk-next");
-    FBSettings = fbsdk.Settings;
   } catch {}
 }
 
@@ -145,10 +140,7 @@ export default function RootLayout() {
     if (Platform.OS === "ios" && requestTrackingPermissionsAsync) {
       (async () => {
         try {
-          const { status } = await requestTrackingPermissionsAsync();
-          if (FBSettings) {
-            FBSettings.setAdvertiserTrackingEnabled(status === "granted");
-          }
+          await requestTrackingPermissionsAsync();
         } catch {}
       })();
     }

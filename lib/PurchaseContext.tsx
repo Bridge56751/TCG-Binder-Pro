@@ -8,14 +8,9 @@ const REVENUECAT_API_KEY = "appl_SSTytUsLoMQInalBawWscUFhGRp";
 const ENTITLEMENT_ID = "TCG Binder Unlimited";
 
 let Purchases: any = null;
-let FBAppEventsLogger: any = null;
 if (Platform.OS !== "web") {
   try {
     Purchases = require("react-native-purchases").default;
-  } catch {}
-  try {
-    const fbsdk = require("react-native-fbsdk-next");
-    FBAppEventsLogger = fbsdk.AppEventsLogger;
   } catch {}
 }
 
@@ -46,15 +41,6 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
       try {
         Purchases.configure({ apiKey: REVENUECAT_API_KEY });
         setInitialized(true);
-
-        if (FBAppEventsLogger) {
-          try {
-            const anonId = await FBAppEventsLogger.getAnonymousID();
-            if (anonId) {
-              await Purchases.setFBAnonymousID(anonId);
-            }
-          } catch {}
-        }
 
         if (user) {
           try {

@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.tcgbinder",
-      "buildNumber": "13",
+      "buildNumber": "14",
       "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "TCG Binder needs camera access to scan and identify your trading cards using AI recognition.",
@@ -42,15 +42,6 @@
           "origin": "https://replit.com/"
         }
       ],
-      [
-        "expo-build-properties",
-        {
-          "ios": {
-            "deploymentTarget": "16.0",
-            "useFrameworks": "static"
-          }
-        }
-      ],
       "expo-font",
       "expo-web-browser",
       [
@@ -64,19 +55,6 @@
         {
           "photosPermission": "Allow TCG Binder to access your photos so you can select trading card images to scan and identify.",
           "cameraPermission": "Allow TCG Binder to use your camera to scan and identify your trading cards using AI recognition."
-        }
-      ],
-      [
-        "react-native-fbsdk-next",
-        {
-          "appID": "1622411945454184",
-          "clientToken": "8ff8bb45dd6e1caf72a2dce249c46834",
-          "displayName": "TCG Binder",
-          "scheme": "fb1622411945454184",
-          "advertiserIDCollectionEnabled": true,
-          "autoLogAppEventsEnabled": true,
-          "isAutoInitEnabled": true,
-          "iosUserTrackingPermission": "This identifier will be used to deliver personalized ads to you. You can change this in your device settings."
         }
       ],
       [
