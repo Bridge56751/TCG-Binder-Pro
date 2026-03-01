@@ -309,44 +309,45 @@ export default function BatchScanScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <View style={[styles.captureBar, { bottom: scannedCards.length > 0 ? 220 + bottomInset : 40 + bottomInset }]}>
-        <Pressable
-          style={[styles.captureBtn, isCapturing && styles.captureBtnDisabled]}
-          onPress={captureAndIdentify}
-          disabled={isCapturing}
-        >
-          {isCapturing ? (
-            <ActivityIndicator size="small" color="#000" />
-          ) : (
-            <View style={styles.captureBtnInner} />
-          )}
-        </Pressable>
-      </View>
-
-      {scannedCards.length > 0 && (
-        <Animated.View entering={SlideInDown.duration(300)} style={[styles.resultsPanel, { backgroundColor: colors.background, paddingBottom: bottomInset + 8 }]}>
-          <View style={styles.resultsPanelHeader}>
-            <Text style={[styles.resultsPanelTitle, { color: colors.text }]}>
-              Scanned ({scannedCards.length})
-            </Text>
-            {addableCount > 0 && (
-              <Pressable
-                style={[styles.addAllBtn, { backgroundColor: colors.tint }]}
-                onPress={handleAddAll}
-              >
-                <Ionicons name="checkmark-done" size={16} color="#FFFFFF" />
-                <Text style={styles.addAllBtnText}>Add All ({addableCount})</Text>
-              </Pressable>
+      <View style={[styles.bottomContainer, { paddingBottom: bottomInset + 8 }]}>
+        <View style={styles.captureBar}>
+          <Pressable
+            style={[styles.captureBtn, isCapturing && styles.captureBtnDisabled]}
+            onPress={captureAndIdentify}
+            disabled={isCapturing}
+          >
+            {isCapturing ? (
+              <ActivityIndicator size="small" color="#000" />
+            ) : (
+              <View style={styles.captureBtnInner} />
             )}
-          </View>
-          <FlatList
-            ref={flatListRef}
-            data={scannedCards}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 12, gap: 10 }}
-            renderItem={({ item }) => (
+          </Pressable>
+        </View>
+
+        {scannedCards.length > 0 && (
+          <Animated.View entering={SlideInDown.duration(300)} style={[styles.resultsPanel, { backgroundColor: colors.background }]}>
+            <View style={styles.resultsPanelHeader}>
+              <Text style={[styles.resultsPanelTitle, { color: colors.text }]}>
+                Scanned ({scannedCards.length})
+              </Text>
+              {addableCount > 0 && (
+                <Pressable
+                  style={[styles.addAllBtn, { backgroundColor: colors.tint }]}
+                  onPress={handleAddAll}
+                >
+                  <Ionicons name="checkmark-done" size={16} color="#FFFFFF" />
+                  <Text style={styles.addAllBtnText}>Add All ({addableCount})</Text>
+                </Pressable>
+              )}
+            </View>
+            <FlatList
+              ref={flatListRef}
+              data={scannedCards}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 12, gap: 10 }}
+              renderItem={({ item }) => (
               <Animated.View entering={FadeInDown.duration(300)} style={[styles.cardChip, { backgroundColor: colors.surface, borderColor: item.added ? colors.success + "50" : colors.cardBorder }]}>
                 {item.status === "scanning" ? (
                   <View style={styles.cardChipScanning}>
@@ -423,9 +424,10 @@ export default function BatchScanScreen() {
                 )}
               </Animated.View>
             )}
-          />
-        </Animated.View>
-      )}
+            />
+          </Animated.View>
+        )}
+      </View>
     </View>
   );
 }
@@ -543,12 +545,16 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.7)",
     marginTop: 1,
   },
-  captureBar: {
+  bottomContainer: {
     position: "absolute",
+    bottom: 0,
     left: 0,
     right: 0,
-    alignItems: "center",
     zIndex: 10,
+  },
+  captureBar: {
+    alignItems: "center",
+    paddingVertical: 16,
   },
   captureBtn: {
     width: 72,
@@ -572,14 +578,9 @@ const styles = StyleSheet.create({
     borderColor: "rgba(0,0,0,0.1)",
   },
   resultsPanel: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 12,
-    zIndex: 10,
   },
   resultsPanelHeader: {
     flexDirection: "row",
