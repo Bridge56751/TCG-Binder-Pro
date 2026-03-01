@@ -109,4 +109,3 @@ migrations/             # Drizzle migration output
 - **Expo Services**: Used for font loading, camera, image picker, haptics, and other native capabilities.
 - **Resend**: Email service for verification and password reset emails. Requires `RESEND_API_KEY`.
 - **RevenueCat**: In-app purchase management. Frontend uses `EXPO_PUBLIC_REVENUECAT_API_KEY`, backend uses `REVENUECAT_SECRET_API_KEY` for verification.
-- **Meta (Facebook) SDK**: `react-native-fbsdk-next` config plugin for app install ad tracking and conversion optimization. App ID: `903672085924332`. Uses `expo-tracking-transparency` for iOS ATT permission. RevenueCat is connected via `setFBAnonymousID` for subscription attribution. Native-only module — guarded with try/catch `require` to avoid web crashes.

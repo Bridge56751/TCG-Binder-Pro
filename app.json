@@ -56,25 +56,6 @@
           "photosPermission": "Allow TCG Binder to access your photos so you can select trading card images to scan and identify.",
           "cameraPermission": "Allow TCG Binder to use your camera to scan and identify your trading cards using AI recognition."
         }
-      ],
-      [
-        "react-native-fbsdk-next",
-        {
-          "appID": "903672085924332",
-          "clientToken": "99c10ee9692518a8906e762c9a734f76",
-          "displayName": "TCG Binder Pro",
-          "scheme": "fb903672085924332",
-          "advertiserIDCollectionEnabled": true,
-          "autoLogAppEventsEnabled": true,
-          "isAutoInitEnabled": true,
-          "iosUserTrackingPermission": "This identifier will be used to deliver personalized ads to you."
-        }
-      ],
-      [
-        "expo-tracking-transparency",
-        {
-          "userTrackingPermission": "Allow TCG Binder Pro to use your data to deliver personalized ads to you."
-        }
       ]
     ],
     "experiments": {
