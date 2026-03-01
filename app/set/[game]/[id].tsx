@@ -654,10 +654,10 @@ export default function SetDetailScreen() {
         keyExtractor={(item) => item.id}
         numColumns={NUM_COLUMNS}
         ListHeaderComponent={renderHeader}
-        removeClippedSubviews
-        maxToRenderPerBatch={15}
-        windowSize={5}
-        initialNumToRender={12}
+        removeClippedSubviews={Platform.OS !== "web"}
+        maxToRenderPerBatch={20}
+        windowSize={11}
+        initialNumToRender={15}
         onScroll={(e) => {
           if (!needsScrollRestore.current) {
             scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
