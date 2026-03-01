@@ -1412,11 +1412,14 @@ Return ONLY JSON: {"game":"pokemon"|"yugioh"|"mtg","name":"corrected name","setN
               const imgData = await imgRes.json();
               if (imgData.image) result.image = `${imgData.image}/high.png`;
               const tcgPrice = imgData.pricing?.tcgplayer;
-              if (tcgPrice) {
-                const realPrice = tcgPrice.marketPrice ?? tcgPrice.midPrice ?? tcgPrice.lowPrice ?? null;
-                if (realPrice != null && realPrice > 0) {
-                  result.estimatedValue = realPrice;
-                }
+              const cmPrice = imgData.pricing?.cardmarket;
+              const priceData = tcgPrice?.holofoil || tcgPrice?.normal || tcgPrice?.reverseHolofoil || tcgPrice;
+              const usdPrice = priceData?.marketPrice ?? priceData?.midPrice ?? priceData?.lowPrice ?? null;
+              const realPrice = (usdPrice != null && usdPrice > 0) ? usdPrice
+                : (cmPrice?.trend ? Math.round(cmPrice.trend * 108) / 100
+                : (cmPrice?.avg ? Math.round(cmPrice.avg * 108) / 100 : null));
+              if (realPrice != null && realPrice > 0) {
+                result.estimatedValue = realPrice;
               }
             }
           } else if (result.game === "yugioh") {
@@ -1633,10 +1636,13 @@ Return ONLY JSON: {"game":"pokemon"|"yugioh"|"mtg","name":"corrected name","setN
               const imgData = await imgRes.json();
               if (imgData.image) result.image = `${imgData.image}/high.png`;
               const tcgPrice = imgData.pricing?.tcgplayer;
-              if (tcgPrice) {
-                const realPrice = tcgPrice.marketPrice ?? tcgPrice.midPrice ?? tcgPrice.lowPrice ?? null;
-                if (realPrice != null && realPrice > 0) result.estimatedValue = realPrice;
-              }
+              const cmPrice = imgData.pricing?.cardmarket;
+              const priceData = tcgPrice?.holofoil || tcgPrice?.normal || tcgPrice?.reverseHolofoil || tcgPrice;
+              const usdPrice = priceData?.marketPrice ?? priceData?.midPrice ?? priceData?.lowPrice ?? null;
+              const realPrice = (usdPrice != null && usdPrice > 0) ? usdPrice
+                : (cmPrice?.trend ? Math.round(cmPrice.trend * 108) / 100
+                : (cmPrice?.avg ? Math.round(cmPrice.avg * 108) / 100 : null));
+              if (realPrice != null && realPrice > 0) result.estimatedValue = realPrice;
             }
           } else if (game === "yugioh") {
             const ygoRes = await fetchWithTimeout(`https://db.ygoprodeck.com/api/v7/cardinfo.php?name=${encodeURIComponent(result.name)}`);
