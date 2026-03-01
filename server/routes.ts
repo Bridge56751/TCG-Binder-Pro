@@ -1202,7 +1202,9 @@ Return ONLY valid JSON (no markdown, no backticks):
   "language": "en" or "ja"
 }
 
-If you truly cannot identify it, return: {"error": "Could not identify card"}`,
+IMPORTANT: If the image does NOT clearly show a trading card (e.g., it shows a table, fingers, blank surface, blurry/unreadable content, or anything that is not a recognizable TCG card), immediately return: {"noCard": true}
+
+If you can see a card but truly cannot identify it, return: {"error": "Could not identify card"}`,
           },
           {
             role: "user",
@@ -1221,6 +1223,10 @@ If you truly cannot identify it, return: {"error": "Could not identify card"}`,
       const content = response.choices[0]?.message?.content || "{}";
       const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       const result = JSON.parse(cleaned);
+
+      if (result.noCard) {
+        return res.json({ error: "No card detected", noCard: true });
+      }
 
       if (result.cardNumber) {
         result.cardNumber = cleanCardNumber(result.cardNumber);

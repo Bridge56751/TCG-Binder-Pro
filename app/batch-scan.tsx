@@ -118,6 +118,7 @@ export default function BatchScanScreen() {
         quality: 0.8,
         base64: true,
         skipProcessing: false,
+        shutterSound: false,
       });
 
       if (!photo || !photo.base64 || !mountedRef.current) {
@@ -142,7 +143,7 @@ export default function BatchScanScreen() {
 
         if (!mountedRef.current) { isProcessingRef.current = false; return; }
 
-        if (data.error || !data.verified || !data.game) {
+        if (data.error || data.noCard || !data.verified || !data.game) {
           setScannedCards(prev => prev.filter(c => c.id !== cardId));
           isProcessingRef.current = false;
           return;
