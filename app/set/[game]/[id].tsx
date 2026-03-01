@@ -868,7 +868,13 @@ export default function SetDetailScreen() {
               const qty = setCollectionMap[effectiveId] || 0;
               return (
                 <View style={[styles.quickAddRow, { borderBottomColor: colors.cardBorder }]}>
-                  <View style={styles.quickAddInfo}>
+                  <Pressable
+                    style={styles.quickAddInfo}
+                    onPress={() => {
+                      setQuickAddVisible(false);
+                      router.push(`/card/${gameId}/${item.id}`);
+                    }}
+                  >
                     <Text style={[styles.quickAddNumber, { color: colors.textTertiary }]}>
                       #{item.localId}
                     </Text>
@@ -880,7 +886,7 @@ export default function SetDetailScreen() {
                         <Text style={[styles.qtyBadgeText, { color: quickAddFoil ? "#9B59B6" : colors.tint }]}>x{qty}</Text>
                       </View>
                     )}
-                  </View>
+                  </Pressable>
                   <View style={styles.quickAddActions}>
                     {qty > 0 && (
                       <Pressable
