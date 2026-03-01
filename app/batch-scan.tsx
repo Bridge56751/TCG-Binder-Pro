@@ -276,15 +276,18 @@ export default function BatchScanScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, []);
 
+  const searchIdRef = useRef(0);
+
   const closeVerify = useCallback(() => {
+    searchIdRef.current++;
     setVerifyCard(null);
     setSearchResults([]);
     setHasSearched(false);
     setIsSearching(false);
   }, []);
-
   const searchCards = useCallback(async () => {
     if (!editName.trim() && !editCardNumber.trim()) return;
+    const thisSearch = ++searchIdRef.current;
     setIsSearching(true);
     setSearchResults([]);
     setHasSearched(false);
@@ -295,6 +298,7 @@ export default function BatchScanScreen() {
         setName: editSetName.trim() || undefined,
         cardNumber: editCardNumber.trim() || undefined,
       });
+      if (thisSearch !== searchIdRef.current) return;
       const data = await res.json();
       setSearchResults(data.results || []);
       setHasSearched(true);
@@ -302,17 +306,26 @@ export default function BatchScanScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     } catch {
+      if (thisSearch !== searchIdRef.current) return;
       Alert.alert("Error", "Failed to search. Please try again.");
     } finally {
-      setIsSearching(false);
+      if (thisSearch === searchIdRef.current) {
+        setIsSearching(false);
+      }
     }
   }, [editName, editCardNumber, editSetName, editGame]);
 
   const selectSearchResult = useCallback(async (result: any) => {
     if (!verifyCard) return;
+    const existing = scannedCards.find(c => c.id === verifyCard.id);
+    if (!existing) return;
+    const wasAlreadyAdded = !!existing.added;
     const cardId = result.cardId || `${result.setId}-${result.localId}`;
     try {
-      await addCard(result.game, result.setId, cardId);
+      if (!wasAlreadyAdded) {
+        await addCard(result.game, result.setId, cardId);
+        setAddedCount(prev => prev + 1);
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setScannedCards(prev =>
         prev.map(c => c.id === verifyCard.id ? {
@@ -330,7 +343,6 @@ export default function BatchScanScreen() {
           added: true,
         } : c)
       );
-      setAddedCount(prev => prev + 1);
       cacheCard({
         id: cardId,
         localId: result.localId || "",
@@ -348,7 +360,7 @@ export default function BatchScanScreen() {
         Alert.alert("Card Limit Reached", "Upgrade to Premium for unlimited cards.");
       }
     }
-  }, [verifyCard, addCard, closeVerify]);
+  }, [verifyCard, scannedCards, addCard, closeVerify]);
 
   const identifiedCount = scannedCards.filter(c => c.status === "identified").length;
   const scanningCount = scannedCards.filter(c => c.status === "scanning").length;
@@ -504,7 +516,7 @@ export default function BatchScanScreen() {
                     </Pressable>
                   </View>
                 ) : (
-                  <View style={styles.cardChipContent}>
+                  <Pressable onPress={() => openVerify(item)} style={styles.cardChipContent}>
                     <View style={[styles.cardChipThumb, { backgroundColor: colors.surfaceAlt }]}>
                       {item.apiImage ? (
                         <Image source={{ uri: item.apiImage }} style={styles.cardChipThumbImg} contentFit="cover" cachePolicy="disk" />
@@ -548,13 +560,17 @@ export default function BatchScanScreen() {
                         <Text style={[styles.chipAddedText, { color: colors.textTertiary }]}>Unverified</Text>
                       </View>
                     )}
+                    <View style={{ flexDirection: "row", gap: 6, alignItems: "center", marginTop: 2 }}>
+                      <Ionicons name="pencil" size={12} color={colors.tint} />
+                      <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 11, color: colors.tint }}>Tap to edit</Text>
+                    </View>
                     <Pressable
                       onPress={() => removeScannedCard(item.id)}
                       style={[styles.chipRemoveBtn, { position: "absolute", top: 4, right: 4 }]}
                     >
                       <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
                     </Pressable>
-                  </View>
+                  </Pressable>
                 )}
               </Animated.View>
             )}
@@ -562,6 +578,195 @@ export default function BatchScanScreen() {
           </Animated.View>
         )}
       </View>
+
+      <Modal visible={!!verifyCard} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeVerify}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          <View style={{ flex: 1, backgroundColor: colors.background }}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: Platform.OS === "ios" ? 16 : topInset + 8, paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.cardBorder }}>
+              <Pressable onPress={closeVerify} hitSlop={16}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </Pressable>
+              <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 17, color: colors.text }}>Edit Card</Text>
+              <View style={{ width: 24 }} />
+            </View>
+
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 16 }} keyboardShouldPersistTaps="handled">
+              {verifyCard?.imageUri && (
+                <View style={{ alignItems: "center", marginBottom: 4 }}>
+                  <Image source={{ uri: verifyCard.apiImage || verifyCard.imageUri }} style={{ width: 120, height: 168, borderRadius: 10 }} contentFit="cover" cachePolicy="disk" />
+                  <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 12, color: colors.textTertiary, marginTop: 6 }}>AI identified this as:</Text>
+                  <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 15, color: colors.text, marginTop: 2 }}>{verifyCard.name || "Unknown"}</Text>
+                </View>
+              )}
+
+              <View style={{ gap: 6 }}>
+                <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textSecondary }}>Game</Text>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  {(["pokemon", "yugioh", "mtg"] as GameId[]).map(g => (
+                    <Pressable
+                      key={g}
+                      onPress={() => setEditGame(g)}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 10,
+                        borderRadius: 10,
+                        borderWidth: 1.5,
+                        borderColor: editGame === g ? colors[g] : colors.cardBorder,
+                        backgroundColor: editGame === g ? colors[g] + "15" : colors.surface,
+                        alignItems: "center",
+                      }}
+                    >
+                      <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 13, color: editGame === g ? colors[g] : colors.textSecondary }}>
+                        {gameLabel(g)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              <View style={{ gap: 6 }}>
+                <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textSecondary }}>Card Name</Text>
+                <TextInput
+                  value={editName}
+                  onChangeText={setEditName}
+                  placeholder="e.g. Charizard"
+                  placeholderTextColor={colors.textTertiary}
+                  style={{ fontFamily: "DMSans_400Regular", fontSize: 15, color: colors.text, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.cardBorder, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 }}
+                  returnKeyType="search"
+                  onSubmitEditing={searchCards}
+                />
+              </View>
+
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <View style={{ flex: 1, gap: 6 }}>
+                  <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textSecondary }}>Card Number</Text>
+                  <TextInput
+                    value={editCardNumber}
+                    onChangeText={setEditCardNumber}
+                    placeholder="e.g. 025"
+                    placeholderTextColor={colors.textTertiary}
+                    style={{ fontFamily: "DMSans_400Regular", fontSize: 15, color: colors.text, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.cardBorder, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 }}
+                  />
+                </View>
+                <View style={{ flex: 1, gap: 6 }}>
+                  <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textSecondary }}>Set Name</Text>
+                  <TextInput
+                    value={editSetName}
+                    onChangeText={setEditSetName}
+                    placeholder="e.g. Base Set"
+                    placeholderTextColor={colors.textTertiary}
+                    style={{ fontFamily: "DMSans_400Regular", fontSize: 15, color: colors.text, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.cardBorder, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 }}
+                  />
+                </View>
+              </View>
+
+              <Pressable
+                onPress={searchCards}
+                disabled={isSearching || (!editName.trim() && !editCardNumber.trim())}
+                style={({ pressed }) => ({
+                  flexDirection: "row" as const,
+                  alignItems: "center" as const,
+                  justifyContent: "center" as const,
+                  gap: 8,
+                  paddingVertical: 14,
+                  borderRadius: 12,
+                  backgroundColor: (!editName.trim() && !editCardNumber.trim()) ? colors.surfaceAlt : colors.tint,
+                  opacity: pressed ? 0.85 : 1,
+                })}
+              >
+                {isSearching ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Ionicons name="search" size={18} color="#FFFFFF" />
+                )}
+                <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 15, color: "#FFFFFF" }}>
+                  {isSearching ? "Searching..." : "Search"}
+                </Text>
+              </Pressable>
+
+              {hasSearched && searchResults.length === 0 && (
+                <View style={{ alignItems: "center", paddingVertical: 16, gap: 6 }}>
+                  <Ionicons name="search-outline" size={28} color={colors.textTertiary} />
+                  <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 14, color: colors.textSecondary }}>No cards found</Text>
+                  <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 12, color: colors.textTertiary, textAlign: "center" }}>
+                    Try a different name, check the game selection, or remove the set filter.
+                  </Text>
+                </View>
+              )}
+
+              {searchResults.length > 0 && (
+                <View style={{ gap: 8 }}>
+                  <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 13, color: colors.textSecondary }}>
+                    {searchResults.length} result{searchResults.length !== 1 ? "s" : ""} — tap to select
+                  </Text>
+                  {searchResults.map((r: any, idx: number) => (
+                    <Pressable
+                      key={`${r.cardId}-${idx}`}
+                      style={({ pressed }) => ({
+                        flexDirection: "row" as const,
+                        gap: 10,
+                        padding: 10,
+                        borderRadius: 10,
+                        backgroundColor: pressed ? colors.tint + "12" : colors.surface,
+                        borderWidth: 1,
+                        borderColor: pressed ? colors.tint + "40" : colors.cardBorder,
+                      })}
+                      onPress={() => selectSearchResult(r)}
+                    >
+                      {r.image ? (
+                        <Image source={{ uri: r.image }} style={{ width: 48, height: 67, borderRadius: 6 }} contentFit="cover" cachePolicy="disk" />
+                      ) : (
+                        <View style={{ width: 48, height: 67, borderRadius: 6, backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center" }}>
+                          <MaterialCommunityIcons name="cards-outline" size={20} color={colors.textTertiary} />
+                        </View>
+                      )}
+                      <View style={{ flex: 1, justifyContent: "center", gap: 2 }}>
+                        <Text style={{ fontFamily: "DMSans_600SemiBold", fontSize: 14, color: colors.text }} numberOfLines={1}>
+                          {r.name}
+                        </Text>
+                        <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 12, color: colors.textSecondary }} numberOfLines={1}>
+                          {r.setName}{r.localId ? ` #${r.localId}` : ""}
+                        </Text>
+                        <View style={{ flexDirection: "row", gap: 4, marginTop: 2 }}>
+                          <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: colors[r.game as GameId] + "20" }}>
+                            <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 10, color: colors[r.game as GameId] }}>
+                              {gameLabel(r.game)}
+                            </Text>
+                          </View>
+                          {r.rarity && (
+                            <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: colors.surfaceAlt }}>
+                              <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 10, color: colors.textTertiary }}>
+                                {r.rarity}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                      <View style={{ justifyContent: "center" }}>
+                        <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+
+              <Pressable
+                style={({ pressed }) => ({
+                  flexDirection: "row" as const,
+                  alignItems: "center" as const,
+                  justifyContent: "center" as const,
+                  gap: 6,
+                  paddingVertical: 10,
+                  opacity: pressed ? 0.6 : 1,
+                })}
+                onPress={closeVerify}
+              >
+                <Text style={{ fontFamily: "DMSans_500Medium", fontSize: 14, color: colors.textSecondary }}>Cancel</Text>
+              </Pressable>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
