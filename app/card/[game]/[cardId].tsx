@@ -83,7 +83,6 @@ export default function CardDetailScreen() {
   const { galleryCardsRef } = useGallery();
   const [galleryVisible, setGalleryVisible] = useState(false);
   const [detailImgFailed, setDetailImgFailed] = useState(false);
-  const [highResLoaded, setHighResLoaded] = useState(false);
   const [galleryCards, setLocalGalleryCards] = useState<any[]>([]);
   const [galleryStartIndex, setGalleryStartIndex] = useState(0);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
@@ -240,27 +239,15 @@ export default function CardDetailScreen() {
         >
           <Animated.View style={flipStyle}>
             {card.image && !detailImgFailed ? (
-              <View style={styles.cardImage}>
-                {card.imageLow && !highResLoaded && (
-                  <Image
-                    source={{ uri: card.imageLow }}
-                    style={StyleSheet.absoluteFill}
-                    contentFit="contain"
-                    cachePolicy="disk"
-                    recyclingKey={`${cardId}-low`}
-                  />
-                )}
-                <Image
-                  source={{ uri: card.image }}
-                  style={StyleSheet.absoluteFill}
-                  contentFit="contain"
-                  transition={highResLoaded ? 0 : 200}
-                  cachePolicy="disk"
-                  recyclingKey={cardId as string}
-                  onLoad={() => setHighResLoaded(true)}
-                  onError={() => setDetailImgFailed(true)}
-                />
-              </View>
+              <Image
+                source={{ uri: card.image }}
+                style={styles.cardImage}
+                contentFit="contain"
+                transition={150}
+                cachePolicy="disk"
+                recyclingKey={cardId as string}
+                onError={() => setDetailImgFailed(true)}
+              />
             ) : (
               <View style={[styles.cardImage, styles.noImage, { backgroundColor: colors.surfaceAlt }]}>
                 <Ionicons name="image-outline" size={48} color={colors.textTertiary} />

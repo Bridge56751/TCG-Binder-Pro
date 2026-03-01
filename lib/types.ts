@@ -69,7 +69,6 @@ export interface CardDetail {
   name: string;
   englishName?: string | null;
   image: string | null;
-  imageLow?: string | null;
   game: GameId;
   setId: string;
   setName: string;
