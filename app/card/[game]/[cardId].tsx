@@ -100,8 +100,8 @@ export default function CardDetailScreen() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      flipAnim.value = withTiming(0, { duration: 400 });
-    }, 100);
+      flipAnim.value = withTiming(0, { duration: 600 });
+    }, 300);
     return () => clearTimeout(timer);
   }, []);
 
@@ -243,7 +243,7 @@ export default function CardDetailScreen() {
                 source={{ uri: card.image }}
                 style={styles.cardImage}
                 contentFit="contain"
-                transition={150}
+                transition={300}
                 cachePolicy="disk"
                 recyclingKey={cardId as string}
                 onError={() => setDetailImgFailed(true)}
