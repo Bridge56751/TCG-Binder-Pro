@@ -334,10 +334,12 @@ export default function SetDetailScreen() {
     if (gameData) {
       const setData = gameData[id || ""];
       if (Array.isArray(setData)) {
-        for (const cardId of setData) {
-          const baseId = getBaseCardId(cardId);
-          map[baseId] = (map[baseId] || 0) + 1;
-          map[cardId] = (map[cardId] || 0) + 1;
+        for (const cId of setData) {
+          map[cId] = (map[cId] || 0) + 1;
+          const baseId = getBaseCardId(cId);
+          if (baseId !== cId) {
+            map[baseId] = (map[baseId] || 0) + 1;
+          }
         }
       }
     }
