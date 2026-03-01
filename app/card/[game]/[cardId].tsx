@@ -79,7 +79,7 @@ export default function CardDetailScreen() {
   const baseCardId = getBaseCardId(rawCardId || "");
   const cardId = baseCardId;
   const [viewFoil, setViewFoil] = useState(isInitiallyFoil);
-  const { hasCard, removeCard, addCard, cardQuantity } = useCollection();
+  const { hasCard, removeCard, removeOneCard, addCard, cardQuantity } = useCollection();
   const { galleryCardsRef } = useGallery();
   const [galleryVisible, setGalleryVisible] = useState(false);
   const [detailImgFailed, setDetailImgFailed] = useState(false);
@@ -307,22 +307,45 @@ export default function CardDetailScreen() {
             <View style={styles.badgeRow}>
               {(() => {
                 const qty = cardQuantity(gameId, card.setId, effectiveCardId);
-                return justAdded ? (
-                  <Animated.View
-                    style={[styles.badge, { backgroundColor: colors.success + "18" }, ownedBadgeStyle]}
-                  >
-                    <Ionicons name="layers" size={12} color={colors.success} />
-                    <Text style={[styles.badgeText, { color: colors.success }]}>
-                      x{qty} owned
-                    </Text>
+                const accentColor = viewFoil && gameId === "mtg" ? "#9B59B6" : colors.tint;
+                return (
+                  <Animated.View style={justAdded ? ownedBadgeStyle : undefined}>
+                    <View style={[styles.qtyStepper, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                      <Pressable
+                        style={[styles.qtyStepBtn, { backgroundColor: colors.error + "15" }]}
+                        onPress={async () => {
+                          if (qty <= 1) {
+                            await removeCard(gameId, card.setId, effectiveCardId);
+                          } else {
+                            await removeOneCard(gameId, card.setId, effectiveCardId);
+                          }
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        }}
+                      >
+                        <Ionicons name={qty <= 1 ? "trash-outline" : "remove"} size={18} color={colors.error} />
+                      </Pressable>
+                      <View style={styles.qtyDisplay}>
+                        <Text style={[styles.qtyValue, { color: colors.text }]}>{qty}</Text>
+                        <Text style={[styles.qtyLabel, { color: colors.textTertiary }]}>owned</Text>
+                      </View>
+                      <Pressable
+                        style={[styles.qtyStepBtn, { backgroundColor: accentColor + "15" }]}
+                        onPress={async () => {
+                          try {
+                            await addCard(gameId, card.setId, effectiveCardId);
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          } catch (err: any) {
+                            if (err?.message === "FREE_LIMIT" || err?.message === "GUEST_LIMIT") {
+                              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                              setLimitReached(true);
+                            }
+                          }
+                        }}
+                      >
+                        <Ionicons name="add" size={18} color={accentColor} />
+                      </Pressable>
+                    </View>
                   </Animated.View>
-                ) : (
-                  <View style={[styles.badge, { backgroundColor: colors.success + "18" }]}>
-                    <Ionicons name="layers" size={12} color={colors.success} />
-                    <Text style={[styles.badgeText, { color: colors.success }]}>
-                      x{qty} owned
-                    </Text>
-                  </View>
                 );
               })()}
             </View>
@@ -609,6 +632,35 @@ const styles = StyleSheet.create({
   badgeText: {
     fontFamily: "DMSans_600SemiBold",
     fontSize: 12,
+  },
+  qtyStepper: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 4,
+    gap: 4,
+  },
+  qtyStepBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  qtyDisplay: {
+    alignItems: "center" as const,
+    paddingHorizontal: 16,
+  },
+  qtyValue: {
+    fontFamily: "DMSans_700Bold",
+    fontSize: 20,
+    lineHeight: 24,
+  },
+  qtyLabel: {
+    fontFamily: "DMSans_400Regular",
+    fontSize: 11,
+    lineHeight: 14,
   },
   addBinderBtn: {
     flexDirection: "row",
