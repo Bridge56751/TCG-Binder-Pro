@@ -524,7 +524,14 @@ export default function CollectionScreen() {
             {GAMES.map((game) => {
               const count = totalCards(game.id);
               return (
-                <View key={game.id} style={styles.perGameItem}>
+                <Pressable
+                  key={game.id}
+                  style={({ pressed }) => [styles.perGameItem, { opacity: pressed ? 0.6 : 1 }]}
+                  onPress={() => {
+                    setSelectedGame(game.id);
+                    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                >
                   <View
                     style={[
                       styles.perGameDot,
@@ -539,7 +546,7 @@ export default function CollectionScreen() {
                   <Text style={[styles.perGameCount, { color: colors.text }]}>
                     {count}
                   </Text>
-                </View>
+                </Pressable>
               );
             })}
           </View>
