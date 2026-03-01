@@ -454,8 +454,8 @@ export default function ScanScreen() {
               <View style={[dynamicStyles.scanOptionIcon, { backgroundColor: colors.tint + "15" }]}>
                 <MaterialCommunityIcons name="cards-outline" size={22} color={colors.tint} />
               </View>
-              <Text style={[dynamicStyles.scanOptionLabel, { color: colors.text }]}>Auto Scan</Text>
-              <Text style={[dynamicStyles.scanOptionDesc, { color: colors.textTertiary }]}>Hands-free continuous scanning</Text>
+              <Text style={[dynamicStyles.scanOptionLabel, { color: colors.text }]}>Batch Scan</Text>
+              <Text style={[dynamicStyles.scanOptionDesc, { color: colors.textTertiary }]}>Scan multiple cards quickly</Text>
             </Pressable>
           </View>
 

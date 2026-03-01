@@ -9,6 +9,7 @@ import {
   Alert,
   FlatList,
   Linking,
+  Dimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -22,7 +23,11 @@ import { useTheme } from "@/lib/ThemeContext";
 import type { GameId } from "@/lib/types";
 import { addToScanHistory } from "@/lib/scan-history-storage";
 import { cacheCard } from "@/lib/card-cache";
-import Animated, { FadeIn, FadeInDown, SlideInDown, useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSequence, Easing } from "react-native-reanimated";
+import Animated, { FadeInDown, SlideInDown } from "react-native-reanimated";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const FRAME_WIDTH = SCREEN_WIDTH - 48;
+const FRAME_HEIGHT = FRAME_WIDTH * 1.4;
 
 type ScannedCard = {
   id: string;
@@ -50,9 +55,6 @@ function gameLabel(game: GameId): string {
   return game;
 }
 
-const SCAN_INTERVAL = 2500;
-const DUPLICATE_COOLDOWN = 15000;
-
 export default function BatchScanScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -60,38 +62,12 @@ export default function BatchScanScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const [scannedCards, setScannedCards] = useState<ScannedCard[]>([]);
+  const [isCapturing, setIsCapturing] = useState(false);
   const [addedCount, setAddedCount] = useState(0);
-  const [autoScanning, setAutoScanning] = useState(true);
-  const [paused, setPaused] = useState(false);
   const flatListRef = useRef<FlatList>(null);
-  const isProcessingRef = useRef(false);
-  const recentScansRef = useRef<Map<string, number>>(new Map());
-  const autoScanTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const mountedRef = useRef(true);
-
-  const scanLineY = useSharedValue(0);
-  const scanLineStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: scanLineY.value }],
-  }));
-
-  useEffect(() => {
-    scanLineY.value = withRepeat(
-      withSequence(
-        withTiming(260, { duration: 1800, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0, { duration: 1800, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      false
-    );
-  }, []);
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => { mountedRef.current = false; };
-  }, []);
 
   useEffect(() => {
     if (permission && !permission.granted && permission.canAskAgain) {
@@ -99,30 +75,21 @@ export default function BatchScanScreen() {
     }
   }, [permission]);
 
-  const isDuplicate = useCallback((cardName: string, cardNumber: string, game: string): boolean => {
-    const key = `${game}:${cardName}:${cardNumber}`.toLowerCase();
-    const lastSeen = recentScansRef.current.get(key);
-    if (lastSeen && Date.now() - lastSeen < DUPLICATE_COOLDOWN) {
-      return true;
-    }
-    recentScansRef.current.set(key, Date.now());
-    return false;
-  }, []);
-
-  const autoCapture = useCallback(async () => {
-    if (isProcessingRef.current || !cameraRef.current || !mountedRef.current) return;
-    isProcessingRef.current = true;
+  const captureAndIdentify = useCallback(async () => {
+    if (isCapturing || !cameraRef.current) return;
+    setIsCapturing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
       const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.8,
+        quality: 0.9,
         base64: true,
         skipProcessing: false,
         shutterSound: false,
       });
 
-      if (!photo || !photo.base64 || !mountedRef.current) {
-        isProcessingRef.current = false;
+      if (!photo || !photo.base64) {
+        setIsCapturing(false);
         return;
       }
 
@@ -130,109 +97,87 @@ export default function BatchScanScreen() {
       const newCard: ScannedCard = {
         id: cardId,
         status: "scanning",
+        imageUri: photo.uri,
       };
 
       setScannedCards(prev => [newCard, ...prev]);
+      setIsCapturing(false);
+
+      setTimeout(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      }, 100);
 
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 20000);
+        const timeout = setTimeout(() => controller.abort(), 25000);
         const res = await apiRequest("POST", "/api/identify-card", { image: photo.base64 }, controller.signal);
         clearTimeout(timeout);
         const data = await res.json();
 
-        if (!mountedRef.current) { isProcessingRef.current = false; return; }
+        if (data.error) {
+          setScannedCards(prev =>
+            prev.map(c => c.id === cardId ? { ...c, status: "error" as const, error: data.error } : c)
+          );
+        } else {
+          const setId = data.setId || "";
+          const verifiedId = data.verifiedCardId || `${setId}-${data.cardNumber || ""}`;
 
-        if (data.error || data.noCard || !data.verified || !data.game) {
-          setScannedCards(prev => prev.filter(c => c.id !== cardId));
-          isProcessingRef.current = false;
-          return;
+          setScannedCards(prev =>
+            prev.map(c => c.id === cardId ? {
+              ...c,
+              status: "identified" as const,
+              name: data.englishName || data.name,
+              setName: data.englishSetName || data.setName,
+              setId,
+              cardNumber: data.cardNumber,
+              game: data.game,
+              cardId: verifiedId,
+              verifiedCardId: data.verifiedCardId,
+              estimatedValue: data.estimatedValue,
+              rarity: data.rarity,
+              verified: data.verified,
+              apiImage: data.image,
+            } : c)
+          );
+
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+          if (data.verified && data.game) {
+            try {
+              await addToScanHistory({
+                ...data,
+                name: data.englishName || data.name,
+                setName: data.englishSetName || data.setName,
+                verifiedCardId: data.verifiedCardId || verifiedId,
+              }, false);
+              cacheCard({
+                id: verifiedId,
+                localId: data.cardNumber || "",
+                name: data.englishName || data.name,
+                image: data.image || null,
+                game: data.game,
+                setId,
+                setName: data.englishSetName || data.setName || "",
+                rarity: data.rarity || null,
+                currentPrice: data.estimatedValue,
+                cachedAt: Date.now(),
+              });
+            } catch {}
+          }
         }
-
-        const cardName = data.englishName || data.name || "";
-        const cardNumber = data.cardNumber || "";
-        if (isDuplicate(cardName, cardNumber, data.game)) {
-          setScannedCards(prev => prev.filter(c => c.id !== cardId));
-          isProcessingRef.current = false;
-          return;
-        }
-
-        const setId = data.setId || "";
-        const verifiedId = data.verifiedCardId || `${setId}-${cardNumber}`;
-
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
+      } catch (error: any) {
         setScannedCards(prev =>
           prev.map(c => c.id === cardId ? {
             ...c,
-            status: "identified" as const,
-            name: data.englishName || data.name,
-            setName: data.englishSetName || data.setName,
-            setId,
-            cardNumber,
-            game: data.game,
-            cardId: verifiedId,
-            verifiedCardId: data.verifiedCardId,
-            estimatedValue: data.estimatedValue,
-            rarity: data.rarity,
-            verified: data.verified,
-            apiImage: data.image,
+            status: "error" as const,
+            error: error?.name === "AbortError" ? "Scan timed out" : "Failed to identify",
           } : c)
         );
-
-        setTimeout(() => {
-          flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-        }, 100);
-
-        try {
-          await addToScanHistory({
-            ...data,
-            name: data.englishName || data.name,
-            setName: data.englishSetName || data.setName,
-            verifiedCardId: data.verifiedCardId || verifiedId,
-          }, false);
-          cacheCard({
-            id: verifiedId,
-            localId: cardNumber,
-            name: data.englishName || data.name,
-            image: data.image || null,
-            game: data.game,
-            setId,
-            setName: data.englishSetName || data.setName || "",
-            rarity: data.rarity || null,
-            currentPrice: data.estimatedValue,
-            cachedAt: Date.now(),
-          });
-        } catch {}
-      } catch {
-        if (mountedRef.current) {
-          setScannedCards(prev => prev.filter(c => c.id !== cardId));
-        }
       }
-    } catch {}
-    isProcessingRef.current = false;
-  }, [isDuplicate]);
-
-  useEffect(() => {
-    if (!permission?.granted || !autoScanning || paused) {
-      if (autoScanTimerRef.current) {
-        clearInterval(autoScanTimerRef.current);
-        autoScanTimerRef.current = null;
-      }
-      return;
+    } catch {
+      setIsCapturing(false);
     }
-
-    autoScanTimerRef.current = setInterval(() => {
-      autoCapture();
-    }, SCAN_INTERVAL);
-
-    return () => {
-      if (autoScanTimerRef.current) {
-        clearInterval(autoScanTimerRef.current);
-        autoScanTimerRef.current = null;
-      }
-    };
-  }, [permission?.granted, autoScanning, paused, autoCapture]);
+  }, [isCapturing]);
 
   const handleAddCard = useCallback(async (card: ScannedCard): Promise<boolean> => {
     if (!card.game || !card.cardId || card.added || !card.setId) return false;
@@ -295,7 +240,7 @@ export default function BatchScanScreen() {
         <Ionicons name="camera-outline" size={64} color={colors.textTertiary} />
         <Text style={[styles.permTitle, { color: colors.text }]}>Camera Access Needed</Text>
         <Text style={[styles.permDesc, { color: colors.textSecondary }]}>
-          Auto scan requires camera access to identify your cards in real time.
+          Batch scan requires camera access to identify your cards.
         </Text>
         <Pressable
           style={[styles.permBtn, { backgroundColor: colors.tint }]}
@@ -325,66 +270,64 @@ export default function BatchScanScreen() {
         facing="back"
         autofocus="on"
         flash="off"
+        zoom={0.02}
       />
+
+      <View style={styles.dimOverlay} pointerEvents="none">
+        <View style={styles.dimTop} />
+        <View style={styles.dimMiddleRow}>
+          <View style={styles.dimSide} />
+          <View style={[styles.frameCutout, { width: FRAME_WIDTH, height: FRAME_HEIGHT }]} />
+          <View style={styles.dimSide} />
+        </View>
+        <View style={styles.dimBottom} />
+      </View>
+
+      <View style={styles.frameOverlay} pointerEvents="none">
+        <View style={[styles.frameContainer, { width: FRAME_WIDTH, height: FRAME_HEIGHT }]}>
+          <View style={[styles.frameCorner, styles.cTopLeft]} />
+          <View style={[styles.frameCorner, styles.cTopRight]} />
+          <View style={[styles.frameCorner, styles.cBottomLeft]} />
+          <View style={[styles.frameCorner, styles.cBottomRight]} />
+        </View>
+      </View>
 
       <View style={[styles.topBar, { paddingTop: topInset + 4 }]} pointerEvents="box-none">
         <Pressable style={styles.topBarBtn} onPress={() => router.dismiss()} hitSlop={16}>
           <Ionicons name="close" size={24} color="#FFFFFF" />
         </Pressable>
         <View style={styles.topBarCenter} pointerEvents="none">
-          <Text style={styles.topBarTitle}>Auto Scan</Text>
+          <Text style={styles.topBarTitle}>Batch Scan</Text>
           {scannedCards.length > 0 ? (
             <Text style={styles.topBarCount}>
-              {identifiedCount} found{scanningCount > 0 ? ` · ${scanningCount} scanning` : ""}
+              {identifiedCount} identified{scanningCount > 0 ? ` · ${scanningCount} scanning` : ""}
             </Text>
           ) : (
-            <Text style={styles.topBarCount}>Place a card in frame</Text>
+            <Text style={styles.topBarCount}>Fill the frame with your card</Text>
           )}
         </View>
-        <Pressable
-          style={[styles.topBarBtn, paused && { backgroundColor: "rgba(255,80,80,0.5)" }]}
-          onPress={() => { setPaused(p => !p); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
-          hitSlop={16}
-        >
-          <Ionicons name={paused ? "play" : "pause"} size={20} color="#FFFFFF" />
-        </Pressable>
+        <View style={{ width: 40 }} />
       </View>
 
-      <View style={styles.crosshairOverlay} pointerEvents="none">
-        <View style={styles.crosshairFrame}>
-          <View style={[styles.crossCorner, styles.cTopLeft]} />
-          <View style={[styles.crossCorner, styles.cTopRight]} />
-          <View style={[styles.crossCorner, styles.cBottomLeft]} />
-          <View style={[styles.crossCorner, styles.cBottomRight]} />
-          {!paused && (
-            <Animated.View style={[styles.scanLine, scanLineStyle]} />
-          )}
-        </View>
-        <View style={styles.statusRow}>
-          {paused ? (
-            <View style={styles.statusBadgePaused}>
-              <Ionicons name="pause-circle" size={14} color="#FF6B6B" />
-              <Text style={styles.statusTextPaused}>Paused</Text>
-            </View>
-          ) : scanningCount > 0 ? (
-            <View style={styles.statusBadgeScanning}>
-              <ActivityIndicator size={10} color="#FFFFFF" />
-              <Text style={styles.statusTextActive}>Identifying...</Text>
-            </View>
+      <View style={[styles.captureBar, { bottom: scannedCards.length > 0 ? 220 + bottomInset : 40 + bottomInset }]}>
+        <Pressable
+          style={[styles.captureBtn, isCapturing && styles.captureBtnDisabled]}
+          onPress={captureAndIdentify}
+          disabled={isCapturing}
+        >
+          {isCapturing ? (
+            <ActivityIndicator size="small" color="#000" />
           ) : (
-            <View style={styles.statusBadgeActive}>
-              <View style={styles.pulseDot} />
-              <Text style={styles.statusTextActive}>Scanning</Text>
-            </View>
+            <View style={styles.captureBtnInner} />
           )}
-        </View>
+        </Pressable>
       </View>
 
       {scannedCards.length > 0 && (
         <Animated.View entering={SlideInDown.duration(300)} style={[styles.resultsPanel, { backgroundColor: colors.background, paddingBottom: bottomInset + 8 }]}>
           <View style={styles.resultsPanelHeader}>
             <Text style={[styles.resultsPanelTitle, { color: colors.text }]}>
-              Scanned ({identifiedCount})
+              Scanned ({scannedCards.length})
             </Text>
             {addableCount > 0 && (
               <Pressable
@@ -398,64 +341,86 @@ export default function BatchScanScreen() {
           </View>
           <FlatList
             ref={flatListRef}
-            data={scannedCards.filter(c => c.status !== "scanning")}
+            data={scannedCards}
             keyExtractor={(item) => item.id}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: 12, gap: 10 }}
             renderItem={({ item }) => (
               <Animated.View entering={FadeInDown.duration(300)} style={[styles.cardChip, { backgroundColor: colors.surface, borderColor: item.added ? colors.success + "50" : colors.cardBorder }]}>
-                <View style={styles.cardChipContent}>
-                  <View style={[styles.cardChipThumb, { backgroundColor: colors.surfaceAlt }]}>
-                    {item.apiImage ? (
-                      <Image source={{ uri: item.apiImage }} style={styles.cardChipThumbImg} contentFit="cover" cachePolicy="disk" />
-                    ) : (
-                      <MaterialCommunityIcons name="cards-outline" size={20} color={colors.textTertiary} />
-                    )}
+                {item.status === "scanning" ? (
+                  <View style={styles.cardChipScanning}>
+                    <View style={[styles.cardChipThumb, { backgroundColor: colors.surfaceAlt }]}>
+                      {item.imageUri ? (
+                        <Image source={{ uri: item.imageUri }} style={styles.cardChipThumbImg} contentFit="cover" />
+                      ) : (
+                        <ActivityIndicator size="small" color={colors.tint} />
+                      )}
+                    </View>
+                    <ActivityIndicator size="small" color={colors.tint} style={{ marginTop: 6 }} />
+                    <Text style={[styles.cardChipStatus, { color: colors.textTertiary }]}>Identifying...</Text>
                   </View>
-                  <Text style={[styles.cardChipName, { color: colors.text }]} numberOfLines={2}>{item.name}</Text>
-                  <Text style={[styles.cardChipSet, { color: colors.textTertiary }]} numberOfLines={1}>
-                    {item.setName} {item.cardNumber ? `#${item.cardNumber}` : ""}
-                  </Text>
-                  {item.estimatedValue != null && item.estimatedValue > 0 && (
-                    <Text style={[styles.cardChipPrice, { color: colors.success }]}>${item.estimatedValue.toFixed(2)}</Text>
-                  )}
-                  <View style={styles.cardChipRow}>
-                    {item.game && (
-                      <View style={[styles.chipGameBadge, { backgroundColor: colors[item.game] + "20" }]}>
-                        <Text style={[styles.chipGameText, { color: colors[item.game] }]}>{gameLabel(item.game)}</Text>
+                ) : item.status === "error" ? (
+                  <View style={styles.cardChipError}>
+                    <Ionicons name="alert-circle" size={24} color={colors.error} />
+                    <Text style={[styles.cardChipStatus, { color: colors.error }]} numberOfLines={2}>{item.error}</Text>
+                    <Pressable onPress={() => removeScannedCard(item.id)} style={[styles.chipAction, { backgroundColor: colors.error + "15" }]}>
+                      <Ionicons name="trash-outline" size={14} color={colors.error} />
+                    </Pressable>
+                  </View>
+                ) : (
+                  <View style={styles.cardChipContent}>
+                    <View style={[styles.cardChipThumb, { backgroundColor: colors.surfaceAlt }]}>
+                      {item.apiImage ? (
+                        <Image source={{ uri: item.apiImage }} style={styles.cardChipThumbImg} contentFit="cover" cachePolicy="disk" />
+                      ) : (
+                        <MaterialCommunityIcons name="cards-outline" size={20} color={colors.textTertiary} />
+                      )}
+                    </View>
+                    <Text style={[styles.cardChipName, { color: colors.text }]} numberOfLines={2}>{item.name}</Text>
+                    <Text style={[styles.cardChipSet, { color: colors.textTertiary }]} numberOfLines={1}>
+                      {item.setName} {item.cardNumber ? `#${item.cardNumber}` : ""}
+                    </Text>
+                    {item.estimatedValue != null && item.estimatedValue > 0 && (
+                      <Text style={[styles.cardChipPrice, { color: colors.success }]}>${item.estimatedValue.toFixed(2)}</Text>
+                    )}
+                    <View style={styles.cardChipRow}>
+                      {item.game && (
+                        <View style={[styles.chipGameBadge, { backgroundColor: colors[item.game] + "20" }]}>
+                          <Text style={[styles.chipGameText, { color: colors[item.game] }]}>{gameLabel(item.game)}</Text>
+                        </View>
+                      )}
+                      {item.verified && (
+                        <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+                      )}
+                    </View>
+                    {item.added ? (
+                      <View style={[styles.chipAddedBadge, { backgroundColor: colors.success + "15" }]}>
+                        <Ionicons name="checkmark" size={14} color={colors.success} />
+                        <Text style={[styles.chipAddedText, { color: colors.success }]}>Added</Text>
+                      </View>
+                    ) : item.verified ? (
+                      <Pressable
+                        style={[styles.chipAddBtn, { backgroundColor: colors.tint }]}
+                        onPress={() => handleAddCard(item)}
+                      >
+                        <Ionicons name="add" size={16} color="#FFFFFF" />
+                        <Text style={styles.chipAddBtnText}>Add</Text>
+                      </Pressable>
+                    ) : (
+                      <View style={[styles.chipAddedBadge, { backgroundColor: colors.surfaceAlt }]}>
+                        <Ionicons name="help-circle-outline" size={14} color={colors.textTertiary} />
+                        <Text style={[styles.chipAddedText, { color: colors.textTertiary }]}>Unverified</Text>
                       </View>
                     )}
-                    {item.verified && (
-                      <Ionicons name="checkmark-circle" size={14} color={colors.success} />
-                    )}
-                  </View>
-                  {item.added ? (
-                    <View style={[styles.chipAddedBadge, { backgroundColor: colors.success + "15" }]}>
-                      <Ionicons name="checkmark" size={14} color={colors.success} />
-                      <Text style={[styles.chipAddedText, { color: colors.success }]}>Added</Text>
-                    </View>
-                  ) : item.verified ? (
                     <Pressable
-                      style={[styles.chipAddBtn, { backgroundColor: colors.tint }]}
-                      onPress={() => handleAddCard(item)}
+                      onPress={() => removeScannedCard(item.id)}
+                      style={[styles.chipRemoveBtn, { position: "absolute", top: 4, right: 4 }]}
                     >
-                      <Ionicons name="add" size={16} color="#FFFFFF" />
-                      <Text style={styles.chipAddBtnText}>Add</Text>
+                      <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
                     </Pressable>
-                  ) : (
-                    <View style={[styles.chipAddedBadge, { backgroundColor: colors.surfaceAlt }]}>
-                      <Ionicons name="help-circle-outline" size={14} color={colors.textTertiary} />
-                      <Text style={[styles.chipAddedText, { color: colors.textTertiary }]}>Unverified</Text>
-                    </View>
-                  )}
-                  <Pressable
-                    onPress={() => removeScannedCard(item.id)}
-                    style={[styles.chipRemoveBtn, { position: "absolute", top: 4, right: 4 }]}
-                  >
-                    <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
-                  </Pressable>
-                </View>
+                  </View>
+                )}
               </Animated.View>
             )}
           />
@@ -479,6 +444,71 @@ const styles = StyleSheet.create({
   camera: {
     flex: 1,
   },
+  dimOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+  },
+  dimTop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+  },
+  dimMiddleRow: {
+    flexDirection: "row",
+  },
+  dimSide: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+  },
+  frameCutout: {
+    backgroundColor: "transparent",
+  },
+  dimBottom: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+  },
+  frameOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
+  },
+  frameContainer: {
+    position: "relative",
+  },
+  frameCorner: {
+    position: "absolute",
+    width: 44,
+    height: 44,
+    borderColor: "#FFFFFF",
+  },
+  cTopLeft: {
+    top: -2,
+    left: -2,
+    borderTopWidth: 4,
+    borderLeftWidth: 4,
+    borderTopLeftRadius: 14,
+  },
+  cTopRight: {
+    top: -2,
+    right: -2,
+    borderTopWidth: 4,
+    borderRightWidth: 4,
+    borderTopRightRadius: 14,
+  },
+  cBottomLeft: {
+    bottom: -2,
+    left: -2,
+    borderBottomWidth: 4,
+    borderLeftWidth: 4,
+    borderBottomLeftRadius: 14,
+  },
+  cBottomRight: {
+    bottom: -2,
+    right: -2,
+    borderBottomWidth: 4,
+    borderRightWidth: 4,
+    borderBottomRightRadius: 14,
+  },
   topBar: {
     position: "absolute",
     top: 0,
@@ -488,14 +518,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     paddingBottom: 8,
-    backgroundColor: "rgba(0,0,0,0.3)",
     zIndex: 10,
   },
   topBarBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: "rgba(0,0,0,0.5)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -514,107 +543,33 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.7)",
     marginTop: 1,
   },
-  crosshairOverlay: {
-    ...StyleSheet.absoluteFillObject,
+  captureBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 10,
+  },
+  captureBtn: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 4,
+    borderColor: "rgba(255,255,255,0.5)",
   },
-  crosshairFrame: {
-    width: 220,
-    height: 310,
-    overflow: "hidden",
+  captureBtnDisabled: {
+    opacity: 0.6,
   },
-  crossCorner: {
-    position: "absolute",
-    width: 36,
-    height: 36,
-    borderColor: "rgba(255,255,255,0.8)",
-  },
-  cTopLeft: {
-    top: 0,
-    left: 0,
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
-    borderTopLeftRadius: 10,
-  },
-  cTopRight: {
-    top: 0,
-    right: 0,
-    borderTopWidth: 3,
-    borderRightWidth: 3,
-    borderTopRightRadius: 10,
-  },
-  cBottomLeft: {
-    bottom: 0,
-    left: 0,
-    borderBottomWidth: 3,
-    borderLeftWidth: 3,
-    borderBottomLeftRadius: 10,
-  },
-  cBottomRight: {
-    bottom: 0,
-    right: 0,
-    borderBottomWidth: 3,
-    borderRightWidth: 3,
-    borderBottomRightRadius: 10,
-  },
-  scanLine: {
-    position: "absolute",
-    left: 8,
-    right: 8,
-    height: 2,
-    backgroundColor: "rgba(0,200,120,0.7)",
-    borderRadius: 1,
-    shadowColor: "#00C878",
-    shadowOpacity: 0.8,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 0 },
-  },
-  statusRow: {
-    marginTop: 16,
-  },
-  statusBadgeActive: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "rgba(0,200,120,0.25)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  statusBadgeScanning: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  statusBadgePaused: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "rgba(255,80,80,0.25)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  statusTextActive: {
-    fontFamily: "DMSans_600SemiBold",
-    fontSize: 12,
-    color: "#FFFFFF",
-  },
-  statusTextPaused: {
-    fontFamily: "DMSans_600SemiBold",
-    fontSize: 12,
-    color: "#FF6B6B",
-  },
-  pulseDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#00C878",
+  captureBtnInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 2,
+    borderColor: "rgba(0,0,0,0.1)",
   },
   resultsPanel: {
     position: "absolute",
@@ -624,6 +579,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 12,
+    zIndex: 10,
   },
   resultsPanelHeader: {
     flexDirection: "row",
@@ -655,10 +611,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: "hidden",
   },
-  cardChipContent: {
+  cardChipScanning: {
     alignItems: "center",
-    padding: 10,
-    gap: 3,
+    padding: 12,
+    gap: 4,
+    minHeight: 160,
+    justifyContent: "center",
   },
   cardChipThumb: {
     width: 60,
@@ -672,6 +630,23 @@ const styles = StyleSheet.create({
     width: 60,
     height: 84,
     borderRadius: 8,
+  },
+  cardChipStatus: {
+    fontFamily: "DMSans_400Regular",
+    fontSize: 11,
+    textAlign: "center",
+  },
+  cardChipError: {
+    alignItems: "center",
+    padding: 12,
+    gap: 6,
+    minHeight: 160,
+    justifyContent: "center",
+  },
+  cardChipContent: {
+    alignItems: "center",
+    padding: 10,
+    gap: 3,
   },
   cardChipName: {
     fontFamily: "DMSans_600SemiBold",
@@ -702,6 +677,14 @@ const styles = StyleSheet.create({
   chipGameText: {
     fontFamily: "DMSans_500Medium",
     fontSize: 9,
+  },
+  chipAction: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
   },
   chipAddBtn: {
     flexDirection: "row",
