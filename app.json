@@ -60,10 +60,10 @@
       [
         "react-native-fbsdk-next",
         {
-          "appID": "903672085924332",
-          "clientToken": "99c10ee9692518a8906e762c9a734f76",
+          "appID": "1622411945454184",
+          "clientToken": "8ff8bb45dd6e1caf72a2dce249c46834",
           "displayName": "TCG Binder",
-          "scheme": "fb903672085924332",
+          "scheme": "fb1622411945454184",
           "advertiserIDCollectionEnabled": true,
           "autoLogAppEventsEnabled": true,
           "isAutoInitEnabled": true,
