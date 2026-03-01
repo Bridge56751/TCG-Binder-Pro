@@ -24,8 +24,9 @@ import type { GameId } from "@/lib/types";
 import { addToScanHistory } from "@/lib/scan-history-storage";
 import { cacheCard } from "@/lib/card-cache";
 import Animated, { FadeInDown, SlideInDown } from "react-native-reanimated";
+import * as ImageManipulator from "expo-image-manipulator";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const FRAME_WIDTH = SCREEN_WIDTH - 48;
 const FRAME_HEIGHT = FRAME_WIDTH * 1.4;
 
@@ -65,6 +66,7 @@ export default function BatchScanScreen() {
   const [isCapturing, setIsCapturing] = useState(false);
   const [addedCount, setAddedCount] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+  const cameraLayoutRef = useRef({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
@@ -82,15 +84,45 @@ export default function BatchScanScreen() {
 
     try {
       const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.9,
-        base64: true,
+        quality: 1,
+        base64: false,
         skipProcessing: false,
         shutterSound: false,
       });
 
-      if (!photo || !photo.base64) {
+      if (!photo || !photo.uri) {
         setIsCapturing(false);
         return;
+      }
+
+      const photoW = photo.width;
+      const photoH = photo.height;
+      const previewW = cameraLayoutRef.current.width;
+      const previewH = cameraLayoutRef.current.height;
+      const scaleX = photoW / previewW;
+      const scaleY = photoH / previewH;
+      const frameLeft = (previewW - FRAME_WIDTH) / 2;
+      const frameTop = (previewH - FRAME_HEIGHT) / 2;
+      const cropX = Math.max(0, Math.round(frameLeft * scaleX));
+      const cropY = Math.max(0, Math.round(frameTop * scaleY));
+      const cropW = Math.min(photoW - cropX, Math.round(FRAME_WIDTH * scaleX));
+      const cropH = Math.min(photoH - cropY, Math.round(FRAME_HEIGHT * scaleY));
+
+      let croppedBase64: string;
+      try {
+        const cropped = await ImageManipulator.manipulateAsync(
+          photo.uri,
+          [{ crop: { originX: cropX, originY: cropY, width: cropW, height: cropH } }],
+          { compress: 0.92, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+        );
+        croppedBase64 = cropped.base64!;
+      } catch {
+        const fallback = await ImageManipulator.manipulateAsync(
+          photo.uri,
+          [],
+          { compress: 0.92, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+        );
+        croppedBase64 = fallback.base64!;
       }
 
       const cardId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
@@ -110,7 +142,7 @@ export default function BatchScanScreen() {
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 25000);
-        const res = await apiRequest("POST", "/api/identify-card", { image: photo.base64 }, controller.signal);
+        const res = await apiRequest("POST", "/api/identify-card", { image: croppedBase64 }, controller.signal);
         clearTimeout(timeout);
         const data = await res.json();
 
@@ -271,6 +303,9 @@ export default function BatchScanScreen() {
         autofocus="on"
         flash="off"
         zoom={0.02}
+        onLayout={(e) => {
+          cameraLayoutRef.current = { width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height };
+        }}
       />
 
       <View style={styles.dimOverlay} pointerEvents="none">

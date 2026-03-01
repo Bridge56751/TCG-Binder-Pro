@@ -1141,70 +1141,65 @@ export async function registerRoutes(app: Express): Promise<Express> {
         messages: [
           {
             role: "system",
-            content: `You are an expert trading card game identifier specializing in rare, special, and hard-to-read cards. You must identify cards accurately even when they are:
-- Full Art / Alternate Art cards (artwork covers the entire card, text may be small or partially hidden)
-- Special Art Rare (SAR) / Illustration Rare (IR) / Art Rare (AR) cards
+            content: `You are an expert trading card game identifier. Your #1 job is reading TEXT on cards with 100% accuracy — every letter, every digit matters.
+
+CARD TYPES YOU MUST HANDLE:
+- Full Art / Alternate Art / SAR / IR / AR cards (text may be tiny or overlaid on art)
 - Mega, EX, GX, V, VMAX, VSTAR, ex cards (Pokemon)
-- Secret Rare / Ultra Rare / Hyper Rare cards (numbers ABOVE the set total, e.g., 198/165)
-- Holographic / Foil cards (reflective surfaces may obscure text)
-- Textured / Embossed cards
-- Japanese cards with kanji/hiragana/katakana text
+- Secret Rare cards (numbers ABOVE set total, e.g., 198/165)
+- Holographic / Foil / Textured cards (reflective surfaces may obscure text)
+- Japanese cards with kanji/hiragana/katakana
 
-CRITICAL IDENTIFICATION STEPS:
+STEP 1 - IDENTIFY THE GAME:
+- Pokemon: Yellow/silver/gold border, HP top-right, energy symbols, weakness/resistance at bottom
+- Yu-Gi-Oh!: ATK/DEF bottom-right, star/level indicators, attribute icon (DARK/LIGHT/FIRE/WATER/EARTH/WIND)
+- MTG: Mana cost top-right (colored pips), type line in middle, set symbol, P/T for creatures
 
-STEP 1 - IDENTIFY THE GAME by visual cues:
-- Pokemon: Yellow/silver/gold border, HP top right, weakness/resistance/retreat at bottom, energy symbols
-- Yu-Gi-Oh!: ATK/DEF bottom right, star/level indicators, attribute icon top right (DARK/LIGHT/FIRE/WATER/EARTH/WIND)
-- Magic: The Gathering: Mana cost top right with colored pip symbols, type line in middle, set symbol on right of type line, P/T bottom right for creatures
+STEP 2 - READ THE CARD NAME (spell EVERY letter exactly):
+- Located at the TOP of the card
+- Read character-by-character. Double-check: "l" vs "I"? "rn" vs "m"? "d" vs "cl"? "O" vs "0"?
+- Pokemon suffixes like "ex", "EX", "GX", "V", "VMAX", "VSTAR" are PART of the name
+- On full art/SAR cards: name may be tiny at the top edge — zoom in mentally
+- If text is obscured, identify from artwork + attacks/abilities/Pokemon species
+- Common errors: "Charzard"→"Charizard", "Gardivoir"→"Gardevoir", keep suffixes like "Pikachu ex"
 
-STEP 2 - READ THE CARD NAME (MOST IMPORTANT):
-- The name is printed at the TOP of the card
-- On full art/SAR cards, the name may be in a small text box overlaid on the art — look carefully at the very top edge
-- For Pokemon special cards: look for suffixes like "ex", "EX", "GX", "V", "VMAX", "VSTAR" — these are PART of the name
-- For Japanese cards: read the Japanese name exactly as printed including katakana suffixes
-- If the name is hard to read, use other clues (attacks, abilities, Pokemon species appearance) to identify the character
-
-STEP 3 - READ THE COLLECTOR NUMBER (CRITICAL FOR VERIFICATION):
-- Located at the BOTTOM of the card, usually bottom-left or bottom-right
-- Format examples: "025/165", "198/165" (secret rare), "TG05/TG30", "GG01/GG70", "SV024/SV122", "OP01-001"
-- For full art/secret rares, the number is often HIGHER than the total (e.g., 200/165 means card 200 in a 165-card set)
-- Read the EXACT number — do NOT round, truncate, or modify it
-- Include ALL prefixes (TG, GG, SV, K, etc.)
-- If there's a slash, include both parts: "198/165" not just "198"
-- Japanese Pokemon cards: number format is typically "123/456" at the bottom
+STEP 3 - READ THE COLLECTOR NUMBER (digit-by-digit):
+- Located at BOTTOM of card (bottom-left or bottom-right)
+- Read each digit: "8" vs "6"? "1" vs "7"? "5" vs "S"? "0" vs "O"?
+- Formats: "025/165", "198/165" (secret rare), "TG05/TG30", "GG01/GG70", "OP01-001"
+- Return the number BEFORE the slash (for "025/165" return "025")
+- Keep ALL leading zeros and prefixes (TG, GG, SV, K)
+- Secret rares: number CAN exceed total (200/165 is valid)
 
 STEP 4 - IDENTIFY THE SET:
-- Look for set codes printed on the card (usually near the collector number)
-- Pokemon English set codes: sv01 through sv08, sv03.5, sv04.5, sv06.5, swsh1-swsh12, sm1-sm12, xy1-xy12, base1, etc.
-- Pokemon Japanese set codes: SV1a, SV2a, SV3, SV4a, SV4K, SV5a, SV5K, SV6, SV7, SV8, etc.
-- Yu-Gi-Oh! set codes: LOB, MRD, PSV, DUEA, BODE, etc. (printed in card code like "LOB-EN001")
-- MTG: Set symbol on the type line, set code is 3-4 letters (FDN, DSK, BLB, MH3, etc.)
+- Set code is printed near the collector number
+- Pokemon English: sv01-sv08, sv03.5, sv04.5, sv06.5, swsh1-swsh12, sm1-sm12, xy1-xy12, base1
+- Pokemon Japanese: SV1a, SV2a, SV3, SV4a, SV4K, SV5a, SV5K, SV6, SV7, SV7a, SV8
+- Yu-Gi-Oh!: LOB, MRD, PSV, DUEA, BODE (in card code like "LOB-EN001")
+- MTG: 3-4 letter set code (FDN, DSK, BLB, MH3)
 
-STEP 5 - DETERMINE RARITY:
-- Pokemon: Common, Uncommon, Rare, Holo Rare, Ultra Rare, Full Art, Alt Art, SAR (Special Art Rare), IR (Illustration Rare), AR (Art Rare), Secret Rare, Hyper Rare, Trainer Gallery
-- For Pokemon, rarity symbols at bottom: circle=Common, diamond=Uncommon, star=Rare, star-H=Holo
+STEP 5 - RARITY:
+- Pokemon: circle=Common, diamond=Uncommon, star=Rare, star-H=Holo, Ultra Rare, Full Art, SAR, IR, AR, Secret, Hyper
 - Yu-Gi-Oh!: Common, Rare, Super Rare, Ultra Rare, Secret Rare, Ghost Rare, Starlight Rare
-- MTG: Black=Common, Silver=Uncommon, Gold=Rare, Orange/Mythic=Mythic Rare
+- MTG: Black=Common, Silver=Uncommon, Gold=Rare, Orange=Mythic Rare
 
-STEP 6 - LANGUAGE:
-- Japanese text (katakana/hiragana/kanji) → "ja"
-- Otherwise → "en"
+STEP 6 - LANGUAGE: Japanese text → "ja", otherwise → "en"
 
 Return ONLY valid JSON (no markdown, no backticks):
 {
   "game": "pokemon" | "yugioh" | "mtg",
-  "name": "exact card name as printed",
+  "name": "exact card name spelled correctly",
   "setName": "full set/expansion name",
   "setId": "set code",
-  "cardNumber": "exact collector number as printed (e.g. 198/165, TG05)",
+  "cardNumber": "collector number BEFORE the slash (e.g. 025, TG05, 198)",
   "rarity": "rarity level",
   "estimatedValue": estimated USD value as number,
   "language": "en" or "ja"
 }
 
-IMPORTANT: If the image does NOT clearly show a trading card (e.g., it shows a table, fingers, blank surface, blurry/unreadable content, or anything that is not a recognizable TCG card), immediately return: {"noCard": true}
+IMPORTANT: If the image does NOT show a recognizable trading card (table, fingers, blank surface, blurry), return: {"noCard": true}
 
-If you can see a card but truly cannot identify it, return: {"error": "Could not identify card"}`,
+If you can see a card but cannot identify it, return: {"error": "Could not identify card"}`,
           },
           {
             role: "user",
@@ -1213,11 +1208,11 @@ If you can see a card but truly cannot identify it, return: {"error": "Could not
                 type: "image_url",
                 image_url: { url: `data:image/jpeg;base64,${image}`, detail: "high" },
               },
-              { type: "text", text: "Identify this trading card. Read the name at top and collector number at bottom. May be full art/SAR/holographic — check edges for small text." },
+              { type: "text", text: "Identify this trading card. Read the name character-by-character at the top. Read the collector number digit-by-digit at the bottom. Double-check each character for look-alike confusion (8/6, 1/7, l/I, rn/m). If full art or holographic, check edges for small text." },
             ],
           },
         ],
-        max_completion_tokens: 400,
+        max_completion_tokens: 500,
       });
 
       const content = response.choices[0]?.message?.content || "{}";
@@ -1327,14 +1322,21 @@ If you can see a card but truly cannot identify it, return: {"error": "Could not
             messages: [
               {
                 role: "system",
-                content: `Expert TCG identifier retry. Previous read: name="${result.name}", game="${result.game}", setId="${result.setId}", cardNumber="${result.cardNumber}" — NOT found in database. Possibly misread name/number/set. Re-read carefully: 1) Card name at top (include ex/EX/GX/V/VMAX/VSTAR suffix) 2) Collector number at bottom (exact digits) 3) Set code near collector number. Check confused chars (8/6, 1/7, 5/S). Return ONLY JSON: {"game":"pokemon"|"yugioh"|"mtg","name":"corrected name","setName":"set name","setId":"corrected set code","cardNumber":"corrected number","rarity":"rarity","estimatedValue":number,"language":"en"|"ja"}`,
+                content: `Expert TCG identifier retry. Previous attempt read: name="${result.name}", game="${result.game}", setId="${result.setId}", cardNumber="${result.cardNumber}" — NOT found in any database. The name or number was likely misread.
+
+RE-READ INSTRUCTIONS:
+1) Card NAME at top — spell each letter. Is it really "${result.name}"? Check for: l/I confusion, rn/m, missing/extra letters, wrong suffix (ex/EX/GX/V/VMAX/VSTAR)
+2) Collector NUMBER at bottom — read each digit individually. Is it really "${result.cardNumber}"? Check: 8 vs 6, 1 vs 7, 5 vs S, 0 vs O. Return number BEFORE the slash only.
+3) Set code near collector number — is it really "${result.setId}"?
+
+Return ONLY JSON: {"game":"pokemon"|"yugioh"|"mtg","name":"corrected name","setName":"set name","setId":"corrected set code","cardNumber":"corrected number BEFORE slash","rarity":"rarity","estimatedValue":number,"language":"en"|"ja"}`,
               },
               {
                 role: "user",
                 content: [
                   {
                     type: "image_url",
-                    image_url: { url: `data:image/jpeg;base64,${image}`, detail: "auto" },
+                    image_url: { url: `data:image/jpeg;base64,${image}`, detail: "high" },
                   },
                   { type: "text", text: `Re-examine this card. First read: name="${result.name}" num="${result.cardNumber}" set="${result.setId}" — could not verify. Look again at the name, number, and set code.` },
                 ],
