@@ -12,6 +12,7 @@ export interface IStorage {
   deleteUser(id: string): Promise<void>;
   getCollection(userId: string): Promise<Record<string, any>>;
   saveCollection(userId: string, data: Record<string, any>): Promise<void>;
+  getCollectionBackup(userId: string): Promise<Record<string, any>>;
   upgradeToPremium(userId: string): Promise<void>;
   setVerificationCode(userId: string, code: string, expiry: Date): Promise<void>;
   verifyUser(userId: string): Promise<void>;

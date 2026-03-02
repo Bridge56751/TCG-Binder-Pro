@@ -382,11 +382,11 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
 
   const syncCollection = useCallback(async () => {
     const currentData = await getCollection();
-    await apiRequest("POST", "/api/collection/sync", { collection: currentData });
-    setLastSyncTime(Date.now());
-    setSyncStatus("success");
-    setTimeout(() => setSyncStatus((prev) => prev === "success" ? "idle" : prev), 3000);
-  }, []);
+    const success = await performSync(currentData);
+    if (!success) {
+      throw new Error("Sync failed");
+    }
+  }, [performSync]);
 
   const exportCollection = useCallback(async () => {
     const data = await getCollection();
