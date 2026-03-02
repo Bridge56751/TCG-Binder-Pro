@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from "react";
+import { AppState, Platform } from "react-native";
 import type { CollectionData, GameId } from "./types";
 import { GAMES } from "./types";
 import {
@@ -175,6 +176,29 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     syncTimeoutRef.current = setTimeout(() => {
       processSync(data);
     }, 1500);
+  }, [user, processSync]);
+
+  const collectionRef = useRef<CollectionData>({});
+  collectionRef.current = collection;
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    const sub = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "background" || nextState === "inactive") {
+        if (syncTimeoutRef.current) {
+          clearTimeout(syncTimeoutRef.current);
+          syncTimeoutRef.current = null;
+        }
+        const currentData = collectionRef.current;
+        if (Object.keys(currentData).length > 0) {
+          saveCollection(currentData);
+        }
+        if (user && Object.keys(currentData).length > 0) {
+          processSync(currentData);
+        }
+      }
+    });
+    return () => sub.remove();
   }, [user, processSync]);
 
   const loadCollection = useCallback(async () => {
