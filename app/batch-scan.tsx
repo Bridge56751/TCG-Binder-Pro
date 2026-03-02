@@ -63,7 +63,7 @@ function gameLabel(game: GameId): string {
 export default function BatchScanScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const { addCard } = useCollection();
+  const { addCard, syncCollection } = useCollection();
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const [scannedCards, setScannedCards] = useState<ScannedCard[]>([]);
@@ -257,8 +257,9 @@ export default function BatchScanScreen() {
     }
     if (added > 0) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      try { await syncCollection(); } catch {}
     }
-  }, [scannedCards, handleAddCard]);
+  }, [scannedCards, handleAddCard, syncCollection]);
 
   const removeScannedCard = useCallback((id: string) => {
     setScannedCards(prev => prev.filter(c => c.id !== id));

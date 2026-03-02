@@ -189,12 +189,12 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
           clearTimeout(syncTimeoutRef.current);
           syncTimeoutRef.current = null;
         }
-        const currentData = collectionRef.current;
-        if (Object.keys(currentData).length > 0) {
-          saveCollection(currentData);
-        }
-        if (user && Object.keys(currentData).length > 0) {
-          processSync(currentData);
+        if (user) {
+          getCollection().then((latestData) => {
+            if (Object.keys(latestData).length > 0) {
+              processSync(latestData);
+            }
+          }).catch(() => {});
         }
       }
     });
