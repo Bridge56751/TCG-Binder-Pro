@@ -902,11 +902,63 @@ export async function registerRoutes(app: Express): Promise<Express> {
         }
       }
 
+      const existingCollection = await storage.getCollection(req.session.userId);
+      const existingCount = countCollectionCards(existingCollection);
+      const incomingCount = countCollectionCards(collection);
+
+      if (existingCount > 10 && incomingCount < existingCount * 0.5) {
+        console.warn(`[Sync] Data loss prevention: user ${req.session.userId} tried to sync ${incomingCount} cards (had ${existingCount}). Blocked.`);
+        return res.status(409).json({
+          error: "sync_conflict",
+          message: `Sync blocked: incoming collection has ${incomingCount} cards but server has ${existingCount}. This looks like data loss. Use force=true to override.`,
+          serverCount: existingCount,
+          incomingCount,
+        });
+      }
+
       await storage.saveCollection(req.session.userId, collection);
-      res.json({ ok: true });
+      res.json({ ok: true, cardCount: incomingCount });
     } catch (error) {
       console.error("Collection save error:", error);
       res.status(500).json({ error: "Failed to save collection" });
+    }
+  });
+
+  app.post("/api/collection/sync/force", async (req, res) => {
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: "Not logged in" });
+    }
+    try {
+      const { collection } = req.body;
+      if (!collection || typeof collection !== "object") {
+        return res.status(400).json({ error: "Collection data is required" });
+      }
+      const incomingCount = countCollectionCards(collection);
+      console.log(`[Sync] Force sync: user ${req.session.userId} overwriting with ${incomingCount} cards`);
+      await storage.saveCollection(req.session.userId, collection);
+      res.json({ ok: true, cardCount: incomingCount });
+    } catch (error) {
+      console.error("Force sync error:", error);
+      res.status(500).json({ error: "Failed to save collection" });
+    }
+  });
+
+  app.post("/api/collection/restore-backup", async (req, res) => {
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: "Not logged in" });
+    }
+    try {
+      const backup = await storage.getCollectionBackup(req.session.userId);
+      if (!backup || Object.keys(backup).length === 0) {
+        return res.status(404).json({ error: "No backup available" });
+      }
+      const backupCount = countCollectionCards(backup);
+      await storage.saveCollection(req.session.userId, backup);
+      console.log(`[Sync] Restored backup for user ${req.session.userId}: ${backupCount} cards`);
+      res.json({ ok: true, collection: backup, cardCount: backupCount });
+    } catch (error) {
+      console.error("Restore backup error:", error);
+      res.status(500).json({ error: "Failed to restore backup" });
     }
   });
 

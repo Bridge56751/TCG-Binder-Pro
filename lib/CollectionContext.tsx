@@ -130,7 +130,26 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
   const performSync = useCallback(async (data: CollectionData): Promise<boolean> => {
     try {
       setSyncStatus("syncing");
-      await apiRequest("POST", "/api/collection/sync", { collection: data });
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/collection/sync", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ collection: data }),
+      });
+      if (res.status === 409) {
+        const forceUrl = new URL("/api/collection/sync/force", baseUrl);
+        const forceRes = await globalThis.fetch(forceUrl.toString(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ collection: data }),
+        });
+        if (!forceRes.ok) return false;
+      } else if (!res.ok) {
+        return false;
+      }
       setSyncStatus("success");
       setLastSyncTime(Date.now());
       syncRetryRef.current = 0;

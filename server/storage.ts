@@ -71,11 +71,16 @@ export const storage: IStorage = {
     const [existing] = await db.select().from(userCollections).where(eq(userCollections.userId, userId));
     if (existing) {
       await db.update(userCollections)
-        .set({ data, updatedAt: new Date() } as any)
+        .set({ data, previousData: existing.data, updatedAt: new Date() } as any)
         .where(eq(userCollections.userId, userId));
     } else {
       await db.insert(userCollections).values({ userId, data } as any);
     }
+  },
+
+  async getCollectionBackup(userId: string) {
+    const [row] = await db.select().from(userCollections).where(eq(userCollections.userId, userId));
+    return (row?.previousData as Record<string, any>) || {};
   },
 
   async upgradeToPremium(userId: string) {

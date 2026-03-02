@@ -22,6 +22,7 @@ export const userCollections = pgTable("user_collections", {
     .primaryKey()
     .references(() => users.id, { onDelete: "cascade" }),
   data: jsonb("data").notNull().default({}),
+  previousData: jsonb("previous_data"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
