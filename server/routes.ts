@@ -906,11 +906,11 @@ export async function registerRoutes(app: Express): Promise<Express> {
       const existingCount = countCollectionCards(existingCollection);
       const incomingCount = countCollectionCards(collection);
 
-      if (existingCount > 10 && incomingCount < existingCount * 0.5) {
-        console.warn(`[Sync] Data loss prevention: user ${req.session.userId} tried to sync ${incomingCount} cards (had ${existingCount}). Blocked.`);
+      if (existingCount > 10 && incomingCount === 0) {
+        console.warn(`[Sync] Data loss prevention: user ${req.session.userId} tried to sync 0 cards (had ${existingCount}). Blocked.`);
         return res.status(409).json({
           error: "sync_conflict",
-          message: `Sync blocked: incoming collection has ${incomingCount} cards but server has ${existingCount}. This looks like data loss. Use force=true to override.`,
+          message: `Sync blocked: incoming collection is empty but server has ${existingCount} cards.`,
           serverCount: existingCount,
           incomingCount,
         });
