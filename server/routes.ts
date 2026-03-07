@@ -12,6 +12,34 @@ const openai = new OpenAI({
 
 const FREE_CARD_LIMIT = 20;
 
+const RC_PROJECT_ID = "projdb483568";
+
+async function checkRevenueCatEntitlement(subscriberId: string, rcSecretKey: string): Promise<boolean> {
+  try {
+    const rcRes = await fetchWithTimeout(
+      `https://api.revenuecat.com/v2/projects/${RC_PROJECT_ID}/subscribers/${encodeURIComponent(subscriberId)}`,
+      10000,
+      { headers: { "Authorization": `Bearer ${rcSecretKey}`, "Content-Type": "application/json" } }
+    );
+    if (!rcRes.ok) {
+      const errText = await rcRes.text().catch(() => "");
+      console.log(`[RC] Lookup for ${subscriberId} returned ${rcRes.status}: ${errText.substring(0, 200)}`);
+      return false;
+    }
+    const rcData = await rcRes.json() as any;
+    const entitlements = rcData?.subscriber?.entitlements || {};
+    const tcgEntitlement = entitlements["TCG Binder Unlimited"] || entitlements["tcg_binder_unlimited"];
+    if (tcgEntitlement && new Date(tcgEntitlement.expires_date) > new Date()) {
+      return true;
+    }
+    console.log(`[RC] Subscriber ${subscriberId} found but no active "TCG Binder Unlimited" entitlement. Keys: ${Object.keys(entitlements).join(", ") || "none"}`);
+    return false;
+  } catch (err) {
+    console.error(`[RC] Error checking subscriber ${subscriberId}:`, err);
+    return false;
+  }
+}
+
 function countCollectionCards(collection: any): number {
   if (!collection || typeof collection !== "object") return 0;
   let total = 0;
@@ -839,23 +867,8 @@ export async function registerRoutes(app: Express): Promise<Express> {
         return res.status(500).json({ error: "Payment verification not configured" });
       }
 
-      const rcRes = await fetchWithTimeout(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(rcUserId)}`, 15000, {
-        headers: {
-          "Authorization": `Bearer ${rcSecretKey}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!rcRes.ok) {
-        console.error("RevenueCat API error:", rcRes.status, await rcRes.text());
-        return res.status(403).json({ error: "Could not verify purchase" });
-      }
-
-      const rcData = await rcRes.json();
-      const entitlements = rcData?.subscriber?.entitlements || {};
-      const premiumEntitlement = entitlements["TCG Binder Unlimited"];
-
-      if (!premiumEntitlement || new Date(premiumEntitlement.expires_date) < new Date()) {
+      const hasPremium = await checkRevenueCatEntitlement(rcUserId, rcSecretKey);
+      if (!hasPremium) {
         return res.status(403).json({ error: "No active premium subscription found" });
       }
 
@@ -908,31 +921,13 @@ export async function registerRoutes(app: Express): Promise<Express> {
               idsToTry.push(user.rcSubscriberId);
             }
             for (const subscriberId of idsToTry) {
-              try {
-                console.log(`[Sync] Checking RevenueCat for subscriber ID: ${subscriberId} (user ${req.session.userId})`);
-                const rcRes = await fetchWithTimeout(
-                  `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(subscriberId)}`,
-                  10000,
-                  { headers: { "Authorization": `Bearer ${rcSecret}`, "Content-Type": "application/json" } }
-                );
-                if (rcRes.ok) {
-                  const rcData = await rcRes.json() as any;
-                  const entitlements = rcData?.subscriber?.entitlements || {};
-                  const tcgEntitlement = entitlements["TCG Binder Unlimited"];
-                  if (tcgEntitlement && new Date(tcgEntitlement.expires_date) > new Date()) {
-                    verifiedPremium = true;
-                    await storage.upgradeToPremium(req.session.userId, subscriberId);
-                    console.log(`[Sync] Auto-upgraded user ${req.session.userId} to premium via RevenueCat (subscriber: ${subscriberId})`);
-                    break;
-                  } else {
-                    console.log(`[Sync] RevenueCat subscriber ${subscriberId} found but no active "TCG Binder Unlimited" entitlement`);
-                  }
-                } else {
-                  const errText = await rcRes.text().catch(() => "");
-                  console.log(`[Sync] RevenueCat lookup for ${subscriberId} returned ${rcRes.status}: ${errText.substring(0, 200)}`);
-                }
-              } catch (rcErr) {
-                console.error(`[Sync] RevenueCat verification failed for ${subscriberId}:`, rcErr);
+              console.log(`[Sync] Checking RevenueCat for subscriber ID: ${subscriberId} (user ${req.session.userId})`);
+              const hasEntitlement = await checkRevenueCatEntitlement(subscriberId, rcSecret);
+              if (hasEntitlement) {
+                verifiedPremium = true;
+                await storage.upgradeToPremium(req.session.userId, subscriberId);
+                console.log(`[Sync] Auto-upgraded user ${req.session.userId} to premium via RevenueCat (subscriber: ${subscriberId})`);
+                break;
               }
             }
           }
