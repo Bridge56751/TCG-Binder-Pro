@@ -45,7 +45,9 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
         if (user) {
           try {
             await Purchases.logIn(user.id);
-          } catch {}
+          } catch (loginErr) {
+            console.warn("[RevenueCat] logIn failed for user", user.id, loginErr);
+          }
         }
 
         const customerInfo = await Purchases.getCustomerInfo();
