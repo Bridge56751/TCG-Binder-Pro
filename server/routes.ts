@@ -17,7 +17,7 @@ const RC_PROJECT_ID = "projdb483568";
 async function checkRevenueCatEntitlement(subscriberId: string, rcSecretKey: string): Promise<boolean> {
   try {
     const rcRes = await fetchWithTimeout(
-      `https://api.revenuecat.com/v2/projects/${RC_PROJECT_ID}/subscribers/${encodeURIComponent(subscriberId)}`,
+      `https://api.revenuecat.com/v2/projects/${RC_PROJECT_ID}/customers/${encodeURIComponent(subscriberId)}`,
       10000,
       { headers: { "Authorization": `Bearer ${rcSecretKey}`, "Content-Type": "application/json" } }
     );
@@ -27,12 +27,17 @@ async function checkRevenueCatEntitlement(subscriberId: string, rcSecretKey: str
       return false;
     }
     const rcData = await rcRes.json() as any;
-    const entitlements = rcData?.subscriber?.entitlements || {};
-    const tcgEntitlement = entitlements["TCG Binder Unlimited"] || entitlements["tcg_binder_unlimited"];
-    if (tcgEntitlement && new Date(tcgEntitlement.expires_date) > new Date()) {
-      return true;
+    const activeEntitlements = rcData?.active_entitlements?.items || [];
+    for (const ent of activeEntitlements) {
+      const expiry = typeof ent.expires_at === "number" ? ent.expires_at
+        : typeof ent.expires_at === "string" ? new Date(ent.expires_at).getTime()
+        : null;
+      if (!expiry || expiry > Date.now()) {
+        console.log(`[RC] Subscriber ${subscriberId} has active entitlement ${ent.entitlement_id} (expires: ${expiry ? new Date(expiry).toISOString() : 'never'})`);
+        return true;
+      }
     }
-    console.log(`[RC] Subscriber ${subscriberId} found but no active "TCG Binder Unlimited" entitlement. Keys: ${Object.keys(entitlements).join(", ") || "none"}`);
+    console.log(`[RC] Subscriber ${subscriberId} found but no active entitlements. Count: ${activeEntitlements.length}`);
     return false;
   } catch (err) {
     console.error(`[RC] Error checking subscriber ${subscriberId}:`, err);

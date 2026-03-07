@@ -96,9 +96,13 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
     try {
       const customerInfo = await Purchases.getCustomerInfo();
       const rcUserId = customerInfo.originalAppUserId || "";
+      console.log("[RevenueCat] Syncing premium to backend with RC user ID:", rcUserId);
       await apiRequest("POST", "/api/auth/upgrade-premium", { rcUserId });
       setPremiumStatus(true);
-    } catch {}
+      console.log("[RevenueCat] Premium synced to backend successfully");
+    } catch (err) {
+      console.error("[RevenueCat] Failed to sync premium to backend:", err);
+    }
   }, [user, setPremiumStatus]);
 
   useEffect(() => {
