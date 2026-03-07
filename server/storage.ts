@@ -13,7 +13,7 @@ export interface IStorage {
   getCollection(userId: string): Promise<Record<string, any>>;
   saveCollection(userId: string, data: Record<string, any>): Promise<void>;
   getCollectionBackup(userId: string): Promise<Record<string, any>>;
-  upgradeToPremium(userId: string): Promise<void>;
+  upgradeToPremium(userId: string, rcSubscriberId?: string): Promise<void>;
   setVerificationCode(userId: string, code: string, expiry: Date): Promise<void>;
   verifyUser(userId: string): Promise<void>;
   setResetCode(userId: string, code: string, expiry: Date): Promise<void>;
@@ -84,9 +84,11 @@ export const storage: IStorage = {
     return (row?.previousData as Record<string, any>) || {};
   },
 
-  async upgradeToPremium(userId: string) {
+  async upgradeToPremium(userId: string, rcSubscriberId?: string) {
+    const updates: any = { isPremium: true };
+    if (rcSubscriberId) updates.rcSubscriberId = rcSubscriberId;
     await db.update(users)
-      .set({ isPremium: true } as any)
+      .set(updates)
       .where(eq(users.id, userId));
   },
 

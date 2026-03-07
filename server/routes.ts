@@ -859,7 +859,7 @@ export async function registerRoutes(app: Express): Promise<Express> {
         return res.status(403).json({ error: "No active premium subscription found" });
       }
 
-      await storage.upgradeToPremium(req.session.userId);
+      await storage.upgradeToPremium(req.session.userId, rcUserId);
       res.json({ ok: true, isPremium: true });
     } catch (err) {
       console.error("Upgrade error:", err);
@@ -900,28 +900,44 @@ export async function registerRoutes(app: Express): Promise<Express> {
         if (cardCount > FREE_CARD_LIMIT) {
           let verifiedPremium = false;
           const rcSecret = process.env.REVENUECAT_SECRET_API_KEY;
-          if (rcSecret) {
-            try {
-              const rcRes = await fetchWithTimeout(
-                `https://api.revenuecat.com/v1/subscribers/${req.session.userId}`,
-                10000,
-                { headers: { "Authorization": `Bearer ${rcSecret}`, "Content-Type": "application/json" } }
-              );
-              if (rcRes.ok) {
-                const rcData = await rcRes.json() as any;
-                const entitlements = rcData?.subscriber?.entitlements || {};
-                const tcgEntitlement = entitlements["TCG Binder Unlimited"];
-                if (tcgEntitlement && new Date(tcgEntitlement.expires_date) > new Date()) {
-                  verifiedPremium = true;
-                  await storage.upgradeToPremium(req.session.userId);
-                  console.log(`[Sync] Auto-upgraded user ${req.session.userId} to premium via RevenueCat verification`);
+          if (!rcSecret) {
+            console.warn(`[Sync] REVENUECAT_SECRET_API_KEY not set, cannot verify premium for user ${req.session.userId}`);
+          } else {
+            const idsToTry = [req.session.userId];
+            if (user.rcSubscriberId && user.rcSubscriberId !== req.session.userId) {
+              idsToTry.push(user.rcSubscriberId);
+            }
+            for (const subscriberId of idsToTry) {
+              try {
+                console.log(`[Sync] Checking RevenueCat for subscriber ID: ${subscriberId} (user ${req.session.userId})`);
+                const rcRes = await fetchWithTimeout(
+                  `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(subscriberId)}`,
+                  10000,
+                  { headers: { "Authorization": `Bearer ${rcSecret}`, "Content-Type": "application/json" } }
+                );
+                if (rcRes.ok) {
+                  const rcData = await rcRes.json() as any;
+                  const entitlements = rcData?.subscriber?.entitlements || {};
+                  const tcgEntitlement = entitlements["TCG Binder Unlimited"];
+                  if (tcgEntitlement && new Date(tcgEntitlement.expires_date) > new Date()) {
+                    verifiedPremium = true;
+                    await storage.upgradeToPremium(req.session.userId, subscriberId);
+                    console.log(`[Sync] Auto-upgraded user ${req.session.userId} to premium via RevenueCat (subscriber: ${subscriberId})`);
+                    break;
+                  } else {
+                    console.log(`[Sync] RevenueCat subscriber ${subscriberId} found but no active "TCG Binder Unlimited" entitlement`);
+                  }
+                } else {
+                  const errText = await rcRes.text().catch(() => "");
+                  console.log(`[Sync] RevenueCat lookup for ${subscriberId} returned ${rcRes.status}: ${errText.substring(0, 200)}`);
                 }
+              } catch (rcErr) {
+                console.error(`[Sync] RevenueCat verification failed for ${subscriberId}:`, rcErr);
               }
-            } catch (rcErr) {
-              console.error("[Sync] RevenueCat verification failed (non-blocking):", rcErr);
             }
           }
           if (!verifiedPremium) {
+            console.warn(`[Sync] Rejecting sync for user ${req.session.userId}: ${cardCount} cards exceeds free limit of ${FREE_CARD_LIMIT}, premium verification failed`);
             return res.status(403).json({ error: `Free accounts are limited to ${FREE_CARD_LIMIT} cards. Upgrade to Premium for unlimited cards.` });
           }
         }
