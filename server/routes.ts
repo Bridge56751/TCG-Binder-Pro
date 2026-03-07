@@ -19,7 +19,7 @@ function countCollectionCards(collection: any): number {
     if (game && typeof game === "object") {
       for (const cards of Object.values(game as Record<string, any>)) {
         if (Array.isArray(cards)) {
-          total += cards.length;
+          total += new Set(cards.map((c: string) => (c || "").toLowerCase())).size;
         }
       }
     }
@@ -898,7 +898,32 @@ export async function registerRoutes(app: Express): Promise<Express> {
       if (user && !user.isPremium) {
         const cardCount = countCollectionCards(collection);
         if (cardCount > FREE_CARD_LIMIT) {
-          return res.status(403).json({ error: `Free accounts are limited to ${FREE_CARD_LIMIT} cards. Upgrade to Premium for unlimited cards.` });
+          let verifiedPremium = false;
+          const rcSecret = process.env.REVENUECAT_SECRET_API_KEY;
+          if (rcSecret) {
+            try {
+              const rcRes = await fetchWithTimeout(
+                `https://api.revenuecat.com/v1/subscribers/${req.session.userId}`,
+                10000,
+                { headers: { "Authorization": `Bearer ${rcSecret}`, "Content-Type": "application/json" } }
+              );
+              if (rcRes.ok) {
+                const rcData = await rcRes.json() as any;
+                const entitlements = rcData?.subscriber?.entitlements || {};
+                const tcgEntitlement = entitlements["TCG Binder Unlimited"];
+                if (tcgEntitlement && new Date(tcgEntitlement.expires_date) > new Date()) {
+                  verifiedPremium = true;
+                  await storage.upgradeToPremium(req.session.userId);
+                  console.log(`[Sync] Auto-upgraded user ${req.session.userId} to premium via RevenueCat verification`);
+                }
+              }
+            } catch (rcErr) {
+              console.error("[Sync] RevenueCat verification failed (non-blocking):", rcErr);
+            }
+          }
+          if (!verifiedPremium) {
+            return res.status(403).json({ error: `Free accounts are limited to ${FREE_CARD_LIMIT} cards. Upgrade to Premium for unlimited cards.` });
+          }
         }
       }
 

@@ -101,6 +101,7 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
   const syncRetryRef = useRef(0);
   const pendingSyncRef = useRef<CollectionData | null>(null);
   const isSyncingRef = useRef(false);
+  const syncBlockedRef = useRef(false);
   const [progressToast, setProgressToast] = useState<ProgressToastData | null>(null);
   const progressToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const allGameIds = useMemo(() => GAMES.map(g => g.id), []);
@@ -127,7 +128,11 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const performSync = useCallback(async (data: CollectionData): Promise<boolean> => {
+  useEffect(() => {
+    if (isPremium) syncBlockedRef.current = false;
+  }, [isPremium]);
+
+  const performSync = useCallback(async (data: CollectionData): Promise<{ success: boolean; permanent?: boolean }> => {
     try {
       setSyncStatus("syncing");
       const baseUrl = getApiUrl();
@@ -138,6 +143,11 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
         credentials: "include",
         body: JSON.stringify({ collection: data }),
       });
+      if (res.status === 403) {
+        syncBlockedRef.current = true;
+        setSyncStatus("error");
+        return { success: false, permanent: true };
+      }
       if (res.status === 409) {
         const forceUrl = new URL("/api/collection/sync/force", baseUrl);
         const forceRes = await globalThis.fetch(forceUrl.toString(), {
@@ -146,17 +156,18 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
           credentials: "include",
           body: JSON.stringify({ collection: data }),
         });
-        if (!forceRes.ok) return false;
+        if (!forceRes.ok) return { success: false };
       } else if (!res.ok) {
-        return false;
+        return { success: false };
       }
+      syncBlockedRef.current = false;
       setSyncStatus("success");
       setLastSyncTime(Date.now());
       syncRetryRef.current = 0;
       setTimeout(() => setSyncStatus((prev) => prev === "success" ? "idle" : prev), 3000);
-      return true;
+      return { success: true };
     } catch {
-      return false;
+      return { success: false };
     }
   }, []);
 
@@ -167,30 +178,33 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     }
     isSyncingRef.current = true;
 
-    let success = await performSync(data);
+    let result = await performSync(data);
 
-    if (!success) {
+    if (!result.success && !result.permanent) {
       for (let attempt = 1; attempt <= MAX_SYNC_RETRIES; attempt++) {
         await new Promise((r) => setTimeout(r, SYNC_RETRY_DELAY * attempt));
-        success = await performSync(pendingSyncRef.current || data);
-        if (success) break;
+        result = await performSync(pendingSyncRef.current || data);
+        if (result.success || result.permanent) break;
       }
-      if (!success) {
+      if (!result.success && !result.permanent) {
         setSyncStatus("error");
       }
     }
 
     isSyncingRef.current = false;
 
-    if (pendingSyncRef.current) {
+    if (pendingSyncRef.current && !result.permanent) {
       const pending = pendingSyncRef.current;
       pendingSyncRef.current = null;
       processSync(pending);
+    } else {
+      pendingSyncRef.current = null;
     }
   }, [performSync]);
 
   const debouncedSync = useCallback((data: CollectionData) => {
     if (!user) return;
+    if (syncBlockedRef.current) return;
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
     syncTimeoutRef.current = setTimeout(() => {
       processSync(data);
@@ -382,8 +396,9 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
 
   const syncCollection = useCallback(async () => {
     const currentData = await getCollection();
-    const success = await performSync(currentData);
-    if (!success) {
+    syncBlockedRef.current = false;
+    const result = await performSync(currentData);
+    if (!result.success) {
       throw new Error("Sync failed");
     }
   }, [performSync]);
